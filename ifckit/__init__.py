@@ -47,6 +47,9 @@ from ifckit.elements import (  # noqa: F401
     BridgePartType,
 )
 
+# Validator
+from ifckit.validator import validate, ValidationResult  # noqa: F401
+
 __version__ = "0.1.0"
 __all__ = [
     # geometry
@@ -73,5 +76,8 @@ __all__ = [
     "PendingAlignment",
     "AlignmentSegment",
     "BridgePartType",
+    # validator
+    "validate",
+    "ValidationResult",
 ]
 
