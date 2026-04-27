@@ -166,11 +166,11 @@ class IfcModel:
     def add_site(
         self,
         name: str,
-description: Optional[str] = None,
-            latitude: Optional[tuple[float, float, float]] = None,
-            longitude: Optional[tuple[float, float, float]] = None,
-            elevation: Optional[float] = None,
-            location: Optional[tuple[float, float, float]] = None,
+        description: Optional[str] = None,
+        latitude: Optional[tuple[float, float, float]] = None,
+        longitude: Optional[tuple[float, float, float]] = None,
+        elevation: Optional[float] = None,
+        location: Optional[tuple[float, float, float]] = None,
     ) -> SiteHandle:
         """
         Create an IfcSite and aggregate it under the project.
@@ -179,11 +179,25 @@ description: Optional[str] = None,
             name:        Site name.
             description: Optional description.
             latitude:    Optional (degrees, minutes, seconds) tuple for geolocation.
+                         Defaults to Hofplein, Rotterdam (51.9225° N) if not provided.
             longitude:   Optional (degrees, minutes, seconds) tuple for geolocation.
+                         Defaults to Hofplein, Rotterdam (4.4833° E) if not provided.
             elevation:   Site elevation in meters (stored in RefElevation).
             location:    Optional (x, y, z) tuple for the Cartesian point location
-                         (e.g., RD coordinates in meters). Uses IfcSite.ObjectPlacement.
+                         (e.g., RD coordinates in meters). Defaults to Hofplein,
+                         Rotterdam RD coordinates: (103647, 434819, 0) if not provided.
         """
+        # Default to Hofplein, Rotterdam RD coordinates
+        default_location = (103647.0, 434819.0, 0.0)
+        # Default lat/long: 51.9225°N, 4.4833°E (convert to DMS)
+        default_latitude = (51, 55, 21)  # 51.9225°
+        default_longitude = (4, 28, 60)  # 4.4833°
+
+        # Use provided values or defaults
+        actual_location = location if location is not None else default_location
+        actual_latitude = latitude if latitude is not None else default_latitude
+        actual_longitude = longitude if longitude is not None else default_longitude
+
         from ifckit.geometry import Vec, Plane
         from ifckit.builders._geom import local_placement
 
@@ -195,15 +209,16 @@ description: Optional[str] = None,
         )
         if description:
             site.Description = description
-        if latitude:
-            site.RefLatitude = latitude
-        if longitude:
-            site.RefLongitude = longitude
+
+        # Set latitude/longitude (use defaults if not provided)
+        site.RefLatitude = actual_latitude
+        site.RefLongitude = actual_longitude
+
         if elevation is not None:
             site.RefElevation = elevation
-        if location:
+        if actual_location:
             # Set the site origin to the RD coordinate via ObjectPlacement
-            origin = Vec(*location)
+            origin = Vec(*actual_location)
             plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
             site.ObjectPlacement = local_placement(self._file, plane)
         ifcopenshell.api.run(
