@@ -137,7 +137,7 @@ def main(output_path: str = "output/simple_bridge.ifc") -> None:
     bridge = model.add_bridge(site, "Modulo Brug")
     deck = model.add_bridge_part(bridge, "Deck", BridgePartType.DECK.value)
     sub = model.add_bridge_part(bridge, "Substructure", BridgePartType.SUBSTRUCTURE.value)
-    align_handle = model.add_alignment(bridge, "BridgeAlignment")
+    align_handle = model.add_alignment(site, "BridgeAlignment")
 
     reg = default_registry()
     ctx = get_body_context(model.ifc_file)

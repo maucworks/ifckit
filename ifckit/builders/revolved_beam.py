@@ -21,7 +21,7 @@ from ifckit.builders._geom import (
 )
 from ifckit.elements.structural import PendingRevolvedBeam
 from ifckit.elements.base import PendingElement
-from ifckit.geometry import Plane, Vec
+from ifckit.geometry import Plane
 
 
 class RevolvedBeamBuilder:
@@ -54,11 +54,8 @@ class RevolvedBeamBuilder:
         start_tangent = arc.tangent_at_start()
         frame = Plane.from_tangent(arc.start, start_tangent)
 
-        # Profile in local YZ of the start frame
-        pts_2d = []
-        for p in pending.profile:
-            local = frame.to_local(p + arc.start)
-            pts_2d.append((local.y, local.z))
+        # Profile points are already local 2D offsets in the YZ cross-section.
+        pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)
 

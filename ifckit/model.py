@@ -129,8 +129,31 @@ class IfcModel:
             name=name,
         )
 
-        # Assign SI units
-        ifcopenshell.api.run("unit.assign_unit", self._file)
+        # Assign SI units according to the requested length unit.
+        _UNIT_PREFIX: dict = {
+            LengthUnit.METRE: None,
+            LengthUnit.MILLIMETRE: "MILLI",
+        }
+        if unit in _UNIT_PREFIX:
+            prefix = _UNIT_PREFIX[unit]
+            kwargs = {"unit_type": "LENGTHUNIT"}
+            if prefix:
+                kwargs["prefix"] = prefix
+            length_unit = ifcopenshell.api.run("unit.add_si_unit", self._file, **kwargs)
+            ifcopenshell.api.run("unit.assign_unit", self._file, units=[length_unit])
+        else:
+            # Fallback for non-SI units (FOOT, INCH): assign default SI metres
+            # and let the caller handle conversion.
+            ifcopenshell.api.run("unit.assign_unit", self._file)
+
+        # Record author in IfcOwnerHistory if provided.
+        if author:
+            ifcopenshell.api.run(
+                "owner.add_person",
+                self._file,
+                identification=author,
+                family_name=author,
+            )
 
         # Add geometric representation context (needed for geometry)
         self._context = ifcopenshell.api.run(

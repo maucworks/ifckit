@@ -19,11 +19,7 @@ class IfcSchema(enum.Enum):
 
 def get_schema_name(schema: IfcSchema) -> str:
     """Return the ifcopenshell schema string for a given IfcSchema enum value."""
-    if schema == IfcSchema.IFC4:
-        return "IFC4"
-    if schema == IfcSchema.IFC4X3:
-        return "IFC4X3"
-    raise ValueError(f"Unknown schema: {schema}")  # pragma: no cover
+    return schema.value
 
 
 class LengthUnit(enum.Enum):

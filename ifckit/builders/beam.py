@@ -21,7 +21,7 @@ from ifckit.builders._geom import (
 )
 from ifckit.elements.structural import PendingBeam
 from ifckit.elements.base import PendingElement
-from ifckit.geometry import Plane, Vec
+from ifckit.geometry import Plane
 
 
 class BeamBuilder:
@@ -48,11 +48,9 @@ class BeamBuilder:
         length = axis.length
         frame = Plane.from_tangent(axis.start, axis.direction)
 
-        # Project profile to local YZ (use y,z components of to_local)
-        pts_2d = []
-        for p in pending.profile:
-            local = frame.to_local(p + axis.start)
-            pts_2d.append((local.y, local.z))
+        # Profile points are already local 2D offsets in the YZ cross-section.
+        # Treat each Vec as (y, z) coordinates directly — no world-space translation.
+        pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)
 

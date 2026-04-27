@@ -153,7 +153,9 @@ def rhino_plane_to_plane(rg_plane) -> Plane:
     origin = rhino_point_to_vec(rg_plane.Origin)
     x_axis = rhino_vector_to_vec(rg_plane.XAxis)
     z_axis = rhino_vector_to_vec(rg_plane.ZAxis)
-    return Plane(origin=origin, x_axis=x_axis, z_axis=z_axis)
+    # Derive y_axis from z × x so the frame matches the Rhino plane orientation.
+    y_axis = z_axis.cross(x_axis).normalized()
+    return Plane(origin=origin, x_axis=x_axis, y_axis=y_axis)
 
 
 # ---------------------------------------------------------------------------

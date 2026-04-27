@@ -7,6 +7,7 @@ Pending structural elements: PendingBeam, PendingColumn, PendingRevolvedBeam.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Optional
 
 from ifckit.elements.base import ClipData, PendingElement
@@ -118,6 +119,7 @@ class PendingRevolvedBeam(PendingElement):
         profile:    Closed list of Vec points (cross-section in local YZ plane).
         name:       Element name.
         ref_line:   Optional reference line for orientation.
+        clip_data:  Optional clip plane data.
     """
 
     element_type = "revolved_beam"
@@ -128,14 +130,14 @@ class PendingRevolvedBeam(PendingElement):
         profile: List[Vec],
         name: str = "",
         ref_line: Optional[Line] = None,
+        clip_data: Optional[ClipData] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=None)
+        super().__init__(name=name, clip_data=clip_data)
         self.arc = arc
         self.profile = list(profile)
         self.ref_line = ref_line
 
     def to_dict(self) -> Dict[str, Any]:
-        import math
         d = super().to_dict()
         d["arc"] = {
             "center": self.arc.center.to_tuple(),
@@ -148,7 +150,6 @@ class PendingRevolvedBeam(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingRevolvedBeam":
-        import math
         arc_d = cls._require(d, "arc")
         arc = Arc(
             center=Vec(*arc_d["center"]),

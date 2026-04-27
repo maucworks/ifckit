@@ -10,10 +10,34 @@ Pending bridge and infrastructure elements for IFC4x3:
 from __future__ import annotations
 
 import enum
+import math
 from typing import Any, Dict, List, Optional, Union
 
 from ifckit.elements.base import PendingElement
 from ifckit.geometry import Arc, Line, Vec
+
+
+def _element_from_dict(d: Dict[str, Any]) -> PendingElement:
+    """Dispatch a serialised PendingElement dict to the correct subclass."""
+    # Import here to avoid circular imports at module level.
+    from ifckit.elements.building import PendingWall, PendingSlab
+    from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+
+    _registry: Dict[str, type] = {
+        "basic_wall": PendingWall,
+        "basic_slab": PendingSlab,
+        "basic_beam": PendingBeam,
+        "basic_column": PendingColumn,
+        "revolved_beam": PendingRevolvedBeam,
+        "alignment": PendingAlignment,
+        "bridge_part": PendingBridgePart,
+        "bridge": PendingBridge,
+    }
+    etype = d.get("type", "")
+    cls = _registry.get(etype)
+    if cls is None:
+        raise ValueError(f"Unknown element type in dict: {etype!r}")
+    return cls.from_dict(d)
 
 
 # ---------------------------------------------------------------------------
@@ -45,7 +69,6 @@ class AlignmentSegment:
         return self.geometry.length
 
     def to_dict(self) -> Dict[str, Any]:
-        import math
         if isinstance(self.geometry, Line):
             geom_d = {
                 "segment_type": "line",
@@ -64,7 +87,6 @@ class AlignmentSegment:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "AlignmentSegment":
-        import math
         geom_d = d["geometry"]
         if geom_d["segment_type"] == "line":
             geom: Union[Line, Arc] = Line(Vec(*geom_d["start"]), Vec(*geom_d["end"]))
@@ -157,13 +179,23 @@ class PendingBridgePart(PendingElement):
         d = super().to_dict()
         d["part_type"] = self.part_type.value
         d["elements"] = [e.to_dict() for e in self.elements]
+        if self.alignment is not None:
+            d["alignment"] = self.alignment.to_dict()
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBridgePart":
         part_type = BridgePartType(cls._require(d, "part_type"))
+        elements = [_element_from_dict(e) for e in d.get("elements", [])]
+        alignment = (
+            PendingAlignment.from_dict(d["alignment"])
+            if "alignment" in d
+            else None
+        )
         return cls(
             part_type=part_type,
+            elements=elements,
+            alignment=alignment,
             name=d.get("name", ""),
         )
 
@@ -197,9 +229,16 @@ class PendingBridge(PendingElement):
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
         d["parts"] = [p.to_dict() for p in self.parts]
+        if self.alignment is not None:
+            d["alignment"] = self.alignment.to_dict()
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBridge":
         parts = [PendingBridgePart.from_dict(p) for p in cls._require(d, "parts")]
-        return cls(parts=parts, name=d.get("name", ""))
+        alignment = (
+            PendingAlignment.from_dict(d["alignment"])
+            if "alignment" in d
+            else None
+        )
+        return cls(parts=parts, alignment=alignment, name=d.get("name", ""))

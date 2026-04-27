@@ -6,11 +6,11 @@ Framework-agnostic geometry primitives for IFC construction.
 No Rhino, no Grasshopper, no external dependencies beyond the standard library.
 
 Classes:
-    "Vec"    — 3D vector / point
-    Plane   — origin + two axes (right-handed frame)
-    Line3   — start + end "Vec"
-    Arc3    — center, normal, start, end, radius
-    "Polyline" — ordered list of "Vec" (open or closed)
+    Vec      — 3D vector / point
+    Plane    — origin + two axes (right-handed frame)
+    Line     — start + end Vec
+    Arc      — center, normal, start, end, radius
+    Polyline — ordered list of Vec (open or closed)
 """
 
 from __future__ import annotations
@@ -128,10 +128,10 @@ class Vec:
         return self @ self
 
     def normalized(self) -> "Vec":
-        l = abs(self)
-        if l == 0.0:
+        mag = abs(self)
+        if mag == 0.0:
             raise ValueError("Cannot normalize a zero-length vector")
-        return self / l
+        return self / mag
 
     def lerp(self, other: "Vec", t: float) -> "Vec":
         return self + (other - self) * t
@@ -510,14 +510,12 @@ class Path:
     def start_point(self) -> Optional["Vec"]:
         if not self._segments:
             return None
-        seg = self._segments[0]
-        return seg.start if isinstance(seg, Line) else seg.start
+        return self._segments[0].start
 
     def end_point(self) -> Optional["Vec"]:
         if not self._segments:
             return None
-        seg = self._segments[-1]
-        return seg.end if isinstance(seg, Line) else seg.end
+        return self._segments[-1].end
 
     def start_tangent(self) -> Optional["Vec"]:
         if not self._segments:
@@ -604,10 +602,10 @@ def parallel_transport_frames(
 def _polygon_normal(points: List["Vec"]) -> "Vec":
     """Newell's method: compute the normal of a (possibly non-planar) polygon."""
     n = Vec(0, 0, 0)
-    l = len(points)
-    for i in range(l):
+    count = len(points)
+    for i in range(count):
         cur = points[i]
-        nxt = points[(i + 1) % l]
+        nxt = points[(i + 1) % count]
         n = n + Vec(
             (cur.y - nxt.y) * (cur.z + nxt.z),
             (cur.z - nxt.z) * (cur.x + nxt.x),
@@ -619,7 +617,7 @@ def _polygon_normal(points: List["Vec"]) -> "Vec":
 def _signed_area(points: List["Vec"], normal: "Vec") -> float:
     """Signed area of a polygon projected onto the plane defined by normal."""
     area = Vec(0, 0, 0)
-    l = len(points)
-    for i in range(l):
-        area = area + (points[i] ** points[(i + 1) % l])
+    count = len(points)
+    for i in range(count):
+        area = area + (points[i] ** points[(i + 1) % count])
     return (area @ normal) * 0.5

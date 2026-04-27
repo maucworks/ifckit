@@ -22,7 +22,7 @@ class IIfcBuilder(Protocol):
     ifcopenshell entity instances and attaches them to the given container.
     """
 
-    #: IFC class name this builder produces, e.g. 'IfcWall'
+    #: Registry key matching PendingElement.element_type, e.g. 'basic_wall'
     entity_type: str
 
     def build(

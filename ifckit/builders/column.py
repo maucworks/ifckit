@@ -46,10 +46,8 @@ class ColumnBuilder:
         length = axis.length
         frame = Plane.from_tangent(axis.start, axis.direction)
 
-        pts_2d = []
-        for p in pending.profile:
-            local = frame.to_local(p + axis.start)
-            pts_2d.append((local.y, local.z))
+        # Profile points are already local 2D offsets in the YZ cross-section.
+        pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)
 

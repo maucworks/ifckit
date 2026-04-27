@@ -36,6 +36,7 @@ from ifckit.geometry import Arc, Line, Vec
 
 # Tolerances
 _MIN_LENGTH = 1e-6          # minimum meaningful length (metres)
+_MIN_ANGLE = 1e-9           # minimum meaningful angle (radians)
 _WARN_SHORT = 0.01          # warn if axis < 1 cm or profile side < 1 cm
 _ENDPOINT_TOL = 1e-4        # max gap between consecutive segment endpoints
 
@@ -78,11 +79,7 @@ def _footprint_perimeter(pts: list) -> float:
 
 def _seg_end(seg: AlignmentSegment) -> Vec:
     """3-D end point of an alignment segment."""
-    geom = seg.geometry
-    if isinstance(geom, Line):
-        return geom.end
-    # Arc end point
-    return geom.end
+    return seg.geometry.end
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +212,7 @@ def _validate_revolved_beam(rb: PendingRevolvedBeam) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
 
-    if abs(rb.arc.angle) < _MIN_LENGTH:
+    if abs(rb.arc.angle) < _MIN_ANGLE:
         errors.append(
             f"PendingRevolvedBeam '{rb.name}': arc angle must be non-zero"
         )
