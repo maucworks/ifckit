@@ -1,0 +1,625 @@
+"""
+ifckit.geometry
+===============
+
+Framework-agnostic geometry primitives for IFC construction.
+No Rhino, no Grasshopper, no external dependencies beyond the standard library.
+
+Classes:
+    Vec3    — 3D vector / point
+    Plane   — origin + two axes (right-handed frame)
+    Line3   — start + end Vec3
+    Arc3    — center, normal, start, end, radius
+    Polyline3 — ordered list of Vec3 (open or closed)
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Iterator, List, Optional, Sequence, Tuple
+
+
+# ---------------------------------------------------------------------------
+# Vec3
+# ---------------------------------------------------------------------------
+
+class Vec:
+    """
+    Lightweight 3D vector / point.
+
+    Operators:
+        a + b           addition
+        a - b           subtraction
+        a * scalar      scalar multiply
+        scalar * a      (reflected)
+        a / scalar      scalar divide
+        -a              negate
+        abs(a)          length
+        a @ b           dot product
+        a ** b          cross product
+        x, y, z = a     unpacking
+        a[i]            index access (0,1,2)
+        a == b          exact equality
+        a.equals(b, tol) fuzzy equality
+    """
+
+    __slots__ = ("x", "y", "z")
+
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
+        self.x = float(x)
+        self.y = float(y)
+        self.z = float(z)
+
+    # --- constructors -------------------------------------------------------
+
+    @classmethod
+    def from_tuple(cls, t: Sequence[float]) -> "Vec":
+        return cls(t[0], t[1], t[2])
+
+    # --- arithmetic ---------------------------------------------------------
+
+    def __add__(self, other: "Vec") -> "Vec":
+        return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other: "Vec") -> "Vec":
+        return Vec(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    def __mul__(self, scalar: float) -> "Vec":
+        return Vec(self.x * scalar, self.y * scalar, self.z * scalar)
+
+    def __rmul__(self, scalar: float) -> "Vec":
+        return self.__mul__(scalar)
+
+    def __truediv__(self, scalar: float) -> "Vec":
+        return Vec(self.x / scalar, self.y / scalar, self.z / scalar)
+
+    def __neg__(self) -> "Vec":
+        return Vec(-self.x, -self.y, -self.z)
+
+    def __abs__(self) -> float:
+        return math.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
+
+    def __matmul__(self, other: "Vec") -> float:
+        """Dot product: a @ b"""
+        return self.x * other.x + self.y * other.y + self.z * other.z
+
+    def __pow__(self, other: "Vec") -> "Vec":
+        """Cross product: a ** b"""
+        return Vec(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        )
+
+    def __iter__(self) -> Iterator[float]:
+        yield self.x
+        yield self.y
+        yield self.z
+
+    def __getitem__(self, index: int) -> float:
+        return (self.x, self.y, self.z)[index]
+
+    def __len__(self) -> int:
+        return 3
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Vec):
+            return False
+        return self.x == other.x and self.y == other.y and self.z == other.z
+
+    def __repr__(self) -> str:
+        return f"Vec({self.x}, {self.y}, {self.z})"
+
+    # --- vector math --------------------------------------------------------
+
+    def equals(self, other: "Vec", tol: float = 1e-6) -> bool:
+        return abs(self - other) <= tol
+
+    def dot(self, other: "Vec") -> float:
+        return self @ other
+
+    def cross(self, other: "Vec") -> "Vec":
+        return self ** other
+
+    def length(self) -> float:
+        return abs(self)
+
+    def length_squared(self) -> float:
+        return self @ self
+
+    def normalized(self) -> "Vec":
+        l = abs(self)
+        if l == 0.0:
+            raise ValueError("Cannot normalize a zero-length vector")
+        return self / l
+
+    def lerp(self, other: "Vec", t: float) -> "Vec":
+        return self + (other - self) * t
+
+    def distance_to(self, other: "Vec") -> float:
+        return abs(other - self)
+
+    # --- angles -------------------------------------------------------------
+
+    def angle_to(self, other: "Vec") -> float:
+        """Unsigned angle in radians (0..pi)."""
+        cos_a = self.normalized() @ other.normalized()
+        return math.acos(max(-1.0, min(1.0, cos_a)))
+
+    def signed_angle_to(self, other: "Vec", axis: "Vec") -> float:
+        """Signed angle in radians around axis, right-hand rule (-pi..pi)."""
+        n = axis.normalized()
+        a = self.normalized()
+        b = other.normalized()
+        return math.atan2((a ** b) @ n, a @ b)
+
+    def angle_to_plane(self, plane_normal: "Vec") -> float:
+        """Angle between self and a plane defined by its normal (-pi/2..pi/2)."""
+        sin_a = self.normalized() @ plane_normal.normalized()
+        return math.asin(max(-1.0, min(1.0, sin_a)))
+
+    # --- rotation -----------------------------------------------------------
+
+    def rotate_around(self, axis: "Vec", angle: float) -> "Vec":
+        """
+        Rotate self around axis by angle (radians), Rodrigues' formula.
+        axis need not be normalised.
+        """
+        k = axis.normalized()
+        cos_a = math.cos(angle)
+        sin_a = math.sin(angle)
+        return self * cos_a + (k ** self) * sin_a + k * (k @ self) * (1 - cos_a)
+
+    # --- conversion ---------------------------------------------------------
+
+    def to_tuple(self) -> Tuple[float, float, float]:
+        return (self.x, self.y, self.z)
+
+
+# ---------------------------------------------------------------------------
+# Plane  (right-handed frame: origin, x_axis, y_axis; z = x ** y)
+# ---------------------------------------------------------------------------
+
+class Plane:
+    """
+    A right-handed coordinate frame in 3D space.
+
+        z_axis = x_axis ** y_axis
+
+    Useful as an IFC local placement and as a profile orientation.
+    """
+
+    __slots__ = ("origin", "x_axis", "y_axis")
+
+    def __init__(self, origin: Vec3, x_axis: Vec3, y_axis: "Vec") -> None:
+        self.origin = origin
+        self.x_axis = x_axis.normalized()
+        self.y_axis = y_axis.normalized()
+
+    @property
+    def z_axis(self) -> Vec3:
+        return (self.x_axis ** self.y_axis).normalized()
+
+    @classmethod
+    def world_xy(cls) -> "Plane":
+        """Standard XY plane at origin."""
+        return cls(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+
+    @classmethod
+    def from_origin_and_normal(cls, origin: Vec3, normal: "Vec") -> "Plane":
+        """
+        Construct a plane from an origin and normal (z_axis = normal).
+        x_axis is derived by finding the least-parallel world axis.
+        """
+        n = normal.normalized()
+        # pick world axis least aligned with n to derive x
+        world_axes = [Vec(1, 0, 0), Vec(0, 1, 0), Vec(0, 0, 1)]
+        ref = min(world_axes, key=lambda a: abs(n @ a))
+        x = (ref ** n).normalized()  # perpendicular to n
+        y = (n ** x).normalized()
+        return cls(origin, x, y)
+
+    @classmethod
+    def from_tangent(
+        cls,
+        origin: Vec3,
+        tangent: Vec3,
+        world_up: Optional["Vec"] = None,
+    ) -> "Plane":
+        """
+        Construct a frame at origin where x_axis = tangent direction.
+        Used for beam/column/bridge element placement along a path.
+        y_axis is derived from world_up (default: +Z).
+        """
+        t = tangent.normalized()
+        up = (world_up or Vec(0, 0, 1)).normalized()
+        if abs(t @ up) > 0.999:
+            # tangent nearly parallel to up — use +Y as fallback
+            up = Vec(0, 1, 0)
+        y = (up - t * (t @ up)).normalized()
+        x = (t ** y).normalized()  # wait — for beam: x=tangent, y=up-projected, z=x**y
+        # convention: x = tangent (extrusion direction in IFC beam placement)
+        return cls(origin, t, y)
+
+    def transform_point(self, local: "Vec") -> Vec3:
+        """Transform a point from local frame coordinates to world coordinates."""
+        return (
+            self.origin
+            + self.x_axis * local.x
+            + self.y_axis * local.y
+            + self.z_axis * local.z
+        )
+
+    def transform_vector(self, local: "Vec") -> Vec3:
+        """Transform a vector (no translation) from local to world."""
+        return (
+            self.x_axis * local.x
+            + self.y_axis * local.y
+            + self.z_axis * local.z
+        )
+
+    def closest_point(self, world_pt: "Vec") -> Vec3:
+        """Project a world point onto the plane (closest point on plane surface)."""
+        d = world_pt - self.origin
+        return world_pt - self.z_axis * (d @ self.z_axis)
+
+    def to_local(self, world_pt: "Vec") -> Vec3:
+        """Express a world point in local frame coordinates."""
+        d = world_pt - self.origin
+        return Vec(d @ self.x_axis, d @ self.y_axis, d @ self.z_axis)
+
+    def __repr__(self) -> str:
+        return f"Plane(origin={self.origin}, x={self.x_axis}, y={self.y_axis})"
+
+
+# ---------------------------------------------------------------------------
+# Line3
+# ---------------------------------------------------------------------------
+
+class Line:
+    """A finite line segment from start to end."""
+
+    __slots__ = ("start", "end")
+
+    def __init__(self, start: Vec3, end: "Vec") -> None:
+        self.start = start
+        self.end = end
+
+    @property
+    def direction(self) -> Vec3:
+        return (self.end - self.start).normalized()
+
+    @property
+    def length(self) -> float:
+        return self.start.distance_to(self.end)
+
+    @property
+    def midpoint(self) -> Vec3:
+        return self.start.lerp(self.end, 0.5)
+
+    def point_at(self, t: float) -> Vec3:
+        """t=0 → start, t=1 → end."""
+        return self.start.lerp(self.end, t)
+
+    def to_polyline(self) -> "Polyline":
+        return Polyline([self.start, self.end])
+
+    def __repr__(self) -> str:
+        return f"Line({self.start} → {self.end})"
+
+
+# ---------------------------------------------------------------------------
+# Arc3
+# ---------------------------------------------------------------------------
+
+class Arc:
+    """
+    A circular arc in 3D space.
+
+    Defined by:
+        center  — center point
+        normal  — axis of rotation (right-hand rule defines sweep direction)
+        start   — start point (must lie on the circle)
+        angle   — sweep angle in radians (positive = CCW around normal)
+        radius  — derived from |start - center|
+
+    The end point is computed from center, radius, normal, and angle.
+    """
+
+    __slots__ = ("center", "normal", "start", "angle")
+
+    def __init__(
+        self,
+        center: Vec3,
+        normal: Vec3,
+        start: Vec3,
+        angle: float,
+    ) -> None:
+        self.center = center
+        self.normal = normal.normalized()
+        self.start = start
+        self.angle = angle  # radians, signed
+
+    @property
+    def radius(self) -> float:
+        return self.start.distance_to(self.center)
+
+    @property
+    def end(self) -> Vec3:
+        radial = (self.start - self.center)
+        return self.center + radial.rotate_around(self.normal, self.angle)
+
+    @property
+    def midpoint(self) -> Vec3:
+        radial = (self.start - self.center)
+        return self.center + radial.rotate_around(self.normal, self.angle / 2)
+
+    def point_at(self, t: float) -> Vec3:
+        """t=0 → start, t=1 → end."""
+        radial = self.start - self.center
+        return self.center + radial.rotate_around(self.normal, self.angle * t)
+
+    def sample(self, angle_step_deg: float = 5.0) -> List[Vec3]:
+        """
+        Sample the arc into a list of Vec3 points.
+        Includes start and end; step size in degrees.
+        """
+        step = math.radians(angle_step_deg)
+        n_steps = max(1, int(abs(self.angle) / step))
+        return [self.point_at(i / n_steps) for i in range(n_steps + 1)]
+
+    def length(self) -> float:
+        return abs(self.angle) * self.radius
+
+    def tangent_at_start(self) -> Vec3:
+        radial = (self.start - self.center).normalized()
+        sign = 1.0 if self.angle >= 0 else -1.0
+        return (self.normal ** radial) * sign
+
+    def tangent_at_end(self) -> Vec3:
+        radial = (self.end - self.center).normalized()
+        sign = 1.0 if self.angle >= 0 else -1.0
+        return (self.normal ** radial) * sign
+
+    def __repr__(self) -> str:
+        return (
+            f"Arc(center={self.center}, r={self.radius:.3f}, "
+            f"angle={math.degrees(self.angle):.1f}°)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Polyline3
+# ---------------------------------------------------------------------------
+
+class Polyline:
+    """An ordered sequence of Vec3 points forming a polyline."""
+
+    def __init__(self, points: List[Vec3], closed: bool = False) -> None:
+        self.points = list(points)
+        self.closed = closed
+
+    @classmethod
+    def from_tuples(cls, tuples: List[Tuple[float, float, float]], closed: bool = False) -> "Polyline":
+        return cls([Vec(*t) for t in tuples], closed=closed)
+
+    @property
+    def is_closed(self) -> bool:
+        if self.closed:
+            return True
+        if len(self.points) >= 2:
+            return self.points[0].equals(self.points[-1])
+        return False
+
+    def length(self) -> float:
+        total = 0.0
+        pts = self.points
+        n = len(pts) - 1 if not self.closed else len(pts)
+        for i in range(n):
+            total += pts[i].distance_to(pts[(i + 1) % len(pts)])
+        return total
+
+    def close(self) -> "Polyline":
+        """Return a closed copy (appends first point if not already closed)."""
+        pts = list(self.points)
+        if not pts[0].equals(pts[-1]):
+            pts.append(pts[0])
+        return Polyline(pts, closed=True)
+
+    def ensure_ccw(self, normal: Optional["Vec"] = None) -> "Polyline":
+        """
+        Return a copy with vertices wound counter-clockwise around normal.
+        If normal is None, uses the polygon's own computed normal (z_axis of best-fit plane).
+        Requires the polyline to be planar and closed.
+        """
+        n = normal or _polygon_normal(self.points)
+        if _signed_area(self.points, n) < 0:
+            return Polyline(list(reversed(self.points)), closed=self.closed)
+        return Polyline(list(self.points), closed=self.closed)
+
+    def project_to_plane(self, plane: Plane) -> "Polyline":
+        """Project all points to local 2D (x,y) coordinates of a plane."""
+        return Polyline(
+            [Vec(plane.to_local(p).x, plane.to_local(p).y, 0.0) for p in self.points],
+            closed=self.closed,
+        )
+
+    def __len__(self) -> int:
+        return len(self.points)
+
+    def __iter__(self) -> Iterator[Vec3]:
+        return iter(self.points)
+
+    def __repr__(self) -> str:
+        return f"Polyline({len(self.points)} pts, closed={self.is_closed})"
+
+
+# ---------------------------------------------------------------------------
+# Path3  — mixed polyline + arc path (for bridge alignments)
+# ---------------------------------------------------------------------------
+
+class Path:
+    """
+    A G1-continuous path made of Line3 and Arc3 segments.
+    Used for bridge alignment, extrusion paths, etc.
+    """
+
+    def __init__(self) -> None:
+        self._segments: List[Line | Arc] = []
+
+    @property
+    def segments(self) -> List[Line | Arc]:
+        return list(self._segments)
+
+    def add_line(self, start: Vec3, end: "Vec") -> "Path":
+        self._segments.append(Line(start, end))
+        return self
+
+    def add_arc(
+        self,
+        center: Vec3,
+        normal: Vec3,
+        start: Vec3,
+        angle: float,
+    ) -> "Path":
+        self._segments.append(Arc(center, normal, start, angle))
+        return self
+
+    def length(self) -> float:
+        total = 0.0
+        for seg in self._segments:
+            total += seg.length() if isinstance(seg, Arc) else seg.length
+        return total
+
+    def sample(self, angle_step_deg: float = 5.0) -> Polyline3:
+        """
+        Sample the entire path into a Polyline3.
+        Consecutive segment endpoints are deduplicated.
+        """
+        pts: List[Vec3] = []
+        for seg in self._segments:
+            if isinstance(seg, Arc):
+                seg_pts = seg.sample(angle_step_deg)
+            else:
+                seg_pts = [seg.start, seg.end]
+            if pts and pts[-1].equals(seg_pts[0]):
+                seg_pts = seg_pts[1:]
+            pts.extend(seg_pts)
+        return Polyline(pts)
+
+    def start_point(self) -> Optional["Vec"]:
+        if not self._segments:
+            return None
+        seg = self._segments[0]
+        return seg.start if isinstance(seg, Line) else seg.start
+
+    def end_point(self) -> Optional["Vec"]:
+        if not self._segments:
+            return None
+        seg = self._segments[-1]
+        return seg.end if isinstance(seg, Line) else seg.end
+
+    def start_tangent(self) -> Optional["Vec"]:
+        if not self._segments:
+            return None
+        seg = self._segments[0]
+        if isinstance(seg, Line):
+            return seg.direction
+        return seg.tangent_at_start()
+
+    def end_tangent(self) -> Optional["Vec"]:
+        if not self._segments:
+            return None
+        seg = self._segments[-1]
+        if isinstance(seg, Line):
+            return seg.direction
+        return seg.tangent_at_end()
+
+    def __repr__(self) -> str:
+        return f"Path({len(self._segments)} segments, length={self.length():.3f})"
+
+
+# ---------------------------------------------------------------------------
+# Parallel transport frames along a Path3
+# ---------------------------------------------------------------------------
+
+def parallel_transport_frames(
+    path: Path3,
+    seed_normal: Vec3,
+    angle_step_deg: float = 5.0,
+) -> List[Plane]:
+    """
+    Compute non-twisting (rotation-minimizing) frames along a Path3.
+
+    At each sample point the frame is propagated by rotating the previous
+    normal by only as much as the tangent direction demands — no axial spin
+    accumulates (Bishop frame / parallel transport frame).
+
+    Args:
+        path:           The path to frame.
+        seed_normal:    The y_axis of the frame at the start point.
+        angle_step_deg: Arc sampling resolution in degrees.
+
+    Returns:
+        List of Plane objects, one per sample point.
+    """
+    sampled = path.sample(angle_step_deg)
+    pts = sampled.points
+    if len(pts) < 2:
+        raise ValueError("Path must have at least 2 sample points")
+
+    frames: List[Plane] = []
+    prev_tangent = (pts[1] - pts[0]).normalized()
+    prev_normal = seed_normal.normalized()
+    # ensure normal is orthogonal to first tangent
+    prev_normal = (prev_normal - prev_tangent * (prev_normal @ prev_tangent)).normalized()
+
+    for i, pt in enumerate(pts):
+        if i == 0:
+            t = prev_tangent
+        elif i == len(pts) - 1:
+            t = (pts[-1] - pts[-2]).normalized()
+        else:
+            t = (pts[i + 1] - pts[i - 1]).normalized()
+
+        if i > 0:
+            axis = prev_tangent ** t
+            axis_len = abs(axis)
+            if axis_len > 1e-8:
+                angle = prev_tangent.angle_to(t)
+                prev_normal = prev_normal.rotate_around(axis, angle)
+            prev_tangent = t
+
+        binormal = (t ** prev_normal).normalized()
+        normal = (binormal ** t).normalized()
+        frames.append(Plane(pt, t, normal))
+
+    return frames
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _polygon_normal(points: List[Vec3]) -> Vec3:
+    """Newell's method: compute the normal of a (possibly non-planar) polygon."""
+    n = Vec(0, 0, 0)
+    l = len(points)
+    for i in range(l):
+        cur = points[i]
+        nxt = points[(i + 1) % l]
+        n = n + Vec(
+            (cur.y - nxt.y) * (cur.z + nxt.z),
+            (cur.z - nxt.z) * (cur.x + nxt.x),
+            (cur.x - nxt.x) * (cur.y + nxt.y),
+        )
+    return n.normalized()
+
+
+def _signed_area(points: List[Vec3], normal: "Vec") -> float:
+    """Signed area of a polygon projected onto the plane defined by normal."""
+    area = Vec(0, 0, 0)
+    l = len(points)
+    for i in range(l):
+        area = area + (points[i] ** points[(i + 1) % l])
+    return (area @ normal) * 0.5
