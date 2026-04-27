@@ -166,9 +166,27 @@ class IfcModel:
     def add_site(
         self,
         name: str,
-        description: Optional[str] = None,
+description: Optional[str] = None,
+            latitude: Optional[tuple[float, float, float]] = None,
+            longitude: Optional[tuple[float, float, float]] = None,
+            elevation: Optional[float] = None,
+            location: Optional[tuple[float, float, float]] = None,
     ) -> SiteHandle:
-        """Create an IfcSite and aggregate it under the project."""
+        """
+        Create an IfcSite and aggregate it under the project.
+
+        Args:
+            name:        Site name.
+            description: Optional description.
+            latitude:    Optional (degrees, minutes, seconds) tuple for geolocation.
+            longitude:   Optional (degrees, minutes, seconds) tuple for geolocation.
+            elevation:   Site elevation in meters (stored in RefElevation).
+            location:    Optional (x, y, z) tuple for the Cartesian point location
+                         (e.g., RD coordinates in meters). Uses IfcSite.ObjectPlacement.
+        """
+        from ifckit.geometry import Vec, Plane
+        from ifckit.builders._geom import local_placement
+
         site = ifcopenshell.api.run(
             "root.create_entity",
             self._file,
@@ -177,6 +195,17 @@ class IfcModel:
         )
         if description:
             site.Description = description
+        if latitude:
+            site.RefLatitude = latitude
+        if longitude:
+            site.RefLongitude = longitude
+        if elevation is not None:
+            site.RefElevation = elevation
+        if location:
+            # Set the site origin to the RD coordinate via ObjectPlacement
+            origin = Vec(*location)
+            plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
+            site.ObjectPlacement = local_placement(self._file, plane)
         ifcopenshell.api.run(
             "aggregate.assign_object",
             self._file,
