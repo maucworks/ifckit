@@ -215,7 +215,7 @@ class Plane:
         # pick world axis least aligned with n to derive x
         world_axes = [Vec(1, 0, 0), Vec(0, 1, 0), Vec(0, 0, 1)]
         ref = min(world_axes, key=lambda a: abs(n @ a))
-        x = (ref ** n).normalized()  # perpendicular to n
+        x = (n ** ref).normalized()  # n × ref: right-handed, perpendicular to n
         y = (n ** x).normalized()
         return cls(origin, x, y)
 
@@ -237,7 +237,7 @@ class Plane:
             # tangent nearly parallel to up — use +Y as fallback
             up = Vec(0, 1, 0)
         y = (up - t * (t @ up)).normalized()
-        x = (t ** y).normalized()  # wait — for beam: x=tangent, y=up-projected, z=x**y
+        x = (t ** y).normalized()  # convention: x = tangent (extrusion direction in IFC beam placement)
         # convention: x = tangent (extrusion direction in IFC beam placement)
         return cls(origin, t, y)
 
@@ -368,6 +368,7 @@ class Arc:
         n_steps = max(1, int(abs(self.angle) / step))
         return [self.point_at(i / n_steps) for i in range(n_steps + 1)]
 
+    @property
     def length(self) -> float:
         return abs(self.angle) * self.radius
 
@@ -486,10 +487,7 @@ class Path:
         return self
 
     def length(self) -> float:
-        total = 0.0
-        for seg in self._segments:
-            total += seg.length() if isinstance(seg, Arc) else seg.length
-        return total
+        return sum(seg.length for seg in self._segments)
 
     def sample(self, angle_step_deg: float = 5.0) -> "Polyline":
         """

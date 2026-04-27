@@ -73,7 +73,7 @@ class TestArc:
 
     def test_length(self):
         arc = self._quarter_arc()
-        assert arc.length() == pytest.approx(math.pi / 2)
+        assert arc.length == pytest.approx(math.pi / 2)
 
     def test_sample_count(self):
         arc = self._quarter_arc()

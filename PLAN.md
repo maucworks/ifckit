@@ -131,19 +131,19 @@ Builders implemented:
 ### M5 — Validator  ✦ target: 1 commit
 *Goal: all structural errors caught before ifcopenshell is called.*
 
-- [ ] `validate(pending) -> ValidationResult(ok, errors, warnings)`
-- [ ] Per-type rules:
+- [x] `validate(pending) -> ValidationResult(ok, errors, warnings)`
+- [x] Per-type rules:
   - Wall/Slab: footprint closed, plane valid, height > 0
   - Beam/Column: axis length > tol, profile closed
   - RevolvedBeam: arc angle != 0, profile closed
   - Alignment: at least 1 segment, consecutive segments share endpoints
   - Bridge: at least 1 part, all parts valid
-- [ ] Tests: `tests/test_validator.py`
+- [x] Tests: `tests/test_validator.py`
   - valid element passes
   - each invalid condition triggers correct error message
   - warnings for near-degenerate geometry (very short axis, tiny profile)
 
-**Commit:** `feat(validator): structural validation for all pending types`
+**Commit:** `feat(validator): structural validation for all pending types` ✅
 
 ---
 

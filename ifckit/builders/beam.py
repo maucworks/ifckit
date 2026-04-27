@@ -41,15 +41,18 @@ class BeamBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        assert isinstance(pending, PendingBeam)
+        if not isinstance(pending, PendingBeam):
+            raise TypeError(
+                f"BeamBuilder expects PendingBeam, got {type(pending).__name__}"
+            )
 
         # Derive placement frame from axis
         axis = pending.axis
         length = axis.length
         frame = Plane.from_tangent(axis.start, axis.direction)
 
-        # Profile points are already local 2D offsets in the YZ cross-section.
-        # Treat each Vec as (y, z) coordinates directly — no world-space translation.
+        # Profile points are already local 2D offsets in the local cross-section plane.
+        # Treat each Vec as (local u, local v) coordinates — z is ignored.
         pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)

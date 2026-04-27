@@ -50,6 +50,11 @@ class PendingWall(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingWall":
+        """
+        Deserialize from dict.
+
+        Note: Plane is not serialised. Deserialised instances always use world XY plane.
+        """
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         height = cls._require(d, "height")
         return cls(
@@ -97,6 +102,11 @@ class PendingSlab(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingSlab":
+        """
+        Deserialize from dict.
+
+        Note: Plane is not serialised. Deserialised instances always use world XY plane.
+        """
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         thickness = cls._require(d, "thickness")
         return cls(

@@ -50,7 +50,11 @@ from ifckit.elements import (  # noqa: F401
 # Validator
 from ifckit.validator import validate, ValidationResult  # noqa: F401
 
+# Builder registry
+from ifckit.builders import BuilderRegistry, default_registry  # noqa: F401
+
 __version__ = "0.1.0"
+
 __all__ = [
     # geometry
     "Vec",
@@ -79,5 +83,8 @@ __all__ = [
     # validator
     "validate",
     "ValidationResult",
+    # builders
+    "BuilderRegistry",
+    "default_registry",
 ]
 

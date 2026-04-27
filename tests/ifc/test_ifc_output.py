@@ -230,7 +230,7 @@ class TestIfc4x3Bridge:
         bridge = model.add_bridge(site, "ModuloBrug")
         deck = model.add_bridge_part(bridge, "Deck", BridgePartType.DECK.value)
         sub = model.add_bridge_part(bridge, "Sub", BridgePartType.SUBSTRUCTURE.value)
-        align_handle = model.add_alignment(bridge, "MainAlignment")
+        align_handle = model.add_alignment(site, "MainAlignment")
 
         # Populate alignment geometry
         reg = default_registry()

@@ -40,13 +40,16 @@ class ColumnBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        assert isinstance(pending, PendingColumn)
+        if not isinstance(pending, PendingColumn):
+            raise TypeError(
+                f"ColumnBuilder expects PendingColumn, got {type(pending).__name__}"
+            )
 
         axis = pending.axis
         length = axis.length
         frame = Plane.from_tangent(axis.start, axis.direction)
 
-        # Profile points are already local 2D offsets in the YZ cross-section.
+        # Profile points are already local 2D offsets in the local cross-section plane.
         pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)

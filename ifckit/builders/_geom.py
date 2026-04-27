@@ -64,7 +64,9 @@ def profile_from_points(
     The list is automatically closed (first == last) if not already.
     """
     pts = list(points_2d)
-    if pts[0] != pts[-1]:
+    # Close the profile if not already closed (epsilon comparison for float safety).
+    _EPS = 1e-9
+    if not (abs(pts[0][0] - pts[-1][0]) < _EPS and abs(pts[0][1] - pts[-1][1]) < _EPS):
         pts.append(pts[0])
     ifc_pts = [pt2(f, x, y) for x, y in pts]
     polyline = f.create_entity("IfcPolyline", Points=ifc_pts)

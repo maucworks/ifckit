@@ -7,16 +7,18 @@ IIfcBuilder protocol and BuilderRegistry.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Protocol, Type
+from typing import Any, Dict, Protocol, Type, runtime_checkable
 
 import ifcopenshell
 
 from ifckit.elements.base import PendingElement
 
 
+@runtime_checkable
 class IIfcBuilder(Protocol):
     """
     Protocol every builder must satisfy.
+    This protocol lives at the ifcopenshell boundary: it deliberately depends on ifcopenshell.
 
     Each builder converts one PendingElement subtype into one or more
     ifcopenshell entity instances and attaches them to the given container.

@@ -64,8 +64,6 @@ class AlignmentSegment:
 
     @property
     def length(self) -> float:
-        if isinstance(self.geometry, Arc):
-            return self.geometry.length()
         return self.geometry.length
 
     def to_dict(self) -> Dict[str, Any]:

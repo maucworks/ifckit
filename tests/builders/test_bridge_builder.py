@@ -26,7 +26,8 @@ def bridge_handle(ifc4x3_model):
 
 @pytest.fixture
 def alignment_handle(ifc4x3_model, bridge_handle):
-    return ifc4x3_model.add_alignment(bridge_handle, "TestAlignment")
+    site = ifc4x3_model.add_site("Site")  # add_alignment requires SiteHandle
+    return ifc4x3_model.add_alignment(site, "TestAlignment")
 
 
 def _line_seg() -> AlignmentSegment:
@@ -153,7 +154,7 @@ class TestAlignmentBuilder:
         assert len(nested_to_horiz[0].RelatedObjects) == 2
 
     def test_no_name_alignment(self, ifc4x3_model, alignment_handle):
-        pending = PendingAlignment(name=None, segments=[_line_seg()])
+        pending = PendingAlignment(name="", segments=[_line_seg()])
         builder = AlignmentBuilder()
         builder.build(ifc4x3_model.ifc_file, pending, alignment_handle.entity, None)
         horizontals = ifc4x3_model.ifc_file.by_type("IfcAlignmentHorizontal")

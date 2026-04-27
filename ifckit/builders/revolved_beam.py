@@ -29,12 +29,14 @@ class RevolvedBeamBuilder:
     Builds an IfcBeam from a PendingRevolvedBeam via IfcRevolvedAreaSolid.
 
     The arc defines the sweep path.
-    The profile is the cross-section, defined in 2D (YZ).
+    The profile is the cross-section, defined in 2D (local u,v).
 
     The IFC revolve works as follows:
       - Position: placement of the profile at the arc start (frame at start)
       - Axis: the revolution axis (passes through the arc center, along arc normal)
-      - Angle: the arc sweep angle (radians)
+      - Angle: the arc sweep angle (radians). Positive = CCW, negative = CW.
+        Note: Negative angles (CW arcs) are converted to positive by taking abs();
+        the placement frame determines the actual solid orientation.
     """
 
     entity_type = "revolved_beam"
@@ -46,7 +48,10 @@ class RevolvedBeamBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        assert isinstance(pending, PendingRevolvedBeam)
+        if not isinstance(pending, PendingRevolvedBeam):
+            raise TypeError(
+                f"RevolvedBeamBuilder expects PendingRevolvedBeam, got {type(pending).__name__}"
+            )
 
         arc = pending.arc
 

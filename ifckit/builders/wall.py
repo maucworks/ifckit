@@ -42,7 +42,10 @@ class WallBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        assert isinstance(pending, PendingWall)
+        if not isinstance(pending, PendingWall):
+            raise TypeError(
+                f"WallBuilder expects PendingWall, got {type(pending).__name__}"
+            )
 
         # Project footprint to local 2D
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)

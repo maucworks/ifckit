@@ -70,7 +70,10 @@ class AlignmentBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        assert isinstance(pending, PendingAlignment)
+        if not isinstance(pending, PendingAlignment):
+            raise TypeError(
+                f"AlignmentBuilder expects PendingAlignment, got {type(pending).__name__}"
+            )
 
         # container here is the IfcAlignment entity created by IfcModel
         alignment = container
@@ -80,7 +83,7 @@ class AlignmentBuilder:
             "root.create_entity",
             ifc_file,
             ifc_class="IfcAlignmentHorizontal",
-            name=pending.name + "_H" if pending.name else "",
+            name=f"{pending.name}_H" if pending.name else "",
         )
         ifcopenshell.api.run(
             "nest.assign_object",

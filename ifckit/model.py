@@ -17,74 +17,60 @@ import ifcopenshell.api
 from ifckit.schema import IfcSchema, LengthUnit, get_schema_name
 
 
-class SiteHandle:
+_UNIT_PREFIX: dict = {
+    LengthUnit.METRE: None,
+    LengthUnit.MILLIMETRE: "MILLI",
+}
+
+
+class Handle:
+    """Base class for all entity wrappers."""
+    __slots__ = ("_entity",)
+
+    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
+        object.__setattr__(self, "_entity", entity)
+
+    @property
+    def entity(self) -> ifcopenshell.entity_instance:
+        return object.__getattribute__(self, "_entity")
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.entity.is_a()})"
+
+
+class SiteHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcSite entity."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
-class BuildingHandle:
+class BuildingHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBuilding entity."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
-class StoreyHandle:
+class StoreyHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBuildingStorey entity."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
-class BridgeHandle:
+class BridgeHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBridge entity (IFC4X3)."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
-class BridgePartHandle:
+class BridgePartHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBridgePart entity (IFC4X3)."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
-class AlignmentHandle:
+class AlignmentHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcAlignment entity (IFC4X3)."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
-class EntityHandle:
+class EntityHandle(Handle):
     """Generic wrapper around any ifcopenshell product entity."""
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
-        self._entity = entity
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return self._entity
+    pass
 
 
 class IfcModel:
@@ -130,21 +116,19 @@ class IfcModel:
         )
 
         # Assign SI units according to the requested length unit.
-        _UNIT_PREFIX: dict = {
-            LengthUnit.METRE: None,
-            LengthUnit.MILLIMETRE: "MILLI",
-        }
         if unit in _UNIT_PREFIX:
             prefix = _UNIT_PREFIX[unit]
-            kwargs = {"unit_type": "LENGTHUNIT"}
+            kwargs: dict = {"unit_type": "LENGTHUNIT"}
             if prefix:
                 kwargs["prefix"] = prefix
             length_unit = ifcopenshell.api.run("unit.add_si_unit", self._file, **kwargs)
             ifcopenshell.api.run("unit.assign_unit", self._file, units=[length_unit])
         else:
-            # Fallback for non-SI units (FOOT, INCH): assign default SI metres
-            # and let the caller handle conversion.
-            ifcopenshell.api.run("unit.assign_unit", self._file)
+            raise NotImplementedError(
+                f"LengthUnit.{unit.name} is not yet supported. "
+                "Builders write unscaled numeric values; imperial unit scaling is not implemented. "
+                "Use LengthUnit.METRE or LengthUnit.MILLIMETRE."
+            )
 
         # Record author in IfcOwnerHistory if provided.
         if author:
@@ -334,8 +318,17 @@ class IfcModel:
         """
         Create an IfcAlignment and aggregate it under a site.
         Requires schema IFC4X3.
+
+        Args:
+            site: The site to aggregate the alignment under (must be SiteHandle).
+            name: Alignment name.
         """
         self._require_schema(IfcSchema.IFC4X3, "add_alignment")
+        if not isinstance(site, SiteHandle):
+            raise TypeError(
+                f"add_alignment() expects a SiteHandle, got {type(site).__name__}. "
+                "IfcAlignment must be aggregated under IfcSite, not under a bridge or part."
+            )
         alignment = ifcopenshell.api.run(
             "root.create_entity",
             self._file,

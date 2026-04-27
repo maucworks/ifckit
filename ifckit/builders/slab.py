@@ -41,7 +41,10 @@ class SlabBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        assert isinstance(pending, PendingSlab)
+        if not isinstance(pending, PendingSlab):
+            raise TypeError(
+                f"SlabBuilder expects PendingSlab, got {type(pending).__name__}"
+            )
 
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
         profile = profile_from_points(ifc_file, pts_2d)
