@@ -16,8 +16,13 @@ dependencies = [
 dev = [
     "pytest>=7.0",
     "pytest-cov",
+    "httpx>=0.27",
     "ruff",
     "mypy",
+]
+api = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
 ]
 
 [tool.setuptools.packages.find]
@@ -33,3 +38,4 @@ select = ["E", "F", "I"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
