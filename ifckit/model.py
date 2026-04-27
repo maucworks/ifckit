@@ -116,13 +116,26 @@ class IfcModel:
         )
 
         # Assign SI units according to the requested length unit.
+        # Also add area and volume units for complete unit assignment.
         if unit in _UNIT_PREFIX:
             prefix = _UNIT_PREFIX[unit]
             kwargs: dict = {"unit_type": "LENGTHUNIT"}
             if prefix:
                 kwargs["prefix"] = prefix
             length_unit = ifcopenshell.api.run("unit.add_si_unit", self._file, **kwargs)
-            ifcopenshell.api.run("unit.assign_unit", self._file, units=[length_unit])
+
+            area_unit = ifcopenshell.api.run(
+                "unit.add_si_unit", self._file, unit_type="AREAUNIT"
+            )
+            volume_unit = ifcopenshell.api.run(
+                "unit.add_si_unit", self._file, unit_type="VOLUMEUNIT"
+            )
+
+            ifcopenshell.api.run(
+                "unit.assign_unit",
+                self._file,
+                units=[length_unit, area_unit, volume_unit]
+            )
         else:
             raise NotImplementedError(
                 f"LengthUnit.{unit.name} is not yet supported. "
