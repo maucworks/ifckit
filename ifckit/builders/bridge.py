@@ -109,7 +109,10 @@ class AlignmentBuilder:
                     PredefinedType="LINE",
                 )
             else:
-                assert isinstance(geom, Arc)
+                if not isinstance(geom, Arc):
+                    raise TypeError(
+                        f"AlignmentSegment geometry must be Line or Arc, got {type(geom).__name__}"
+                    )
                 # Radius (signed: positive = left turn, negative = right turn)
                 # IFC convention: positive radius = left (CCW), negative = right (CW)
                 radius = geom.radius if geom.angle >= 0 else -geom.radius
