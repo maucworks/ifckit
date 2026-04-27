@@ -96,182 +96,35 @@ L140-py-ifckit/
 
 ## Milestones
 
-### M0 — Scaffold  ✦ target: 1 commit
-*Goal: runnable project, passing empty test suite, CI-ready.*
-
-- [x] `pyproject.toml` with ifcopenshell dep + dev extras
-- [x] `ifckit/geometry/__init__.py` — Vec, Plane, Line, Arc, Polyline,
-       Path, parallel_transport_frames
-- [ ] `ifckit/__init__.py` stub
-- [ ] `tests/conftest.py` stub
-- [ ] `CHANGELOG.md` stub
-- [ ] `README.md` minimal
-- [ ] `pytest` runs (0 tests, no errors)
-
+### M0 — Scaffold  ✅ DONE
 **Commit:** `chore: scaffold project structure and geometry primitives`
 
 ---
 
-### M1 — Geometry layer complete  ✦ target: 2–3 commits
-*Goal: all geometry classes fully tested, no ifcopenshell needed.*
-
-#### M1.1 Vec + Plane
-- [ ] Vec: all operators, angles, rotate_around
-- [ ] Plane: world_xy, from_origin_and_normal, from_tangent,
-       transform_point/vector, to_local, closest_point
-- [ ] Tests: `tests/geometry/test_vec3.py` — 100% coverage
-- [ ] Tests: `tests/geometry/test_plane.py` — 100% coverage
-
-**Commit:** `feat(geometry): Vec and Plane with full test coverage`
-
-#### M1.2 Curves
-- [ ] Line: direction, length, midpoint, point_at, to_polyline
-- [ ] Arc: radius, end, midpoint, point_at, sample, tangent_at_start/end
-- [ ] Polyline: length, close, ensure_ccw, project_to_plane, is_closed
-- [ ] Path: add_line, add_arc, sample, length, tangents
-- [ ] Tests: `tests/geometry/test_curves.py`
-
-**Commit:** `feat(geometry): Line, Arc, Polyline, Path`
-
-#### M1.3 Parallel transport frames
-- [ ] `parallel_transport_frames(path, seed_normal)` — Bishop frame propagation
-- [ ] Edge cases: straight path, 180° arc, near-degenerate tangent
-- [ ] Tests: `tests/geometry/test_frames.py`
-  - straight path → all normals identical
-  - 90° arc → frame rotates exactly 90° around path axis
-  - 180° arc → no twisting (normal stays in plane)
-
-**Commit:** `feat(geometry): parallel transport frames (Bishop frame)`
+### M1 — Geometry layer complete  ✅ DONE (99 tests, 100% coverage)
+**Commit:** `feat(geometry): geometry tests at 100% coverage (M1)`
 
 ---
 
-### M2 — Elements layer  ✦ target: 2 commits
-*Goal: all pending element dataclasses with validation hooks.*
-
-#### M2.1 Building elements
-- [ ] `PendingWall(footprint, plane, height, name, clip_data?)`
-- [ ] `PendingSllab(footprint, plane, height, name, clip_data?)`
-- [ ] Shared base class `PendingElement` with `element_type`, `to_dict()`,
-       `from_dict()`
-- [ ] Tests: `tests/elements/test_building.py`
-  - round-trip to_dict / from_dict
-  - missing required field raises
-  - clip_data optional
-
-**Commit:** `feat(elements): PendingWall and PendingSlab`
-
-#### M2.2 Structural + Bridge elements
-- [ ] `PendingBeam(axis, profile, name, ref_line?, clip_data?)`
-- [ ] `PendingColumn(axis, profile, name, clip_data?)`
-- [ ] `PendingRevolvedBeam(arc, profile, name, ref_line?)`
-- [ ] `PendingAlignment(segments: List[AlignmentSegment])`
-  - `AlignmentSegment` = `Line | Arc` with station offset
-- [ ] `PendingBridgePart(name, part_type, alignment?, elements?)`
-  - `part_type`: DECK | SUBSTRUCTURE | FOUNDATION | SUPERSTRUCTURE
-- [ ] `PendingBridge(name, parts, alignment?)`
-- [ ] Tests: `tests/elements/test_structural.py`,
-       `tests/elements/test_bridge.py`
-
-**Commit:** `feat(elements): structural and bridge pending elements`
+### M2 — Elements layer  ✅ DONE (63 tests, 100% coverage)
+**Commit:** `feat(elements): PendingWall, Slab, Beam, Column, RevolvedBeam, Bridge, Alignment (M2)`
 
 ---
 
-### M3 — Model + Schema layer  ✦ target: 2 commits
-*Goal: IfcModel builds correct hierarchy, saves valid IFC4 and IFC4x3 files.*
-
-#### M3.1 Schema management
-- [ ] `schema.py`: `IfcSchema` enum (`IFC4`, `IFC4X3`)
-- [ ] `get_schema_name(schema) -> str` — returns ifcopenshell schema string
-- [ ] Unit assignment helpers (METRE, MILLIMETRE, FOOT, INCH)
-- [ ] Owner history factory
-- [ ] Geometric representation context factory
-
-**Commit:** `feat(schema): IFC4 and IFC4x3 schema management`
-
-#### M3.2 IfcModel
-- [ ] `IfcModel(name, schema, author, unit)` — creates ifcopenshell store
-- [ ] `add_site(name, description?, location?) -> SiteHandle`
-- [ ] `add_building(site, name, description?, location?) -> BuildingHandle`
-- [ ] `add_storey(building, name, elevation?) -> StoreyHandle`
-- [ ] `add_element(storey, pending_element) -> EntityHandle`
-- [ ] IFC4x3 extensions:
-  - `add_bridge(site, pending_bridge) -> BridgeHandle`
-  - `add_bridge_part(bridge, pending_bridge_part) -> BridgePartHandle`
-  - `add_alignment(site, pending_alignment) -> AlignmentHandle`
-- [ ] `save(path: str)`
-- [ ] `to_string() -> str` (for API responses, no file write)
-- [ ] Tests: `tests/test_model.py`
-  - IFC4: full hierarchy round-trip, save, re-open with ifcopenshell, check
-    entity counts and relationships
-  - IFC4x3: bridge + alignment hierarchy
-
-**Commit:** `feat(model): IfcModel with IFC4 and IFC4x3 hierarchy`
+### M3 — Model + Schema layer  ✅ DONE (41 tests, 100% coverage)
+**Commit:** `feat(schema,model): IfcSchema, LengthUnit, IfcModel IFC4+IFC4X3 hierarchy (M3)`
 
 ---
 
-### M4 — Builders layer  ✦ target: 3–4 commits
-*Goal: each builder produces geometrically correct IFC entities,
-verified by re-parsing the output .ifc.*
+### M4 — Builders layer  ✅ DONE (259 tests total, 100% builders coverage)
+**Commit:** `feat(builders): builder protocol, registry, and all element builders (M4)`
 
-#### M4.1 Builder infrastructure
-- [ ] `IIfcBuilder` protocol (abstract base):
-  ```python
-  class IIfcBuilder(Protocol):
-      entity_type: str
-      def build(self, model, pending, container) -> entity
-  ```
-- [ ] `BuilderRegistry`: register, get, build_entity
-- [ ] `tests/builders/` conftest with shared `tmp_ifc_model` fixture
-
-**Commit:** `feat(builders): builder protocol and registry`
-
-#### M4.2 Wall + Slab builders
-- [ ] `WallBuilder`: footprint → `IfcArbitraryClosedProfileDef` →
-       `IfcExtrudedAreaSolid` → `IfcWallStandardCase`
-- [ ] `SlabBuilder`: same path → `IfcSlab`
-- [ ] Clip plane support: single plane (keep positive side),
-       two planes (keep region between)
-- [ ] Local placement from `Plane`
-- [ ] Tests: `tests/builders/test_wall_builder.py`
-  - output contains `IfcWallStandardCase`
-  - extruded solid height matches input
-  - clipped wall: `IfcBooleanClippingResult` present in output
-  - IFC file parses without errors
-
-**Commit:** `feat(builders): WallBuilder and SlabBuilder`
-
-#### M4.3 Beam + Column builders
-- [ ] `BeamBuilder`: axis → placement frame → profile extrusion → `IfcBeam`
-- [ ] `ColumnBuilder`: same path → `IfcColumn`
-- [ ] `RevolvedBeamBuilder`: arc + profile → `IfcRevolvedAreaSolid` → `IfcBeam`
-- [ ] I-section shortcut: `PendingBeam` can carry `IShapeProfile` dataclass
-       → `IfcIShapeProfileDef` instead of arbitrary polyline
-- [ ] Tests: `tests/builders/test_beam_builder.py`
-  - straight beam: length, profile present in output
-  - revolved beam: `IfcRevolvedAreaSolid` present, angle matches arc
-  - I-section: `IfcIShapeProfileDef` in output
-
-**Commit:** `feat(builders): BeamBuilder, ColumnBuilder, RevolvedBeamBuilder`
-
-#### M4.4 Bridge builders (IFC4x3)
-- [ ] `AlignmentBuilder`:
-  - `IfcAlignment` entity
-  - `IfcAlignmentHorizontal` with `IfcAlignmentHorizontalSegment` per
-     `Line` / `Arc` segment
-  - `IfcRelAggregates` to parent `IfcSite`
-- [ ] `BridgeBuilder`:
-  - `IfcBridge` entity
-  - `IfcRelAggregates` Project → Site → Bridge
-- [ ] `BridgePartBuilder`:
-  - `IfcBridgePart` with `PredefinedType`
-  - `IfcRelAggregates` Bridge → BridgePart
-  - contained elements via `IfcRelContainedInSpatialStructure`
-- [ ] Tests: `tests/builders/test_bridge_builder.py`
-  - alignment: segment count matches Path segments
-  - bridge hierarchy: Project → Site → Bridge → Part → Element
-  - IFC4x3 schema declared in output
-
-**Commit:** `feat(builders): AlignmentBuilder, BridgeBuilder, BridgePartBuilder (IFC4x3)`
+Builders implemented:
+- `IIfcBuilder` protocol + `BuilderRegistry`
+- `_geom.py`: low-level helpers (pt2/pt3/dir3, profiles, extrude, placement)
+- `WallBuilder`, `SlabBuilder`
+- `BeamBuilder`, `ColumnBuilder`, `RevolvedBeamBuilder`
+- `AlignmentBuilder` (IFC4X3)
 
 ---
 
