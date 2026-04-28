@@ -28,9 +28,14 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ifckit import (
-    IfcModel, IfcSchema, LengthUnit,
-    PendingBeam, Vec, Line,
-    BridgePartType, validate,
+    IfcModel,
+    IfcSchema,
+    LengthUnit,
+    PendingBeam,
+    Vec,
+    Line,
+    BridgePartType,
+    validate,
     IBeamProfile,
 )
 from ifckit.builders import default_registry
@@ -40,18 +45,22 @@ from ifckit.builders._geom import get_body_context
 # Model — millimetres throughout, no conversion needed
 # ---------------------------------------------------------------------------
 
-model  = IfcModel(name="Bridge Quickstart", schema=IfcSchema.IFC4X3,
-                  author="you", unit=LengthUnit.MILLIMETRE)
-site   = model.add_site("Site A")
+model = IfcModel(
+    name="Bridge Quickstart",
+    schema=IfcSchema.IFC4X3,
+    author="you",
+    unit=LengthUnit.MILLIMETRE,
+)
+site = model.add_site("Site A")
 bridge = model.add_bridge(site, "Main Bridge")
-deck   = model.add_bridge_part(bridge, "Deck", BridgePartType.DECK.value)
+deck = model.add_bridge_part(bridge, "Deck", BridgePartType.DECK.value)
 
 profile = IBeamProfile(
     height=600,
     width=300,
     web_thickness=10,
     flange_thickness=10,
-    anchor='s',
+    anchor="nw",
 )
 
 beam = PendingBeam(

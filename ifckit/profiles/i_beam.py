@@ -149,18 +149,18 @@ class IBeamProfile:
         htw = tw / 2
 
         return [
-            (-hw,       oz        ),   # 0  bottom-left  outer flange
-            ( hw,       oz        ),   # 1  bottom-right outer flange
-            ( hw,       oz + tf   ),   # 2  bottom-right inner flange
-            ( htw,      oz + tf   ),   # 3  web bottom-right
-            ( htw,      oz + h-tf ),   # 4  web top-right
-            ( hw,       oz + h-tf ),   # 5  top-right inner flange
-            ( hw,       oz + h    ),   # 6  top-right outer flange
-            (-hw,       oz + h    ),   # 7  top-left  outer flange
-            (-hw,       oz + h-tf ),   # 8  top-left  inner flange
-            (-htw,      oz + h-tf ),   # 9  web top-left
-            (-htw,      oz + tf   ),   # 10 web bottom-left
-            (-hw,       oz + tf   ),   # 11 bottom-left inner flange
+            (oy - hw,       oz        ),   # 0  bottom-left  outer flange
+            (oy + hw,       oz        ),   # 1  bottom-right outer flange
+            (oy + hw,       oz + tf   ),   # 2  bottom-right inner flange
+            (oy + htw,      oz + tf   ),   # 3  web bottom-right
+            (oy + htw,      oz + h-tf ),   # 4  web top-right
+            (oy + hw,       oz + h-tf ),   # 5  top-right inner flange
+            (oy + hw,       oz + h    ),   # 6  top-right outer flange
+            (oy - hw,       oz + h    ),   # 7  top-left  outer flange
+            (oy - hw,       oz + h-tf ),   # 8  top-left  inner flange
+            (oy - htw,      oz + h-tf ),   # 9  web top-left
+            (oy - htw,      oz + tf   ),   # 10 web bottom-left
+            (oy - hw,       oz + tf   ),   # 11 bottom-left inner flange
         ]
 
     def to_dict(self) -> dict:
