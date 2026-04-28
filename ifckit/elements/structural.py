@@ -14,13 +14,24 @@ from ifckit.elements.base import PendingElement
 from ifckit.geometry import Arc, Line, Plane, Vec
 
 # A profile point can be a Vec or a plain (x, y) or (x, y, z) tuple.
+# A profile source can also be any object with get_profile_points().
 ProfilePoint = Union[Vec, Tuple[float, float], Tuple[float, float, float]]
+ProfileInput = Union[Sequence[ProfilePoint], Any]  # Any = duck-typed profile object
 
 
-def _coerce_profile(points: Sequence[ProfilePoint]) -> List[Vec]:
-    """Coerce a mixed list of Vec / (x,y) / (x,y,z) tuples to List[Vec]."""
+def _coerce_profile(profile: ProfileInput) -> List[Vec]:
+    """
+    Coerce a profile to List[Vec].
+
+    Accepts:
+      - Any object with a ``get_profile_points()`` method (e.g. IBeamProfile)
+      - A sequence of Vec
+      - A sequence of (x, y) or (x, y, z) tuples
+    """
+    if hasattr(profile, "get_profile_points"):
+        profile = profile.get_profile_points()
     result = []
-    for p in points:
+    for p in profile:
         if isinstance(p, Vec):
             result.append(p)
         elif len(p) == 2:
