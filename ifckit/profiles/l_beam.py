@@ -28,10 +28,7 @@ suitable for use as a PendingBeam / PendingColumn profile in ifckit.
 
 from __future__ import annotations
 
-from typing import List, Tuple, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from ifckit.geometry import Vec
+from typing import List, Tuple
 
 
 # Anchor → (x_fraction_of_width, y_fraction_of_height)
@@ -154,15 +151,6 @@ class LBeamProfile:
             (oy + t, oz + h),   # 4  top of vertical leg, inner
             (oy,     oz + h),   # 5  top-left
         ]
-
-    def to_beam_profile(self) -> "List[Vec]":
-        """
-        Return profile points as a list of ifckit Vec for use with PendingBeam/PendingColumn.
-
-        Maps (y, z) → Vec(z, y) to match the BeamBuilder cross-section convention.
-        """
-        from ifckit.geometry import Vec as _Vec
-        return [_Vec(z, y) for y, z in self.get_profile_points()]
 
     def to_dict(self) -> dict:
         return {

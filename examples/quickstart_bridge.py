@@ -65,7 +65,7 @@ profile = IBeamProfile(
 
 beam = PendingBeam(
     axis=Line(Vec(0, 0, 0), Vec(3000, 0, 0)),
-    profile=profile.to_beam_profile(),
+    profile=[Vec(x, y) for x, y in profile.get_profile_points()],
     name="I-Beam 300x600x10",
 )
 

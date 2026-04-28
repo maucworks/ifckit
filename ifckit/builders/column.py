@@ -53,16 +53,24 @@ class ColumnBuilder:
         local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
         frame = Plane.from_tangent(local_start, axis.direction)
 
-        # Profile points are already local 2D offsets in the local cross-section plane.
+        # Profile points are (x, y) in cross-section XY plane:
+        # profile-X = horizontal right, profile-Y = vertical up.
         pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)
 
+        # cross-section horizontal = world-Y projected perpendicular to tangent
+        t = axis.direction.normalized()
+        world_y = Vec(0.0, 1.0, 0.0)
+        if abs(t @ world_y) > 0.999:
+            world_y = Vec(1.0, 0.0, 0.0)
+        horiz = (world_y - t * (t @ world_y)).normalized()
+
         placement = axis2placement3d(
             ifc_file,
             frame.origin,
-            frame.x_axis,
-            frame.y_axis,
+            t,      # Axis = extrusion direction
+            horiz,  # RefDirection = profile X = horizontal
         )
         solid = extrude_profile(
             ifc_file, profile, length, position=placement,

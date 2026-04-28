@@ -44,12 +44,13 @@ DECK_WIDTH = 8.0            # m
 BEAM_SPACING = 2.0          # m  between longitudinal beams
 NUM_BEAMS = int(DECK_WIDTH / BEAM_SPACING)
 
-# I-beam-like profile (simplified rectangle, YZ plane)
+# Rectangular beam profile in cross-section XY plane:
+# X = horizontal (width), Y = vertical (height), centred on (0,0)
 BEAM_PROFILE = [
-    Vec(0, -0.2),
-    Vec(0.6, -0.2),
-    Vec(0.6, 0.2),
-    Vec(0, 0.2),
+    Vec(-0.2, -0.3),
+    Vec( 0.2, -0.3),
+    Vec( 0.2,  0.3),
+    Vec(-0.2,  0.3),
 ]
 
 

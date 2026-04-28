@@ -55,18 +55,31 @@ class BeamBuilder:
         local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
         frame = Plane.from_tangent(local_start, axis.direction)
 
-        # Profile points are already local 2D offsets in the local cross-section plane.
-        # Treat each Vec as (local u, local v) coordinates — z is ignored.
+        # Profile points are (x, y) in the cross-section XY plane,
+        # where profile-X = horizontal (world Y direction in the cross-section)
+        # and profile-Y = vertical (world Z direction in the cross-section).
         pts_2d = [(p.x, p.y) for p in pending.profile]
 
         profile = profile_from_points(ifc_file, pts_2d)
 
-        # Extrude along local X = axis direction
+        # Build solid placement:
+        #   Axis        = beam tangent (= extrusion direction = local Z of solid)
+        #   RefDirection = cross-section local X = horizontal right in cross-section
+        #
+        # For a beam along tangent T, the cross-section horizontal is the
+        # component of world-Y perpendicular to T (normalised).
+        t = axis.direction.normalized()
+        world_y = Vec(0.0, 1.0, 0.0)
+        # fallback if beam runs along Y
+        if abs(t @ world_y) > 0.999:
+            world_y = Vec(1.0, 0.0, 0.0)
+        horiz = (world_y - t * (t @ world_y)).normalized()  # profile X = right
+
         placement = axis2placement3d(
             ifc_file,
             frame.origin,
-            frame.x_axis,   # extrusion = local X (= tangent)
-            frame.y_axis,
+            t,      # Axis = extrusion direction (local Z of solid)
+            horiz,  # RefDirection = profile X = horizontal in cross-section
         )
         solid = extrude_profile(
             ifc_file, profile, length, position=placement,
