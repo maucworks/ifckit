@@ -60,12 +60,12 @@ profile = IBeamProfile(
     width=300,
     web_thickness=10,
     flange_thickness=10,
-    anchor="nw",
+    anchor="ne",
 )
 
 beam = PendingBeam(
     axis=Line(Vec(0, 0, 0), Vec(3000, 0, 0)),
-    profile=[Vec(y, z) for y, z in profile.get_profile_points()],
+    profile=profile.to_beam_profile(),
     name="I-Beam 300x600x10",
 )
 
