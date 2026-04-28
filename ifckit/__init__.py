@@ -53,6 +53,9 @@ from ifckit.validator import validate, ValidationResult  # noqa: F401
 # Builder registry
 from ifckit.builders import BuilderRegistry, default_registry  # noqa: F401
 
+# Profiles
+from ifckit.profiles import IBeamProfile, LBeamProfile  # noqa: F401
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -86,5 +89,8 @@ __all__ = [
     # builders
     "BuilderRegistry",
     "default_registry",
+    # profiles
+    "IBeamProfile",
+    "LBeamProfile",
 ]
 
