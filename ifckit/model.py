@@ -179,28 +179,18 @@ class IfcModel:
             name:        Site name.
             description: Optional description.
             latitude:    Optional (degrees, minutes, seconds) tuple for geolocation.
-                         Defaults to Hofplein, Rotterdam (51.9225° N) if not provided.
+                         When provided, stored in IfcSite.RefLatitude.
+                         Example for Hofplein Rotterdam: (51, 55, 21)
             longitude:   Optional (degrees, minutes, seconds) tuple for geolocation.
-                         Defaults to Hofplein, Rotterdam (4.4833° E) if not provided.
+                         When provided, stored in IfcSite.RefLongitude.
+                         Example for Hofplein Rotterdam: (4, 28, 60)
             elevation:   Site elevation in meters (stored in RefElevation).
-            location:    Optional (x, y, z) tuple for the Cartesian point location
-                         (e.g., RD coordinates in meters). Defaults to Hofplein,
-                         Rotterdam RD coordinates: (103647, 434819, 0) if not provided.
+            location:    Optional (x, y, z) Cartesian origin for the site's
+                         ObjectPlacement.  Use this when working in a real-world
+                         coordinate system (e.g. RD New: (103647, 434819, 0)).
+                         When omitted the site has no ObjectPlacement and elements
+                         are placed in a local project coordinate system at (0,0,0).
         """
-        # Default to Hofplein, Rotterdam RD coordinates
-        default_location = (103647.0, 434819.0, 0.0)
-        # Default lat/long: 51.9225°N, 4.4833°E (convert to DMS)
-        default_latitude = (51, 55, 21)  # 51.9225°
-        default_longitude = (4, 28, 60)  # 4.4833°
-
-        # Use provided values or defaults
-        actual_location = location if location is not None else default_location
-        actual_latitude = latitude if latitude is not None else default_latitude
-        actual_longitude = longitude if longitude is not None else default_longitude
-
-        from ifckit.geometry import Vec, Plane
-        from ifckit.builders._geom import local_placement
-
         site = ifcopenshell.api.run(
             "root.create_entity",
             self._file,
@@ -209,16 +199,16 @@ class IfcModel:
         )
         if description:
             site.Description = description
-
-        # Set latitude/longitude (use defaults if not provided)
-        site.RefLatitude = actual_latitude
-        site.RefLongitude = actual_longitude
-
+        if latitude is not None:
+            site.RefLatitude = latitude
+        if longitude is not None:
+            site.RefLongitude = longitude
         if elevation is not None:
             site.RefElevation = elevation
-        if actual_location:
-            # Set the site origin to the RD coordinate via ObjectPlacement
-            origin = Vec(*actual_location)
+        if location is not None:
+            from ifckit.geometry import Vec, Plane
+            from ifckit.builders._geom import local_placement
+            origin = Vec(*location)
             plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
             site.ObjectPlacement = local_placement(self._file, plane)
         ifcopenshell.api.run(
