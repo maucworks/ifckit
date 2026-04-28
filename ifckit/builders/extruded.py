@@ -24,6 +24,13 @@ The ObjectPlacement encodes the full cross-section frame:
 
 The solid's IfcAxis2Placement3D is identity so profile coords are
 interpreted directly in ObjectPlacement local space.
+
+Clipping
+--------
+start_clip and end_clip are optional Planes (world space).  Each defines a
+half-space whose complement is removed from the solid using
+IfcBooleanClippingResult.  The plane's z_axis points toward the material
+to keep.
 """
 
 from __future__ import annotations
@@ -33,11 +40,13 @@ import ifcopenshell.api
 
 from ifckit.builders._geom import (
     axis2placement3d,
+    dir3,
     extrude_profile,
     get_body_context,
     local_placement,
     product_definition_shape,
     profile_from_points,
+    pt3,
     shape_representation,
     storey_elevation,
 )
@@ -109,8 +118,14 @@ class ExtrudedElementBuilder:
             extrude_direction=(0.0, 0.0, 1.0),
         )
 
+        # Apply clips — each clip plane is in world space; transform to OP local.
+        geometry = solid
+        for clip_plane in _iter_clips(pending):
+            geometry = _apply_clip(ifc_file, geometry, clip_plane, op_plane, elev)
+
+        rep_type = "SweptSolid" if geometry is solid else "Clipping"
         body_ctx = get_body_context(ifc_file)
-        shape_rep = shape_representation(ifc_file, body_ctx, solid)
+        shape_rep = shape_representation(ifc_file, body_ctx, geometry, rep_type=rep_type)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         element = ifcopenshell.api.run(
@@ -131,3 +146,83 @@ class ExtrudedElementBuilder:
         )
 
         return element
+
+
+# ---------------------------------------------------------------------------
+# Clipping helpers
+# ---------------------------------------------------------------------------
+
+def _iter_clips(pending: PendingBeam | PendingColumn):
+    """Yield (start_clip, end_clip) planes that are not None."""
+    if pending.start_clip is not None:
+        yield pending.start_clip
+    if pending.end_clip is not None:
+        yield pending.end_clip
+
+
+def _apply_clip(
+    ifc_file: ifcopenshell.file,
+    solid: ifcopenshell.entity_instance,
+    clip_plane: Plane,
+    op_plane: Plane,
+    elev: float,
+) -> ifcopenshell.entity_instance:
+    """
+    Subtract the half-space on the negative side of clip_plane from solid.
+
+    clip_plane is in world space.  It is transformed into ObjectPlacement
+    local space before creating the IfcHalfSpaceSolid.
+
+    The clip_plane's z_axis points toward the material to KEEP, so the
+    half-space to remove has its agreement_flag=False (keeps the side the
+    normal points away from).
+    """
+    # Shift clip plane origin to storey-local space (same as op_plane origin)
+    world_origin = Vec(
+        clip_plane.origin.x,
+        clip_plane.origin.y,
+        clip_plane.origin.z - elev,
+    )
+
+    # Express clip plane origin and normal in ObjectPlacement local coords
+    local_origin = op_plane.to_local(world_origin)
+    local_normal = Vec(
+        clip_plane.z_axis @ op_plane.x_axis,
+        clip_plane.z_axis @ op_plane.y_axis,
+        clip_plane.z_axis @ op_plane.z_axis,
+    )
+
+    # IfcAxis2Placement3D for the half-space base surface
+    # The surface normal = local_normal (= Axis of the placement)
+    # We need a RefDirection perpendicular to normal; pick any.
+    ref = _arbitrary_perp(local_normal)
+    half_space_pos = ifc_file.create_entity(
+        "IfcAxis2Placement3D",
+        Location=pt3(ifc_file, local_origin.x, local_origin.y, local_origin.z),
+        Axis=dir3(ifc_file, local_normal.x, local_normal.y, local_normal.z),
+        RefDirection=dir3(ifc_file, ref.x, ref.y, ref.z),
+    )
+    base_surface = ifc_file.create_entity(
+        "IfcPlane",
+        Position=half_space_pos,
+    )
+    # AgreementFlag=False → remove the side the normal points AWAY from,
+    # i.e. keep the side the normal points toward. ✓
+    half_space = ifc_file.create_entity(
+        "IfcHalfSpaceSolid",
+        BaseSurface=base_surface,
+        AgreementFlag=False,
+    )
+    return ifc_file.create_entity(
+        "IfcBooleanClippingResult",
+        Operator="DIFFERENCE",
+        FirstOperand=solid,
+        SecondOperand=half_space,
+    )
+
+
+def _arbitrary_perp(v: Vec) -> Vec:
+    """Return an arbitrary unit vector perpendicular to v."""
+    n = v.normalized()
+    candidate = Vec(1.0, 0.0, 0.0) if abs(n @ Vec(1, 0, 0)) < 0.9 else Vec(0.0, 1.0, 0.0)
+    return (candidate - n * (n @ candidate)).normalized()

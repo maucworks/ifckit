@@ -10,8 +10,20 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Optional
 
-from ifckit.elements.base import ClipData, PendingElement
+from ifckit.elements.base import PendingElement
 from ifckit.geometry import Arc, Line, Plane, Vec
+
+
+def _plane_to_dict(plane: Plane) -> Dict[str, Any]:
+    return {
+        "origin": plane.origin.to_tuple(),
+        "x_axis": plane.x_axis.to_tuple(),
+        "y_axis": plane.y_axis.to_tuple(),
+    }
+
+
+def _plane_from_dict(d: Dict[str, Any]) -> Plane:
+    return Plane(Vec(*d["origin"]), Vec(*d["x_axis"]), Vec(*d["y_axis"]))
 
 
 def _validate_up(up: Vec, axis: Line, cls_name: str) -> None:
@@ -32,17 +44,20 @@ class PendingBeam(PendingElement):
     A straight beam defined by an axis (Line) and a cross-section profile.
 
     Args:
-        axis:       Line from start to end of the beam.
-        profile:    Closed list of Vec points defining the cross-section
-                    in the local XY plane (perpendicular to axis).
-        up:         Optional guide-up vector (world space).  Defines the
-                    profile Y direction (vertical up in cross-section).
-                    Must not be parallel to the beam axis — raises
-                    ValueError immediately if it is.
-                    Defaults to world +Z (or +Y if axis is vertical).
-        name:       Element name.
-        ref_line:   Optional reference line for web orientation.
-        clip_data:  Optional clip plane data.
+        axis:        Line from start to end of the beam.
+        profile:     Closed list of Vec points defining the cross-section
+                     in the local XY plane (perpendicular to axis).
+        up:          Optional guide-up vector (world space).  Defines the
+                     profile Y direction (vertical up in cross-section).
+                     Must not be parallel to the beam axis — raises
+                     ValueError immediately if it is.
+                     Defaults to world +Z (or +Y if axis is vertical).
+        start_clip:  Optional Plane that clips the start of the extrusion.
+                     The plane's z_axis points toward the material to keep.
+        end_clip:    Optional Plane that clips the end of the extrusion.
+                     The plane's z_axis points toward the material to keep.
+        name:        Element name.
+        ref_line:    Optional reference line for web orientation.
     """
 
     element_type = "basic_beam"
@@ -52,14 +67,17 @@ class PendingBeam(PendingElement):
         axis: Line,
         profile: List[Vec],
         up: Optional[Vec] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
         name: str = "",
         ref_line: Optional[Line] = None,
-        clip_data: Optional[ClipData] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data)
+        super().__init__(name=name)
         self.axis = axis
         self.profile = list(profile)
         self.ref_line = ref_line
+        self.start_clip = start_clip
+        self.end_clip = end_clip
         if up is not None:
             _validate_up(up, axis, "PendingBeam")
         self.up = up
@@ -70,18 +88,21 @@ class PendingBeam(PendingElement):
         axis: Line,
         profile: List[Vec],
         plane: Plane,
+        up: Optional[Vec] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
         name: str = "",
         ref_line: Optional[Line] = None,
-        clip_data: Optional[ClipData] = None,
     ) -> "PendingBeam":
         """Construct with up extracted from plane.y_axis."""
         return cls(
             axis=axis,
             profile=profile,
             up=plane.y_axis,
+            start_clip=start_clip,
+            end_clip=end_clip,
             name=name,
             ref_line=ref_line,
-            clip_data=clip_data,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -93,6 +114,10 @@ class PendingBeam(PendingElement):
         d["profile"] = [p.to_tuple() for p in self.profile]
         if self.up is not None:
             d["up"] = self.up.to_tuple()
+        if self.start_clip is not None:
+            d["start_clip"] = _plane_to_dict(self.start_clip)
+        if self.end_clip is not None:
+            d["end_clip"] = _plane_to_dict(self.end_clip)
         return d
 
     @classmethod
@@ -106,8 +131,9 @@ class PendingBeam(PendingElement):
             axis=axis,
             profile=profile,
             up=up,
+            start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
+            end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
             name=d.get("name", ""),
-            clip_data=d.get("clip_data"),
         )
 
 
@@ -116,14 +142,15 @@ class PendingColumn(PendingElement):
     A column defined by an axis (Line) and a cross-section profile.
 
     Args:
-        axis:       Line from base to top of the column.
-        profile:    Closed list of Vec points defining the cross-section.
-        up:         Optional guide-up vector (world space).  Defines the
-                    profile Y direction.  Must not be parallel to the
-                    column axis — raises ValueError immediately if it is.
-                    Defaults to world +Z (or +Y if axis is vertical).
-        name:       Element name.
-        clip_data:  Optional clip plane data.
+        axis:        Line from base to top of the column.
+        profile:     Closed list of Vec points defining the cross-section.
+        up:          Optional guide-up vector (world space).  Defines the
+                     profile Y direction.  Must not be parallel to the
+                     column axis — raises ValueError immediately if it is.
+                     Defaults to world +Z (or +Y if axis is vertical).
+        start_clip:  Optional Plane that clips the base of the extrusion.
+        end_clip:    Optional Plane that clips the top of the extrusion.
+        name:        Element name.
     """
 
     element_type = "basic_column"
@@ -133,12 +160,15 @@ class PendingColumn(PendingElement):
         axis: Line,
         profile: List[Vec],
         up: Optional[Vec] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
         name: str = "",
-        clip_data: Optional[ClipData] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data)
+        super().__init__(name=name)
         self.axis = axis
         self.profile = list(profile)
+        self.start_clip = start_clip
+        self.end_clip = end_clip
         if up is not None:
             _validate_up(up, axis, "PendingColumn")
         self.up = up
@@ -149,16 +179,19 @@ class PendingColumn(PendingElement):
         axis: Line,
         profile: List[Vec],
         plane: Plane,
+        up: Optional[Vec] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
         name: str = "",
-        clip_data: Optional[ClipData] = None,
     ) -> "PendingColumn":
         """Construct with up extracted from plane.y_axis."""
         return cls(
             axis=axis,
             profile=profile,
             up=plane.y_axis,
+            start_clip=start_clip,
+            end_clip=end_clip,
             name=name,
-            clip_data=clip_data,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -170,6 +203,10 @@ class PendingColumn(PendingElement):
         d["profile"] = [p.to_tuple() for p in self.profile]
         if self.up is not None:
             d["up"] = self.up.to_tuple()
+        if self.start_clip is not None:
+            d["start_clip"] = _plane_to_dict(self.start_clip)
+        if self.end_clip is not None:
+            d["end_clip"] = _plane_to_dict(self.end_clip)
         return d
 
     @classmethod
@@ -183,8 +220,9 @@ class PendingColumn(PendingElement):
             axis=axis,
             profile=profile,
             up=up,
+            start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
+            end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
             name=d.get("name", ""),
-            clip_data=d.get("clip_data"),
         )
 
 

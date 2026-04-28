@@ -3,7 +3,7 @@ import math
 import pytest
 import ifcopenshell
 
-from ifckit.geometry import Vec, Line, Arc
+from ifckit.geometry import Vec, Line, Arc, Plane
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
@@ -67,6 +67,48 @@ class TestBeamBuilder:
         ifc4_model.save(path)
         reopened = ifcopenshell.open(path)
         assert len(reopened.by_type("IfcBeam")) == 1
+
+
+class TestBeamClipping:
+    """Tests for start_clip / end_clip on PendingBeam."""
+
+    def test_start_clip_produces_boolean_result(self, ifc4_model, ifc4_storey, body_context):
+        # Perpendicular clip at x=1.0 from start, keeping +X side
+        clip = Plane(Vec(1, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))  # z_axis = +X = keep dir
+        pending = PendingBeam(BEAM_AXIS, SQUARE_PROFILE, start_clip=clip)
+        _beam_builder.build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        results = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")
+        assert len(results) == 1
+
+    def test_end_clip_produces_boolean_result(self, ifc4_model, ifc4_storey, body_context):
+        clip = Plane(Vec(4, 0, 0), Vec(-1, 0, 0), Vec(0, 0, 1))  # z_axis = -X = keep start side
+        pending = PendingBeam(BEAM_AXIS, SQUARE_PROFILE, end_clip=clip)
+        _beam_builder.build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        results = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")
+        assert len(results) == 1
+
+    def test_both_clips_produce_two_boolean_results(self, ifc4_model, ifc4_storey, body_context):
+        start_clip = Plane(Vec(1, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        end_clip   = Plane(Vec(4, 0, 0), Vec(-1, 0, 0), Vec(0, 0, 1))
+        pending = PendingBeam(BEAM_AXIS, SQUARE_PROFILE, start_clip=start_clip, end_clip=end_clip)
+        _beam_builder.build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        results = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")
+        assert len(results) == 2
+
+    def test_no_clip_no_boolean_result(self, ifc4_model, ifc4_storey, body_context):
+        pending = PendingBeam(BEAM_AXIS, SQUARE_PROFILE)
+        _beam_builder.build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        assert len(ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")) == 0
+
+    def test_clipped_beam_parses_after_save(self, ifc4_model, ifc4_storey, body_context, tmp_path):
+        clip = Plane(Vec(1, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        pending = PendingBeam(BEAM_AXIS, SQUARE_PROFILE, start_clip=clip)
+        _beam_builder.build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        path = str(tmp_path / "clipped_beam.ifc")
+        ifc4_model.save(path)
+        reopened = ifcopenshell.open(path)
+        assert len(reopened.by_type("IfcBeam")) == 1
+        assert len(reopened.by_type("IfcBooleanClippingResult")) == 1
 
 
 class TestColumnBuilder:
