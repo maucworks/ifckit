@@ -33,6 +33,7 @@ from ifckit import (
     LengthUnit,
     PendingBeam,
     Vec,
+    Plane,
     Line,
     BridgePartType,
     validate,
@@ -66,16 +67,28 @@ profile = IBeamProfile(
 beam = PendingBeam(
     axis=Line(Vec(0, 0, 0), Vec(3000, 0, 0)),
     up=Vec(0, 1, 1),
-    profile=[Vec(x, y) for x, y in profile.get_profile_points()],
+    profile=profile.get_profile_points(),
     name="I-Beam 300x600x10",
 )
-
 result = validate(beam)
 assert result.ok, result.errors
+
+
+beam1 = PendingBeam(
+    axis=Line(Vec(0, 500, 0), Vec(3000, 500, 0)),
+    profile=[Vec(x, y) for x, y in profile.get_profile_points()],
+    start_clip=Plane(Vec(600, 0, 0), Vec(1, 0, 1), Vec(0, 1, 0)),  # 45° mitre at start
+    end_clip=Plane(Vec(2400, 0, 0), Vec(-1, 0, 1), Vec(0, -1, 0)),  # 45° mitre at end
+    name="I-Beam clipped",
+)
+result = validate(beam1)
+assert result.ok, result.errors
+
 
 reg = default_registry()
 ctx = get_body_context(model.ifc_file)
 reg.get("basic_beam").build(model.ifc_file, beam, deck.entity, ctx)
+reg.get("basic_beam").build(model.ifc_file, beam1, deck.entity, ctx)
 
 os.makedirs("output", exist_ok=True)
 model.save("output/quickstart_bridge.ifc")

@@ -8,10 +8,26 @@ Pending structural elements: PendingBeam, PendingColumn, PendingRevolvedBeam.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ifckit.elements.base import PendingElement
 from ifckit.geometry import Arc, Line, Plane, Vec
+
+# A profile point can be a Vec or a plain (x, y) or (x, y, z) tuple.
+ProfilePoint = Union[Vec, Tuple[float, float], Tuple[float, float, float]]
+
+
+def _coerce_profile(points: Sequence[ProfilePoint]) -> List[Vec]:
+    """Coerce a mixed list of Vec / (x,y) / (x,y,z) tuples to List[Vec]."""
+    result = []
+    for p in points:
+        if isinstance(p, Vec):
+            result.append(p)
+        elif len(p) == 2:
+            result.append(Vec(p[0], p[1], 0.0))
+        else:
+            result.append(Vec(p[0], p[1], p[2]))
+    return result
 
 
 def _plane_to_dict(plane: Plane) -> Dict[str, Any]:
@@ -65,7 +81,7 @@ class PendingBeam(PendingElement):
     def __init__(
         self,
         axis: Line,
-        profile: List[Vec],
+        profile: Sequence[ProfilePoint],
         up: Optional[Vec] = None,
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
@@ -74,7 +90,7 @@ class PendingBeam(PendingElement):
     ) -> None:
         super().__init__(name=name)
         self.axis = axis
-        self.profile = list(profile)
+        self.profile = _coerce_profile(profile)
         self.ref_line = ref_line
         self.start_clip = start_clip
         self.end_clip = end_clip
@@ -158,7 +174,7 @@ class PendingColumn(PendingElement):
     def __init__(
         self,
         axis: Line,
-        profile: List[Vec],
+        profile: Sequence[ProfilePoint],
         up: Optional[Vec] = None,
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
@@ -166,7 +182,7 @@ class PendingColumn(PendingElement):
     ) -> None:
         super().__init__(name=name)
         self.axis = axis
-        self.profile = list(profile)
+        self.profile = _coerce_profile(profile)
         self.start_clip = start_clip
         self.end_clip = end_clip
         if up is not None:
@@ -243,14 +259,13 @@ class PendingRevolvedBeam(PendingElement):
     def __init__(
         self,
         arc: Arc,
-        profile: List[Vec],
+        profile: Sequence[ProfilePoint],
         name: str = "",
         ref_line: Optional[Line] = None,
-        clip_data: Optional[ClipData] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data)
+        super().__init__(name=name)
         self.arc = arc
-        self.profile = list(profile)
+        self.profile = _coerce_profile(profile)
         self.ref_line = ref_line
 
     def to_dict(self) -> Dict[str, Any]:
