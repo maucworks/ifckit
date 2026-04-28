@@ -1,4 +1,6 @@
 """Tests for ifckit.model — IfcModel hierarchy (IFC4 and IFC4X3)"""
+
+import math
 import pytest
 import ifcopenshell
 from ifckit.schema import IfcSchema
@@ -12,11 +14,16 @@ from ifckit.model import (
     AlignmentHandle,
     EntityHandle,
 )
+from ifckit.geometry import Vec, Line, Arc, Path, Plane
+from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+from ifckit.elements.swept import PendingSweptBeam
+from ifckit.elements.building import PendingWall, PendingSlab
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def ifc4():
@@ -31,6 +38,7 @@ def ifc4x3():
 # ---------------------------------------------------------------------------
 # IfcModel construction
 # ---------------------------------------------------------------------------
+
 
 class TestIfcModelInit:
     def test_project_exists(self, ifc4):
@@ -62,6 +70,7 @@ class TestIfcModelInit:
 # ---------------------------------------------------------------------------
 # IFC4 hierarchy
 # ---------------------------------------------------------------------------
+
 
 class TestIfc4Hierarchy:
     def test_add_site(self, ifc4):
@@ -141,6 +150,7 @@ class TestIfc4Hierarchy:
 # IFC4X3 bridge hierarchy
 # ---------------------------------------------------------------------------
 
+
 class TestIfc4x3Hierarchy:
     def _setup(self, model):
         return model.add_site("Site")
@@ -207,6 +217,7 @@ class TestIfc4x3Hierarchy:
 # Schema guard
 # ---------------------------------------------------------------------------
 
+
 class TestSchemaGuard:
     def test_add_bridge_on_ifc4_raises(self, ifc4):
         site = ifc4.add_site("S")
@@ -216,6 +227,7 @@ class TestSchemaGuard:
     def test_add_bridge_part_on_ifc4_raises(self, ifc4):
         # Create a dummy handle — the guard fires before any lookup
         from ifckit.model import BridgeHandle
+
         dummy = BridgeHandle(ifc4.ifc_file.by_type("IfcProject")[0])
         with pytest.raises(ValueError, match="IFC4X3"):
             ifc4.add_bridge_part(dummy, "Deck")
@@ -229,6 +241,7 @@ class TestSchemaGuard:
 # ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
+
 
 class TestExport:
     def test_save(self, ifc4, tmp_path):
@@ -255,3 +268,157 @@ class TestExport:
 
     def test_ifc_file_property(self, ifc4):
         assert isinstance(ifc4.ifc_file, ifcopenshell.file)
+
+
+# ---------------------------------------------------------------------------
+# model.add()
+# ---------------------------------------------------------------------------
+
+_SQUARE_PROFILE = [Vec(-0.1, -0.1), Vec(0.1, -0.1), Vec(0.1, 0.1), Vec(-0.1, 0.1)]
+_BEAM_AXIS = Line(Vec(0, 0, 0), Vec(5, 0, 0))
+_FOOTPRINT = [Vec(0, 0, 0), Vec(4, 0, 0), Vec(4, 3, 0), Vec(0, 3, 0)]
+
+
+@pytest.fixture
+def model_with_storey():
+    m = IfcModel(name="Test", schema=IfcSchema.IFC4)
+    site = m.add_site("Site")
+    bldg = m.add_building(site, "Building")
+    storey = m.add_storey(bldg, "Ground Floor", elevation=0.0)
+    return m, storey
+
+
+@pytest.fixture
+def model_with_bridge_part():
+    m = IfcModel(name="Bridge", schema=IfcSchema.IFC4X3)
+    site = m.add_site("Site")
+    bridge = m.add_bridge(site, "B")
+    part = m.add_bridge_part(bridge, "Deck", part_type="DECK")
+    return m, part
+
+
+class TestModelAdd:
+    def test_add_beam_returns_entity_handle(self, model_with_storey):
+        m, storey = model_with_storey
+        pending = PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="B1")
+        handle = m.add(pending, storey)
+        assert isinstance(handle, EntityHandle)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_add_beam_name_passed_through(self, model_with_storey):
+        m, storey = model_with_storey
+        pending = PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="MyBeam")
+        handle = m.add(pending, storey)
+        assert handle.entity.Name == "MyBeam"
+
+    def test_add_column(self, model_with_storey):
+        m, storey = model_with_storey
+        col_axis = Line(Vec(0, 0, 0), Vec(0, 0, 3))
+        pending = PendingColumn(col_axis, _SQUARE_PROFILE, name="C1")
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcColumn")
+
+    def test_add_wall(self, model_with_storey):
+        m, storey = model_with_storey
+        pending = PendingWall(
+            footprint=_FOOTPRINT,
+            plane=Plane.world_xy(),
+            height=3.0,
+            name="W1",
+        )
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcWall")
+
+    def test_add_slab(self, model_with_storey):
+        m, storey = model_with_storey
+        pending = PendingSlab(
+            footprint=_FOOTPRINT,
+            plane=Plane.world_xy(),
+            thickness=0.2,
+            name="Slab1",
+        )
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcSlab")
+
+    def test_add_revolved_beam(self, model_with_storey):
+        m, storey = model_with_storey
+        arc = Arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+        pending = PendingRevolvedBeam(arc, _SQUARE_PROFILE, name="RB1")
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_add_swept_beam_line(self, model_with_storey):
+        m, storey = model_with_storey
+        pending = PendingSweptBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="SW1")
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_add_swept_beam_arc(self, model_with_storey):
+        m, storey = model_with_storey
+        arc = Arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+        pending = PendingSweptBeam(arc, _SQUARE_PROFILE, name="SW2")
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_add_swept_beam_path(self, model_with_storey):
+        m, storey = model_with_storey
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
+        p.add_arc(Vec(3, 1, 0), Vec(0, 0, 1), Vec(3, 0, 0), math.pi / 2)
+        pending = PendingSweptBeam(p, _SQUARE_PROFILE, name="SW3")
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_add_beam_with_clips(self, model_with_storey):
+        m, storey = model_with_storey
+        start_clip = Plane(Vec(1, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        end_clip = Plane(Vec(4, 0, 0), Vec(-1, 0, 0), Vec(0, 0, 1))
+        pending = PendingBeam(
+            _BEAM_AXIS, _SQUARE_PROFILE, start_clip=start_clip, end_clip=end_clip, name="Clipped"
+        )
+        handle = m.add(pending, storey)
+        assert handle.entity.is_a("IfcBeam")
+        assert len(m.ifc_file.by_type("IfcBooleanClippingResult")) == 2
+
+    def test_add_invalid_element_raises_value_error(self, model_with_storey):
+        m, storey = model_with_storey
+        # Zero-length axis → validation error
+        bad = PendingBeam(Line(Vec(0, 0, 0), Vec(0, 0, 0)), _SQUARE_PROFILE)
+        with pytest.raises(ValueError, match="Validation failed"):
+            m.add(bad, storey)
+
+    def test_add_wrong_container_raises_type_error(self, model_with_storey):
+        m, storey = model_with_storey
+        pending = PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE)
+        with pytest.raises(TypeError, match="StoreyHandle or BridgePartHandle"):
+            m.add(pending, "not-a-handle")
+
+    def test_add_beam_to_bridge_part(self, model_with_bridge_part):
+        m, part = model_with_bridge_part
+        pending = PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="BridgeBeam")
+        handle = m.add(pending, part)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_add_emits_warning_for_short_axis(self, model_with_storey):
+        import warnings
+
+        m, storey = model_with_storey
+        # 5 mm axis — valid but very short → should warn
+        short = PendingBeam(Line(Vec(0, 0, 0), Vec(0.005, 0, 0)), _SQUARE_PROFILE)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            m.add(short, storey)
+        assert any("very short" in str(w.message) for w in caught)
+
+    def test_add_multiple_beams_in_same_storey(self, model_with_storey):
+        m, storey = model_with_storey
+        for i in range(3):
+            axis = Line(Vec(0, i, 0), Vec(5, i, 0))
+            m.add(PendingBeam(axis, _SQUARE_PROFILE, name=f"B{i}"), storey)
+        assert len(m.ifc_file.by_type("IfcBeam")) == 3
+
+    def test_add_returns_entity_with_global_id(self, model_with_storey):
+        m, storey = model_with_storey
+        handle = m.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE), storey)
+        assert handle.entity.GlobalId is not None
+        assert len(handle.entity.GlobalId) == 22  # IFC GlobalId length

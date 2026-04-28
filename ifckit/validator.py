@@ -32,18 +32,20 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+from ifckit.elements.swept import PendingSweptBeam
 from ifckit.geometry import Arc, Line, Vec
 
 # Tolerances
-_MIN_LENGTH = 1e-6          # minimum meaningful length (metres)
-_MIN_ANGLE = 1e-9           # minimum meaningful angle (radians)
-_WARN_SHORT = 0.01          # warn if axis < 1 cm or profile side < 1 cm
-_ENDPOINT_TOL = 1e-4        # max gap between consecutive segment endpoints
+_MIN_LENGTH = 1e-6  # minimum meaningful length (metres)
+_MIN_ANGLE = 1e-9  # minimum meaningful angle (radians)
+_WARN_SHORT = 0.01  # warn if axis < 1 cm or profile side < 1 cm
+_ENDPOINT_TOL = 1e-4  # max gap between consecutive segment endpoints
 
 
 # ---------------------------------------------------------------------------
 # Result type
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ValidationResult:
@@ -61,6 +63,7 @@ class ValidationResult:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _profile_area_2d(pts: list) -> float:
     """Shoelace formula — signed area in XY plane."""
     n = len(pts)
@@ -76,7 +79,6 @@ def _footprint_perimeter(pts: list) -> float:
     return sum((pts[(i + 1) % n] - pts[i]).length() for i in range(n))
 
 
-
 def _seg_end(seg: AlignmentSegment) -> Vec:
     """3-D end point of an alignment segment."""
     return seg.geometry.end
@@ -86,6 +88,7 @@ def _seg_end(seg: AlignmentSegment) -> Vec:
 # Per-type validators
 # ---------------------------------------------------------------------------
 
+
 def _validate_wall(w: PendingWall) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -93,31 +96,23 @@ def _validate_wall(w: PendingWall) -> ValidationResult:
     # footprint: need at least 3 points
     if len(w.footprint) < 3:
         errors.append(
-            f"PendingWall '{w.name}': footprint must have at least 3 points, "
-            f"got {len(w.footprint)}"
+            f"PendingWall '{w.name}': footprint must have at least 3 points, got {len(w.footprint)}"
         )
     else:
         area = abs(_profile_area_2d(w.footprint))
-        if area < _MIN_LENGTH ** 2:
-            errors.append(
-                f"PendingWall '{w.name}': footprint area is effectively zero"
-            )
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingWall '{w.name}': footprint area is effectively zero")
         perim = _footprint_perimeter(w.footprint)
         if perim < _WARN_SHORT:
             warnings.append(
-                f"PendingWall '{w.name}': footprint perimeter is very small "
-                f"({perim:.4f} m)"
+                f"PendingWall '{w.name}': footprint perimeter is very small ({perim:.4f} m)"
             )
 
     # height
     if w.height <= 0.0:
-        errors.append(
-            f"PendingWall '{w.name}': height must be > 0, got {w.height}"
-        )
+        errors.append(f"PendingWall '{w.name}': height must be > 0, got {w.height}")
     elif w.height < _WARN_SHORT:
-        warnings.append(
-            f"PendingWall '{w.name}': height is very small ({w.height:.4f} m)"
-        )
+        warnings.append(f"PendingWall '{w.name}': height is very small ({w.height:.4f} m)")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
@@ -128,24 +123,17 @@ def _validate_slab(s: PendingSlab) -> ValidationResult:
 
     if len(s.footprint) < 3:
         errors.append(
-            f"PendingSlab '{s.name}': footprint must have at least 3 points, "
-            f"got {len(s.footprint)}"
+            f"PendingSlab '{s.name}': footprint must have at least 3 points, got {len(s.footprint)}"
         )
     else:
         area = abs(_profile_area_2d(s.footprint))
-        if area < _MIN_LENGTH ** 2:
-            errors.append(
-                f"PendingSlab '{s.name}': footprint area is effectively zero"
-            )
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingSlab '{s.name}': footprint area is effectively zero")
 
     if s.thickness <= 0.0:
-        errors.append(
-            f"PendingSlab '{s.name}': thickness must be > 0, got {s.thickness}"
-        )
+        errors.append(f"PendingSlab '{s.name}': thickness must be > 0, got {s.thickness}")
     elif s.thickness < _WARN_SHORT:
-        warnings.append(
-            f"PendingSlab '{s.name}': thickness is very small ({s.thickness:.4f} m)"
-        )
+        warnings.append(f"PendingSlab '{s.name}': thickness is very small ({s.thickness:.4f} m)")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
@@ -156,25 +144,18 @@ def _validate_beam(b: PendingBeam) -> ValidationResult:
 
     axis_len = b.axis.length
     if axis_len < _MIN_LENGTH:
-        errors.append(
-            f"PendingBeam '{b.name}': axis length must be > 0, got {axis_len:.6f}"
-        )
+        errors.append(f"PendingBeam '{b.name}': axis length must be > 0, got {axis_len:.6f}")
     elif axis_len < _WARN_SHORT:
-        warnings.append(
-            f"PendingBeam '{b.name}': axis is very short ({axis_len:.4f} m)"
-        )
+        warnings.append(f"PendingBeam '{b.name}': axis is very short ({axis_len:.4f} m)")
 
     if len(b.profile) < 3:
         errors.append(
-            f"PendingBeam '{b.name}': profile must have at least 3 points, "
-            f"got {len(b.profile)}"
+            f"PendingBeam '{b.name}': profile must have at least 3 points, got {len(b.profile)}"
         )
     else:
         area = abs(_profile_area_2d(b.profile))
-        if area < _MIN_LENGTH ** 2:
-            errors.append(
-                f"PendingBeam '{b.name}': profile area is effectively zero"
-            )
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingBeam '{b.name}': profile area is effectively zero")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
@@ -185,25 +166,18 @@ def _validate_column(c: PendingColumn) -> ValidationResult:
 
     axis_len = c.axis.length
     if axis_len < _MIN_LENGTH:
-        errors.append(
-            f"PendingColumn '{c.name}': axis length must be > 0, got {axis_len:.6f}"
-        )
+        errors.append(f"PendingColumn '{c.name}': axis length must be > 0, got {axis_len:.6f}")
     elif axis_len < _WARN_SHORT:
-        warnings.append(
-            f"PendingColumn '{c.name}': axis is very short ({axis_len:.4f} m)"
-        )
+        warnings.append(f"PendingColumn '{c.name}': axis is very short ({axis_len:.4f} m)")
 
     if len(c.profile) < 3:
         errors.append(
-            f"PendingColumn '{c.name}': profile must have at least 3 points, "
-            f"got {len(c.profile)}"
+            f"PendingColumn '{c.name}': profile must have at least 3 points, got {len(c.profile)}"
         )
     else:
         area = abs(_profile_area_2d(c.profile))
-        if area < _MIN_LENGTH ** 2:
-            errors.append(
-                f"PendingColumn '{c.name}': profile area is effectively zero"
-            )
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingColumn '{c.name}': profile area is effectively zero")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
@@ -213,9 +187,7 @@ def _validate_revolved_beam(rb: PendingRevolvedBeam) -> ValidationResult:
     warnings: List[str] = []
 
     if abs(rb.arc.angle) < _MIN_ANGLE:
-        errors.append(
-            f"PendingRevolvedBeam '{rb.name}': arc angle must be non-zero"
-        )
+        errors.append(f"PendingRevolvedBeam '{rb.name}': arc angle must be non-zero")
 
     if len(rb.profile) < 3:
         errors.append(
@@ -224,16 +196,13 @@ def _validate_revolved_beam(rb: PendingRevolvedBeam) -> ValidationResult:
         )
     else:
         area = abs(_profile_area_2d(rb.profile))
-        if area < _MIN_LENGTH ** 2:
-            errors.append(
-                f"PendingRevolvedBeam '{rb.name}': profile area is effectively zero"
-            )
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingRevolvedBeam '{rb.name}': profile area is effectively zero")
 
     arc_len = abs(rb.arc.angle) * rb.arc.radius
     if 0 < arc_len < _WARN_SHORT:
         warnings.append(
-            f"PendingRevolvedBeam '{rb.name}': arc length is very small "
-            f"({arc_len:.4f} m)"
+            f"PendingRevolvedBeam '{rb.name}': arc length is very small ({arc_len:.4f} m)"
         )
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
@@ -244,21 +213,16 @@ def _validate_alignment(a: PendingAlignment) -> ValidationResult:
     warnings: List[str] = []
 
     if len(a.segments) == 0:
-        errors.append(
-            f"PendingAlignment '{a.name}': must have at least one segment"
-        )
+        errors.append(f"PendingAlignment '{a.name}': must have at least one segment")
         return ValidationResult(ok=False, errors=errors, warnings=warnings)
 
     # Each segment must have positive length; warn if very short
     for i, seg in enumerate(a.segments):
         if seg.length < _MIN_LENGTH:
-            errors.append(
-                f"PendingAlignment '{a.name}': segment {i} has zero or negative length"
-            )
+            errors.append(f"PendingAlignment '{a.name}': segment {i} has zero or negative length")
         elif seg.length < _WARN_SHORT:
             warnings.append(
-                f"PendingAlignment '{a.name}': segment {i} is very short "
-                f"({seg.length:.4f} m)"
+                f"PendingAlignment '{a.name}': segment {i} is very short ({seg.length:.4f} m)"
             )
 
     # Consecutive segments must share endpoints (G0 continuity)
@@ -302,9 +266,7 @@ def _validate_bridge(b: PendingBridge) -> ValidationResult:
     warnings: List[str] = []
 
     if len(b.parts) == 0:
-        errors.append(
-            f"PendingBridge '{b.name}': must have at least one part"
-        )
+        errors.append(f"PendingBridge '{b.name}': must have at least one part")
 
     for i, part in enumerate(b.parts):
         child = _validate_bridge_part(part)
@@ -323,6 +285,40 @@ def _validate_bridge(b: PendingBridge) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+def _validate_swept_beam(sb: PendingSweptBeam) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # Path length
+    from ifckit.geometry import Path as _Path
+
+    path = sb.path
+    if isinstance(path, Line):
+        path_len = path.length
+    elif isinstance(path, Arc):
+        path_len = path.length
+    else:
+        path_len = path.length()
+
+    if path_len < _MIN_LENGTH:
+        errors.append(f"PendingSweptBeam '{sb.name}': path length must be > 0, got {path_len:.6f}")
+    elif path_len < _WARN_SHORT:
+        warnings.append(f"PendingSweptBeam '{sb.name}': path is very short ({path_len:.4f} m)")
+
+    # Profile
+    if len(sb.profile) < 3:
+        errors.append(
+            f"PendingSweptBeam '{sb.name}': profile must have at least 3 points, "
+            f"got {len(sb.profile)}"
+        )
+    else:
+        area = abs(_profile_area_2d(sb.profile))
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingSweptBeam '{sb.name}': profile area is effectively zero")
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -333,6 +329,7 @@ _VALIDATORS = {
     PendingBeam: _validate_beam,
     PendingColumn: _validate_column,
     PendingRevolvedBeam: _validate_revolved_beam,
+    PendingSweptBeam: _validate_swept_beam,
     PendingAlignment: _validate_alignment,
     PendingBridgePart: _validate_bridge_part,
     PendingBridge: _validate_bridge,
@@ -355,7 +352,5 @@ def validate(pending: PendingElement) -> ValidationResult:
     """
     validator = _VALIDATORS.get(type(pending))
     if validator is None:
-        raise TypeError(
-            f"No validator registered for type {type(pending).__name__!r}"
-        )
+        raise TypeError(f"No validator registered for type {type(pending).__name__!r}")
     return validator(pending)

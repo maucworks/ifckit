@@ -9,7 +9,8 @@ Supports IFC4 (buildings) and IFC4X3 (bridges / infrastructure).
 
 from __future__ import annotations
 
-from typing import Optional
+import warnings as _warnings
+from typing import Optional, Union
 
 import ifcopenshell
 import ifcopenshell.api
@@ -25,6 +26,7 @@ _UNIT_PREFIX: dict = {
 
 class Handle:
     """Base class for all entity wrappers."""
+
     __slots__ = ("_entity",)
 
     def __init__(self, entity: ifcopenshell.entity_instance) -> None:
@@ -40,36 +42,43 @@ class Handle:
 
 class SiteHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcSite entity."""
+
     pass
 
 
 class BuildingHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBuilding entity."""
+
     pass
 
 
 class StoreyHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBuildingStorey entity."""
+
     pass
 
 
 class BridgeHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBridge entity (IFC4X3)."""
+
     pass
 
 
 class BridgePartHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBridgePart entity (IFC4X3)."""
+
     pass
 
 
 class AlignmentHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcAlignment entity (IFC4X3)."""
+
     pass
 
 
 class EntityHandle(Handle):
     """Generic wrapper around any ifcopenshell product entity."""
+
     pass
 
 
@@ -124,17 +133,13 @@ class IfcModel:
                 kwargs["prefix"] = prefix
             length_unit = ifcopenshell.api.run("unit.add_si_unit", self._file, **kwargs)
 
-            area_unit = ifcopenshell.api.run(
-                "unit.add_si_unit", self._file, unit_type="AREAUNIT"
-            )
+            area_unit = ifcopenshell.api.run("unit.add_si_unit", self._file, unit_type="AREAUNIT")
             volume_unit = ifcopenshell.api.run(
                 "unit.add_si_unit", self._file, unit_type="VOLUMEUNIT"
             )
 
             ifcopenshell.api.run(
-                "unit.assign_unit",
-                self._file,
-                units=[length_unit, area_unit, volume_unit]
+                "unit.assign_unit", self._file, units=[length_unit, area_unit, volume_unit]
             )
         else:
             raise NotImplementedError(
@@ -158,6 +163,70 @@ class IfcModel:
             self._file,
             context_type="Model",
         )
+
+        # Builder registry (lazy import to avoid circular deps at module load)
+        from ifckit.builders import default_registry
+
+        self._registry = default_registry()
+
+    # ------------------------------------------------------------------
+    # High-level element API
+    # ------------------------------------------------------------------
+
+    def add(
+        self,
+        pending: "PendingElement",
+        container: "Union[StoreyHandle, BridgePartHandle]",
+    ) -> "EntityHandle":
+        """
+        Validate and build a pending element, placing it in *container*.
+
+        Args:
+            pending:   Any ``PendingElement`` subclass (PendingBeam, PendingWall, …).
+            container: The spatial container — a ``StoreyHandle`` (IFC4 building) or
+                       a ``BridgePartHandle`` (IFC4X3 bridge).
+
+        Returns:
+            ``EntityHandle`` wrapping the created IFC entity.
+
+        Raises:
+            TypeError:    If *container* is not a StoreyHandle or BridgePartHandle.
+            LookupError:  If no builder is registered for the element type.
+            ValueError:   If validation fails (message lists all errors).
+        """
+        from ifckit.elements.base import PendingElement
+        from ifckit.validator import validate
+
+        if not isinstance(container, (StoreyHandle, BridgePartHandle)):
+            raise TypeError(
+                f"model.add() expects a StoreyHandle or BridgePartHandle, "
+                f"got {type(container).__name__}"
+            )
+
+        # Validate — raise on errors, warn on warnings
+        result = validate(pending)
+        for w in result.warnings:
+            _warnings.warn(w, stacklevel=2)
+        if not result.ok:
+            raise ValueError(
+                f"Validation failed for {type(pending).__name__} "
+                f"'{pending.name}':\n" + "\n".join(f"  - {e}" for e in result.errors)
+            )
+
+        # Resolve builder
+        builder = self._registry.get(pending.element_type)
+        if builder is None:
+            raise LookupError(
+                f"No builder registered for element type {pending.element_type!r}. "
+                "Register one via model._registry.register() or use default_registry()."
+            )
+
+        # Build using the model's body context
+        from ifckit.builders._geom import get_body_context
+
+        ctx = get_body_context(self._file)
+        entity = builder.build(self._file, pending, container.entity, ctx)
+        return EntityHandle(entity)
 
     # ------------------------------------------------------------------
     # IFC4 spatial hierarchy
@@ -208,6 +277,7 @@ class IfcModel:
         if location is not None:
             from ifckit.geometry import Vec, Plane
             from ifckit.builders._geom import local_placement
+
             origin = Vec(*location)
             plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
             site.ObjectPlacement = local_placement(self._file, plane)
@@ -266,6 +336,7 @@ class IfcModel:
         # Create ObjectPlacement: origin at (0, 0, elevation) in project space.
         from ifckit.geometry import Vec, Plane
         from ifckit.builders._geom import local_placement
+
         origin = Vec(0.0, 0.0, float(elevation))
         plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
         storey.ObjectPlacement = local_placement(self._file, plane)
