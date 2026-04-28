@@ -19,6 +19,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     project_profile_to_plane,
     shape_representation,
+    storey_elevation,
 )
 from ifckit.elements.building import PendingWall
 from ifckit.elements.base import PendingElement
@@ -51,12 +52,24 @@ class WallBuilder:
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
         profile = profile_from_points(ifc_file, pts_2d)
 
+        # Translate plane origin to storey-local coordinates (subtract elevation Z).
+        elev = storey_elevation(container)
+        from ifckit.geometry import Vec
+        local_origin = Vec(
+            pending.plane.origin.x,
+            pending.plane.origin.y,
+            pending.plane.origin.z - elev,
+        )
+        local_plane = pending.plane.__class__(
+            local_origin, pending.plane.x_axis, pending.plane.y_axis
+        )
+
         # Solid: extrude in local Z
         placement = axis2placement3d(
             ifc_file,
-            pending.plane.origin,
-            pending.plane.z_axis,
-            pending.plane.x_axis,
+            local_plane.origin,
+            local_plane.z_axis,
+            local_plane.x_axis,
         )
         solid = extrude_profile(ifc_file, profile, pending.height, position=placement)
 
@@ -70,7 +83,9 @@ class WallBuilder:
             "root.create_entity", ifc_file, ifc_class="IfcWall", name=pending.name
         )
         wall.Representation = prod_rep
-        wall.ObjectPlacement = local_placement(ifc_file, pending.plane)
+        wall.ObjectPlacement = local_placement(
+            ifc_file, local_plane, relative_to=container.ObjectPlacement
+        )
 
         # Contain
         ifcopenshell.api.run(

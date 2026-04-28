@@ -248,7 +248,13 @@ class IfcModel:
         name: str,
         elevation: float = 0.0,
     ) -> StoreyHandle:
-        """Create an IfcBuildingStorey and aggregate it under a building."""
+        """
+        Create an IfcBuildingStorey and aggregate it under a building.
+
+        The storey receives an IfcLocalPlacement with the elevation as Z-offset,
+        so that element placements can be expressed relative to the storey origin
+        (local Z = 0 at floor level).
+        """
         storey = ifcopenshell.api.run(
             "root.create_entity",
             self._file,
@@ -256,6 +262,14 @@ class IfcModel:
             name=name,
         )
         storey.Elevation = elevation
+
+        # Create ObjectPlacement: origin at (0, 0, elevation) in project space.
+        from ifckit.geometry import Vec, Plane
+        from ifckit.builders._geom import local_placement
+        origin = Vec(0.0, 0.0, float(elevation))
+        plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
+        storey.ObjectPlacement = local_placement(self._file, plane)
+
         ifcopenshell.api.run(
             "aggregate.assign_object",
             self._file,

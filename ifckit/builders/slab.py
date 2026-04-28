@@ -19,6 +19,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     project_profile_to_plane,
     shape_representation,
+    storey_elevation,
 )
 from ifckit.elements.building import PendingSlab
 from ifckit.elements.base import PendingElement
@@ -49,11 +50,22 @@ class SlabBuilder:
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
         profile = profile_from_points(ifc_file, pts_2d)
 
+        elev = storey_elevation(container)
+        from ifckit.geometry import Vec
+        local_origin = Vec(
+            pending.plane.origin.x,
+            pending.plane.origin.y,
+            pending.plane.origin.z - elev,
+        )
+        local_plane = pending.plane.__class__(
+            local_origin, pending.plane.x_axis, pending.plane.y_axis
+        )
+
         placement = axis2placement3d(
             ifc_file,
-            pending.plane.origin,
-            pending.plane.z_axis,
-            pending.plane.x_axis,
+            local_plane.origin,
+            local_plane.z_axis,
+            local_plane.x_axis,
         )
         solid = extrude_profile(ifc_file, profile, pending.thickness, position=placement)
 
@@ -65,7 +77,9 @@ class SlabBuilder:
             "root.create_entity", ifc_file, ifc_class="IfcSlab", name=pending.name
         )
         slab.Representation = prod_rep
-        slab.ObjectPlacement = local_placement(ifc_file, pending.plane)
+        slab.ObjectPlacement = local_placement(
+            ifc_file, local_plane, relative_to=container.ObjectPlacement
+        )
 
         ifcopenshell.api.run(
             "spatial.assign_container",

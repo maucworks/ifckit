@@ -18,6 +18,7 @@ from ifckit.builders._geom import (
     product_definition_shape,
     profile_from_points,
     shape_representation,
+    storey_elevation,
 )
 from ifckit.elements.structural import PendingColumn
 from ifckit.elements.base import PendingElement
@@ -47,7 +48,10 @@ class ColumnBuilder:
 
         axis = pending.axis
         length = axis.length
-        frame = Plane.from_tangent(axis.start, axis.direction)
+        elev = storey_elevation(container)
+        from ifckit.geometry import Vec
+        local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
+        frame = Plane.from_tangent(local_start, axis.direction)
 
         # Profile points are already local 2D offsets in the local cross-section plane.
         pts_2d = [(p.x, p.y) for p in pending.profile]
@@ -73,7 +77,9 @@ class ColumnBuilder:
             "root.create_entity", ifc_file, ifc_class="IfcColumn", name=pending.name
         )
         column.Representation = prod_rep
-        column.ObjectPlacement = local_placement(ifc_file, frame)
+        column.ObjectPlacement = local_placement(
+            ifc_file, frame, relative_to=container.ObjectPlacement
+        )
 
         ifcopenshell.api.run(
             "spatial.assign_container",

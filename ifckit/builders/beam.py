@@ -18,6 +18,7 @@ from ifckit.builders._geom import (
     product_definition_shape,
     profile_from_points,
     shape_representation,
+    storey_elevation,
 )
 from ifckit.elements.structural import PendingBeam
 from ifckit.elements.base import PendingElement
@@ -46,10 +47,13 @@ class BeamBuilder:
                 f"BeamBuilder expects PendingBeam, got {type(pending).__name__}"
             )
 
-        # Derive placement frame from axis
+        # Derive placement frame from axis; translate to storey-local Z.
         axis = pending.axis
         length = axis.length
-        frame = Plane.from_tangent(axis.start, axis.direction)
+        elev = storey_elevation(container)
+        from ifckit.geometry import Vec
+        local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
+        frame = Plane.from_tangent(local_start, axis.direction)
 
         # Profile points are already local 2D offsets in the local cross-section plane.
         # Treat each Vec as (local u, local v) coordinates — z is ignored.
@@ -77,7 +81,9 @@ class BeamBuilder:
             "root.create_entity", ifc_file, ifc_class="IfcBeam", name=pending.name
         )
         beam.Representation = prod_rep
-        beam.ObjectPlacement = local_placement(ifc_file, frame)
+        beam.ObjectPlacement = local_placement(
+            ifc_file, frame, relative_to=container.ObjectPlacement
+        )
 
         ifcopenshell.api.run(
             "spatial.assign_container",

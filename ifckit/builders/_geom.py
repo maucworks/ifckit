@@ -141,6 +141,24 @@ def project_profile_to_plane(
     return result
 
 
+def storey_elevation(container: ifcopenshell.entity_instance) -> float:
+    """
+    Extract the Z-elevation from a storey's ObjectPlacement.
+
+    Returns 0.0 if the storey has no ObjectPlacement (backward-compat).
+    """
+    try:
+        coords = (
+            container.ObjectPlacement
+            .RelativePlacement
+            .Location
+            .Coordinates
+        )
+        return float(coords[2]) if len(coords) > 2 else 0.0
+    except AttributeError:
+        return 0.0
+
+
 def get_body_context(
     ifc_file: ifcopenshell.file,
 ) -> ifcopenshell.entity_instance:

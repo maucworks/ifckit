@@ -18,6 +18,7 @@ from ifckit.builders._geom import (
     pt3,
     dir3,
     shape_representation,
+    storey_elevation,
 )
 from ifckit.elements.structural import PendingRevolvedBeam
 from ifckit.elements.base import PendingElement
@@ -54,10 +55,16 @@ class RevolvedBeamBuilder:
             )
 
         arc = pending.arc
+        elev = storey_elevation(container)
+        from ifckit.geometry import Vec
 
-        # Frame at the start of the arc
+        def _local_pt(v):
+            return Vec(v.x, v.y, v.z - elev)
+
+        # Frame at the start of the arc (storey-local coords)
         start_tangent = arc.tangent_at_start()
-        frame = Plane.from_tangent(arc.start, start_tangent)
+        local_start = _local_pt(arc.start)
+        frame = Plane.from_tangent(local_start, start_tangent)
 
         # Profile points are already local 2D offsets in the YZ cross-section.
         pts_2d = [(p.x, p.y) for p in pending.profile]
@@ -71,9 +78,12 @@ class RevolvedBeamBuilder:
         radial = (arc.start - arc.center).normalized()
         tangent = arc.tangent_at_start()
 
+        local_arc_start = _local_pt(arc.start)
+        local_arc_center = _local_pt(arc.center)
+
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
-            Location=pt3(ifc_file, *arc.start.to_tuple()),
+            Location=pt3(ifc_file, *local_arc_start.to_tuple()),
             Axis=dir3(ifc_file, *tangent.to_tuple()),  # local Z = extrusion direction
             RefDirection=dir3(ifc_file, *radial.to_tuple()),
         )
@@ -81,7 +91,7 @@ class RevolvedBeamBuilder:
         # Revolution axis: passes through arc center, along arc normal
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
-            Location=pt3(ifc_file, *arc.center.to_tuple()),
+            Location=pt3(ifc_file, *local_arc_center.to_tuple()),
             Axis=dir3(ifc_file, *arc.normal.to_tuple()),
         )
 
@@ -101,7 +111,9 @@ class RevolvedBeamBuilder:
             "root.create_entity", ifc_file, ifc_class="IfcBeam", name=pending.name
         )
         beam.Representation = prod_rep
-        beam.ObjectPlacement = local_placement(ifc_file, frame)
+        beam.ObjectPlacement = local_placement(
+            ifc_file, frame, relative_to=container.ObjectPlacement
+        )
 
         ifcopenshell.api.run(
             "spatial.assign_container",
