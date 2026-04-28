@@ -3,6 +3,20 @@ ifckit.builders.beam
 ====================
 
 BeamBuilder: PendingBeam → IfcBeam with extruded solid along an axis.
+
+Profile convention
+------------------
+Profile points are (x, y) in the cross-section plane where:
+  x = horizontal right
+  y = vertical up
+
+The ObjectPlacement of the beam encodes the full cross-section frame:
+  local X (RefDir) = horiz  (profile X → world)
+  local Y          = vert   (profile Y → world)
+  local Z (Axis)   = t      (extrusion direction)
+
+The solid's own IfcAxis2Placement3D is kept at identity so that profile
+coordinates are interpreted directly in ObjectPlacement local space.
 """
 
 from __future__ import annotations
@@ -22,16 +36,11 @@ from ifckit.builders._geom import (
 )
 from ifckit.elements.structural import PendingBeam
 from ifckit.elements.base import PendingElement
-from ifckit.geometry import Plane
+from ifckit.geometry import Plane, Vec
 
 
 class BeamBuilder:
-    """
-    Builds an IfcBeam from a PendingBeam.
-
-    The profile is defined in the local YZ cross-section plane.
-    The extrusion runs along the beam's local X axis (= axis direction).
-    """
+    """Builds an IfcBeam from a PendingBeam."""
 
     entity_type = "basic_beam"
 
@@ -47,43 +56,45 @@ class BeamBuilder:
                 f"BeamBuilder expects PendingBeam, got {type(pending).__name__}"
             )
 
-        # Derive placement frame from axis; translate to storey-local Z.
         axis = pending.axis
         length = axis.length
+
+        # Translate start to storey-local Z
         elev = storey_elevation(container)
-        from ifckit.geometry import Vec
         local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
-        frame = Plane.from_tangent(local_start, axis.direction)
 
-        # Profile points are (x, y) in the cross-section XY plane,
-        # where profile-X = horizontal (world Y direction in the cross-section)
-        # and profile-Y = vertical (world Z direction in the cross-section).
-        pts_2d = [(p.x, p.y) for p in pending.profile]
-
-        profile = profile_from_points(ifc_file, pts_2d)
-
-        # Build solid placement:
-        #   Axis        = beam tangent (= extrusion direction = local Z of solid)
-        #   RefDirection = cross-section local X = horizontal right in cross-section
-        #
-        # For a beam along tangent T, the cross-section horizontal is the
-        # component of world-Y perpendicular to T (normalised).
+        # Cross-section frame:
+        #   t     = beam tangent (extrusion direction)
+        #   horiz = horizontal right  (world-Y projected perpendicular to t)
+        #   vert  = vertical up       = t × horiz
         t = axis.direction.normalized()
         world_y = Vec(0.0, 1.0, 0.0)
-        # fallback if beam runs along Y
         if abs(t @ world_y) > 0.999:
             world_y = Vec(1.0, 0.0, 0.0)
-        horiz = (world_y - t * (t @ world_y)).normalized()  # profile X = right
+        horiz = (world_y - t * (t @ world_y)).normalized()
+        vert  = t ** horiz
 
-        placement = axis2placement3d(
+        # ObjectPlacement encodes the full frame:
+        #   RefDir (local X) = horiz
+        #   local Y          = vert
+        #   Axis   (local Z) = t
+        # Profile (x, y) → world: x*horiz + y*vert  ✓
+        op_plane = Plane(local_start, horiz, vert)
+
+        # Solid placement = identity (profile coords are in OP local space)
+        solid_pos = axis2placement3d(
             ifc_file,
-            frame.origin,
-            t,      # Axis = extrusion direction (local Z of solid)
-            horiz,  # RefDirection = profile X = horizontal in cross-section
+            Vec(0.0, 0.0, 0.0),
+            Vec(0.0, 0.0, 1.0),  # local Z
+            Vec(1.0, 0.0, 0.0),  # local X
         )
+
+        # Profile and solid
+        pts_2d = [(p.x, p.y) for p in pending.profile]
+        profile = profile_from_points(ifc_file, pts_2d)
         solid = extrude_profile(
-            ifc_file, profile, length, position=placement,
-            extrude_direction=(0.0, 0.0, 1.0),  # local Z in placement = extrusion direction
+            ifc_file, profile, length, position=solid_pos,
+            extrude_direction=(0.0, 0.0, 1.0),
         )
 
         body_ctx = get_body_context(ifc_file)
@@ -95,7 +106,7 @@ class BeamBuilder:
         )
         beam.Representation = prod_rep
         beam.ObjectPlacement = local_placement(
-            ifc_file, frame, relative_to=container.ObjectPlacement
+            ifc_file, op_plane, relative_to=container.ObjectPlacement
         )
 
         ifcopenshell.api.run(
