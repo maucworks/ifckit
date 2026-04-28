@@ -80,12 +80,15 @@ class ExtrudedElementBuilder:
         local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
 
         # Cross-section frame (right-handed, Plane.z_axis = t = extrusion dir):
-        #   vert  = world-Z projected perpendicular to t  (up in cross-section)
+        #   vert  = up guide projected perpendicular to t  (profile Y = up)
         #   horiz = vert × t  →  horiz × vert = t  so Plane.z_axis = t ✓
         t = axis.direction.normalized()
-        world_z = Vec(0.0, 0.0, 1.0)
-        if abs(t @ world_z) > 0.999:
-            world_z = Vec(0.0, 1.0, 0.0)
+        if pending.up is not None:
+            world_z = pending.up.normalized()
+        else:
+            world_z = Vec(0.0, 0.0, 1.0)
+            if abs(t @ world_z) > 0.999:
+                world_z = Vec(0.0, 1.0, 0.0)
         vert  = (world_z - t * (t @ world_z)).normalized()
         horiz = (vert ** t).normalized()
 

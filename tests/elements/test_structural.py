@@ -1,7 +1,7 @@
 """Tests for PendingBeam, PendingColumn, PendingRevolvedBeam."""
 import math
 import pytest
-from ifckit.geometry import Vec, Line, Arc
+from ifckit.geometry import Vec, Line, Arc, Plane
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
 
 
@@ -59,6 +59,38 @@ class TestPendingBeam:
         pts.append(Vec(99, 0, 0))
         assert len(b.profile) == 4
 
+    def test_up_default_is_none(self):
+        b = PendingBeam(AXIS, PROFILE)
+        assert b.up is None
+
+    def test_up_stored(self):
+        b = PendingBeam(AXIS, PROFILE, up=Vec(0, 0, 1))
+        assert b.up.equals(Vec(0, 0, 1))
+
+    def test_up_parallel_to_axis_raises(self):
+        with pytest.raises(ValueError, match="parallel"):
+            PendingBeam(AXIS, PROFILE, up=Vec(1, 0, 0))  # axis is along +X
+
+    def test_up_zero_raises(self):
+        with pytest.raises(ValueError):
+            PendingBeam(AXIS, PROFILE, up=Vec(0, 0, 0))
+
+    def test_from_plane_extracts_y_axis(self):
+        plane = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        b = PendingBeam.from_plane(AXIS, PROFILE, plane)
+        assert b.up.equals(plane.y_axis)
+
+    def test_up_roundtrip(self):
+        b = PendingBeam(AXIS, PROFILE, up=Vec(0, 1, 1))
+        d = b.to_dict()
+        assert "up" in d
+        b2 = PendingBeam.from_dict(d)
+        assert b2.up.equals(Vec(0, 1, 1))
+
+    def test_no_up_not_in_dict(self):
+        b = PendingBeam(AXIS, PROFILE)
+        assert "up" not in b.to_dict()
+
 
 class TestPendingColumn:
     def test_element_type(self):
@@ -87,6 +119,29 @@ class TestPendingColumn:
     def test_from_dict_missing_axis_raises(self):
         with pytest.raises(ValueError):
             PendingColumn.from_dict({"profile": [(0, 0, 0)]})
+
+    def test_up_default_is_none(self):
+        c = PendingColumn(AXIS, PROFILE)
+        assert c.up is None
+
+    def test_up_stored(self):
+        c = PendingColumn(AXIS, PROFILE, up=Vec(0, 0, 1))
+        assert c.up.equals(Vec(0, 0, 1))
+
+    def test_up_parallel_to_axis_raises(self):
+        with pytest.raises(ValueError, match="parallel"):
+            PendingColumn(AXIS, PROFILE, up=Vec(1, 0, 0))
+
+    def test_from_plane_extracts_y_axis(self):
+        plane = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        c = PendingColumn.from_plane(AXIS, PROFILE, plane)
+        assert c.up.equals(plane.y_axis)
+
+    def test_up_roundtrip(self):
+        c = PendingColumn(AXIS, PROFILE, up=Vec(0, 1, 1))
+        d = c.to_dict()
+        b2 = PendingColumn.from_dict(d)
+        assert b2.up.equals(Vec(0, 1, 1))
 
 
 class TestPendingRevolvedBeam:
