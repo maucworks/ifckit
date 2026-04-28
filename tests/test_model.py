@@ -228,7 +228,7 @@ class TestSchemaGuard:
         # Create a dummy handle — the guard fires before any lookup
         from ifckit.model import BridgeHandle
 
-        dummy = BridgeHandle(ifc4.ifc_file.by_type("IfcProject")[0])
+        dummy = BridgeHandle(ifc4.ifc_file.by_type("IfcProject")[0], ifc4)
         with pytest.raises(ValueError, match="IFC4X3"):
             ifc4.add_bridge_part(dummy, "Deck")
 
@@ -422,3 +422,97 @@ class TestModelAdd:
         handle = m.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE), storey)
         assert handle.entity.GlobalId is not None
         assert len(handle.entity.GlobalId) == 22  # IFC GlobalId length
+
+
+# ---------------------------------------------------------------------------
+# Handle chaining
+# ---------------------------------------------------------------------------
+
+
+class TestHandleChaining:
+    def test_site_add_building_returns_building_handle(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        site = m.add_site("Site")
+        bldg = site.add_building("Building")
+        assert isinstance(bldg, BuildingHandle)
+        assert bldg.entity.is_a("IfcBuilding")
+
+    def test_building_add_storey_returns_storey_handle(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        site = m.add_site("Site")
+        bldg = site.add_building("Building")
+        storey = bldg.add_storey("Ground Floor", elevation=0.0)
+        assert isinstance(storey, StoreyHandle)
+        assert storey.entity.is_a("IfcBuildingStorey")
+
+    def test_full_ifc4_chain(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        floor = m.add_site("Site").add_building("Building").add_storey("GF")
+        assert isinstance(floor, StoreyHandle)
+
+    def test_storey_add_beam(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        handle = floor.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="B1"))
+        assert isinstance(handle, EntityHandle)
+        assert handle.entity.is_a("IfcBeam")
+        assert handle.entity.Name == "B1"
+
+    def test_storey_add_column(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        col_axis = Line(Vec(0, 0, 0), Vec(0, 0, 3))
+        handle = floor.add(PendingColumn(col_axis, _SQUARE_PROFILE))
+        assert handle.entity.is_a("IfcColumn")
+
+    def test_storey_add_validates_and_raises(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        bad = PendingBeam(Line(Vec(0, 0, 0), Vec(0, 0, 0)), _SQUARE_PROFILE)
+        with pytest.raises(ValueError, match="Validation failed"):
+            floor.add(bad)
+
+    def test_storey_add_equals_model_add(self):
+        """floor.add(p) and model.add(p, floor) produce the same IFC class."""
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        site = m.add_site("S")
+        bldg = site.add_building("B")
+        floor = bldg.add_storey("GF")
+        # via floor.add
+        h1 = floor.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE))
+        # via model.add on a second storey
+        floor2 = m.add_storey(bldg, "Level 2", elevation=3.0)
+        h2 = m.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE), floor2)
+        assert h1.entity.is_a() == h2.entity.is_a()
+
+    def test_full_ifc4x3_chain(self):
+        m = IfcModel(name="Bridge", schema=IfcSchema.IFC4X3)
+        part = m.add_site("S").add_bridge("B").add_bridge_part("Deck", part_type="DECK")
+        assert isinstance(part, BridgePartHandle)
+        assert part.entity.is_a("IfcBridgePart")
+
+    def test_bridge_part_add_beam(self):
+        m = IfcModel(name="Bridge", schema=IfcSchema.IFC4X3)
+        part = m.add_site("S").add_bridge("B").add_bridge_part("Deck", part_type="DECK")
+        handle = part.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="Girder"))
+        assert handle.entity.is_a("IfcBeam")
+        assert handle.entity.Name == "Girder"
+
+    def test_flat_api_still_works(self):
+        """model.add_building(site, ...) etc. remain valid."""
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        site = m.add_site("Site")
+        bldg = m.add_building(site, "Building")
+        floor = m.add_storey(bldg, "GF")
+        handle = m.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE), floor)
+        assert handle.entity.is_a("IfcBeam")
+
+    def test_multiple_storeys_via_chaining(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        bldg = m.add_site("S").add_building("B")
+        gf = bldg.add_storey("Ground Floor", elevation=0.0)
+        l1 = bldg.add_storey("Level 1", elevation=3.5)
+        gf.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="GF Beam"))
+        l1.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="L1 Beam"))
+        assert len(m.ifc_file.by_type("IfcBeam")) == 2
+        assert len(m.ifc_file.by_type("IfcBuildingStorey")) == 2

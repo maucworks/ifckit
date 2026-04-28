@@ -27,14 +27,19 @@ _UNIT_PREFIX: dict = {
 class Handle:
     """Base class for all entity wrappers."""
 
-    __slots__ = ("_entity",)
+    __slots__ = ("_entity", "_model")
 
-    def __init__(self, entity: ifcopenshell.entity_instance) -> None:
+    def __init__(self, entity: ifcopenshell.entity_instance, model: "IfcModel") -> None:
         object.__setattr__(self, "_entity", entity)
+        object.__setattr__(self, "_model", model)
 
     @property
     def entity(self) -> ifcopenshell.entity_instance:
         return object.__getattribute__(self, "_entity")
+
+    @property
+    def _model_ref(self) -> "IfcModel":
+        return object.__getattribute__(self, "_model")
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.entity.is_a()})"
@@ -43,31 +48,65 @@ class Handle:
 class SiteHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcSite entity."""
 
-    pass
+    def add_building(
+        self,
+        name: str,
+        description: Optional[str] = None,
+    ) -> "BuildingHandle":
+        """Create an IfcBuilding under this site."""
+        return self._model_ref.add_building(self, name, description=description)
+
+    def add_bridge(
+        self,
+        name: str,
+        description: Optional[str] = None,
+    ) -> "BridgeHandle":
+        """Create an IfcBridge under this site (IFC4X3 only)."""
+        return self._model_ref.add_bridge(self, name, description=description)
+
+    def add_alignment(self, name: str) -> "AlignmentHandle":
+        """Create an IfcAlignment under this site (IFC4X3 only)."""
+        return self._model_ref.add_alignment(self, name)
 
 
 class BuildingHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBuilding entity."""
 
-    pass
+    def add_storey(
+        self,
+        name: str,
+        elevation: float = 0.0,
+    ) -> "StoreyHandle":
+        """Create an IfcBuildingStorey under this building."""
+        return self._model_ref.add_storey(self, name, elevation=elevation)
 
 
 class StoreyHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBuildingStorey entity."""
 
-    pass
+    def add(self, pending: "PendingElement") -> "EntityHandle":
+        """Validate and build *pending*, placing it in this storey."""
+        return self._model_ref.add(pending, self)
 
 
 class BridgeHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBridge entity (IFC4X3)."""
 
-    pass
+    def add_bridge_part(
+        self,
+        name: str,
+        part_type: str = "NOTDEFINED",
+    ) -> "BridgePartHandle":
+        """Create an IfcBridgePart under this bridge."""
+        return self._model_ref.add_bridge_part(self, name, part_type=part_type)
 
 
 class BridgePartHandle(Handle):
     """Thin wrapper around an ifcopenshell IfcBridgePart entity (IFC4X3)."""
 
-    pass
+    def add(self, pending: "PendingElement") -> "EntityHandle":
+        """Validate and build *pending*, placing it in this bridge part."""
+        return self._model_ref.add(pending, self)
 
 
 class AlignmentHandle(Handle):
@@ -226,7 +265,7 @@ class IfcModel:
 
         ctx = get_body_context(self._file)
         entity = builder.build(self._file, pending, container.entity, ctx)
-        return EntityHandle(entity)
+        return EntityHandle(entity, self)
 
     # ------------------------------------------------------------------
     # IFC4 spatial hierarchy
@@ -287,7 +326,7 @@ class IfcModel:
             products=[site],
             relating_object=self._project,
         )
-        return SiteHandle(site)
+        return SiteHandle(site, self)
 
     def add_building(
         self,
@@ -310,7 +349,7 @@ class IfcModel:
             products=[building],
             relating_object=site.entity,
         )
-        return BuildingHandle(building)
+        return BuildingHandle(building, self)
 
     def add_storey(
         self,
@@ -347,7 +386,7 @@ class IfcModel:
             products=[storey],
             relating_object=building.entity,
         )
-        return StoreyHandle(storey)
+        return StoreyHandle(storey, self)
 
     def add_element(
         self,
@@ -378,7 +417,7 @@ class IfcModel:
             products=[entity],
             relating_structure=storey.entity,
         )
-        return EntityHandle(entity)
+        return EntityHandle(entity, self)
 
     # ------------------------------------------------------------------
     # IFC4X3 bridge hierarchy
@@ -409,7 +448,7 @@ class IfcModel:
             products=[bridge],
             relating_object=site.entity,
         )
-        return BridgeHandle(bridge)
+        return BridgeHandle(bridge, self)
 
     def add_bridge_part(
         self,
@@ -440,7 +479,7 @@ class IfcModel:
             products=[part],
             relating_object=bridge.entity,
         )
-        return BridgePartHandle(part)
+        return BridgePartHandle(part, self)
 
     def add_alignment(
         self,
@@ -473,7 +512,7 @@ class IfcModel:
             products=[alignment],
             relating_object=site.entity,
         )
-        return AlignmentHandle(alignment)
+        return AlignmentHandle(alignment, self)
 
     def add_element_to_part(
         self,
@@ -496,7 +535,7 @@ class IfcModel:
             products=[entity],
             relating_structure=part.entity,
         )
-        return EntityHandle(entity)
+        return EntityHandle(entity, self)
 
     # ------------------------------------------------------------------
     # Export
