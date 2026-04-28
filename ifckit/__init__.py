@@ -40,6 +40,7 @@ from ifckit.elements import (  # noqa: F401
     PendingBeam,
     PendingColumn,
     PendingRevolvedBeam,
+    PendingSweptBeam,
     PendingBridge,
     PendingBridgePart,
     PendingAlignment,
@@ -52,6 +53,7 @@ from ifckit.validator import validate, ValidationResult  # noqa: F401
 
 # Builder registry
 from ifckit.builders import BuilderRegistry, default_registry  # noqa: F401
+from ifckit.builders import SweptElementBuilder, SweptBeamBuilder  # noqa: F401
 
 # Profiles
 from ifckit.profiles import IBeamProfile, LBeamProfile  # noqa: F401
@@ -78,6 +80,7 @@ __all__ = [
     "PendingBeam",
     "PendingColumn",
     "PendingRevolvedBeam",
+    "PendingSweptBeam",
     "PendingBridge",
     "PendingBridgePart",
     "PendingAlignment",
@@ -89,8 +92,9 @@ __all__ = [
     # builders
     "BuilderRegistry",
     "default_registry",
+    "SweptElementBuilder",
+    "SweptBeamBuilder",
     # profiles
     "IBeamProfile",
     "LBeamProfile",
 ]
-

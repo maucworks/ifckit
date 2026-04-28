@@ -39,6 +39,7 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
+    _arbitrary_perp,
     axis2placement3d,
     dir3,
     extrude_profile,
@@ -98,8 +99,8 @@ class ExtrudedElementBuilder:
             world_z = Vec(0.0, 0.0, 1.0)
             if abs(t @ world_z) > 0.999:
                 world_z = Vec(0.0, 1.0, 0.0)
-        vert  = (world_z - t * (t @ world_z)).normalized()
-        horiz = (vert ** t).normalized()
+        vert = (world_z - t * (t @ world_z)).normalized()
+        horiz = (vert**t).normalized()
 
         op_plane = Plane(local_start, horiz, vert)
 
@@ -114,7 +115,10 @@ class ExtrudedElementBuilder:
         pts_2d = [(p.x, p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
         solid = extrude_profile(
-            ifc_file, profile, length, position=solid_pos,
+            ifc_file,
+            profile,
+            length,
+            position=solid_pos,
             extrude_direction=(0.0, 0.0, 1.0),
         )
 
@@ -129,7 +133,8 @@ class ExtrudedElementBuilder:
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         element = ifcopenshell.api.run(
-            "root.create_entity", ifc_file,
+            "root.create_entity",
+            ifc_file,
             ifc_class=self._ifc_class,
             name=pending.name,
         )
@@ -151,6 +156,7 @@ class ExtrudedElementBuilder:
 # ---------------------------------------------------------------------------
 # Clipping helpers
 # ---------------------------------------------------------------------------
+
 
 def _iter_clips(pending: PendingBeam | PendingColumn):
     """Yield (start_clip, end_clip) planes that are not None."""
@@ -219,10 +225,3 @@ def _apply_clip(
         FirstOperand=solid,
         SecondOperand=half_space,
     )
-
-
-def _arbitrary_perp(v: Vec) -> Vec:
-    """Return an arbitrary unit vector perpendicular to v."""
-    n = v.normalized()
-    candidate = Vec(1.0, 0.0, 0.0) if abs(n @ Vec(1, 0, 0)) < 0.9 else Vec(0.0, 1.0, 0.0)
-    return (candidate - n * (n @ candidate)).normalized()

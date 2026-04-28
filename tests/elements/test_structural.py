@@ -1,8 +1,10 @@
-"""Tests for PendingBeam, PendingColumn, PendingRevolvedBeam."""
+"""Tests for PendingBeam, PendingColumn, PendingRevolvedBeam, PendingSweptBeam."""
+
 import math
 import pytest
-from ifckit.geometry import Vec, Line, Arc, Plane
+from ifckit.geometry import Vec, Line, Arc, Path, Plane
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+from ifckit.elements.swept import PendingSweptBeam
 
 
 AXIS = Line(Vec(0, 0, 0), Vec(5, 0, 0))
@@ -49,9 +51,7 @@ class TestPendingBeam:
 
     def test_from_dict_missing_profile_raises(self):
         with pytest.raises(ValueError, match="profile"):
-            PendingBeam.from_dict({
-                "axis": {"start": (0, 0, 0), "end": (1, 0, 0)}
-            })
+            PendingBeam.from_dict({"axis": {"start": (0, 0, 0), "end": (1, 0, 0)}})
 
     def test_profile_is_copy(self):
         pts = list(PROFILE)
@@ -177,3 +177,120 @@ class TestPendingRevolvedBeam:
     def test_from_dict_missing_arc_raises(self):
         with pytest.raises(ValueError):
             PendingRevolvedBeam.from_dict({"profile": [(0, 0, 0)]})
+
+
+# ---------------------------------------------------------------------------
+# PendingSweptBeam
+# ---------------------------------------------------------------------------
+
+LINE_PATH = Line(Vec(0, 0, 0), Vec(5, 0, 0))
+ARC_PATH = Arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+
+
+class TestPendingSweptBeam:
+    def test_element_type(self):
+        sb = PendingSweptBeam(LINE_PATH, PROFILE)
+        assert sb.element_type == "swept_beam"
+
+    def test_fields_line(self):
+        sb = PendingSweptBeam(LINE_PATH, PROFILE, name="SB1")
+        assert sb.name == "SB1"
+        assert len(sb.profile) == 4
+        assert sb.up is None
+        assert sb.start_clip is None
+        assert sb.end_clip is None
+
+    def test_fields_arc(self):
+        sb = PendingSweptBeam(ARC_PATH, PROFILE, name="SB2")
+        assert sb.name == "SB2"
+        assert isinstance(sb.path, Arc)
+
+    def test_up_stored(self):
+        sb = PendingSweptBeam(LINE_PATH, PROFILE, up=Vec(0, 0, 1))
+        assert sb.up.equals(Vec(0, 0, 1))
+
+    def test_up_parallel_to_line_raises(self):
+        # LINE_PATH is along +X; up=+X is parallel
+        with pytest.raises(ValueError, match="parallel"):
+            PendingSweptBeam(LINE_PATH, PROFILE, up=Vec(1, 0, 0))
+
+    def test_up_parallel_to_arc_start_tangent_raises(self):
+        # ARC_PATH start tangent = +Y (circle in XY, radius 1, start at (0,0,0))
+        # tangent_at_start = normal × radial = (0,0,1) × (0,-1,0) = (1*0-1*0, 1*0-0*0, 0*(-1)-0*0)?
+        # let's just check the start tangent direction:
+        t = ARC_PATH.tangent_at_start()
+        with pytest.raises(ValueError, match="parallel"):
+            PendingSweptBeam(ARC_PATH, PROFILE, up=t)
+
+    def test_profile_coercion_tuples(self):
+        pts = [(0.0, -0.1), (0.2, -0.1), (0.2, 0.1), (0.0, 0.1)]
+        sb = PendingSweptBeam(LINE_PATH, pts)
+        assert len(sb.profile) == 4
+        assert isinstance(sb.profile[0], Vec)
+
+    def test_profile_coercion_duck_type(self):
+        class FakeProfile:
+            def get_profile_points(self):
+                return [Vec(0, 0, 0), Vec(1, 0, 0), Vec(1, 1, 0), Vec(0, 1, 0)]
+
+        sb = PendingSweptBeam(LINE_PATH, FakeProfile())
+        assert len(sb.profile) == 4
+
+    def test_clips_stored(self):
+        clip = Plane(Vec(1, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        sb = PendingSweptBeam(LINE_PATH, PROFILE, start_clip=clip, end_clip=clip)
+        assert sb.start_clip is not None
+        assert sb.end_clip is not None
+
+    def test_to_dict_line(self):
+        sb = PendingSweptBeam(LINE_PATH, PROFILE, name="SB1")
+        d = sb.to_dict()
+        assert d["type"] == "swept_beam"
+        assert d["path"]["type"] == "line"
+        assert d["path"]["start"] == (0.0, 0.0, 0.0)
+        assert d["path"]["end"] == (5.0, 0.0, 0.0)
+        assert len(d["profile"]) == 4
+
+    def test_to_dict_arc(self):
+        sb = PendingSweptBeam(ARC_PATH, PROFILE)
+        d = sb.to_dict()
+        assert d["path"]["type"] == "arc"
+        assert abs(d["path"]["angle_deg"] - 90.0) < 1e-6
+
+    def test_to_dict_mixed_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
+        p.add_arc(Vec(3, 1, 0), Vec(0, 0, 1), Vec(3, 0, 0), math.pi / 2)
+        sb = PendingSweptBeam(p, PROFILE)
+        d = sb.to_dict()
+        assert d["path"]["type"] == "path"
+        assert len(d["path"]["segments"]) == 2
+
+    def test_from_dict_roundtrip_line(self):
+        sb = PendingSweptBeam(LINE_PATH, PROFILE, name="SB1")
+        d = sb.to_dict()
+        sb2 = PendingSweptBeam.from_dict(d)
+        assert sb2.name == "SB1"
+        assert sb2.path.start.equals(LINE_PATH.start)
+        assert sb2.path.end.equals(LINE_PATH.end)
+        assert len(sb2.profile) == 4
+
+    def test_from_dict_roundtrip_arc(self):
+        sb = PendingSweptBeam(ARC_PATH, PROFILE, up=Vec(0, 0, 1))
+        d = sb.to_dict()
+        sb2 = PendingSweptBeam.from_dict(d)
+        assert sb2.up.equals(Vec(0, 0, 1))
+        assert sb2.path.radius == pytest.approx(ARC_PATH.radius)
+
+    def test_from_dict_roundtrip_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
+        p.add_arc(Vec(3, 1, 0), Vec(0, 0, 1), Vec(3, 0, 0), math.pi / 2)
+        sb = PendingSweptBeam(p, PROFILE)
+        d = sb.to_dict()
+        sb2 = PendingSweptBeam.from_dict(d)
+        assert len(sb2.path.segments) == 2
+
+    def test_no_up_not_in_dict(self):
+        sb = PendingSweptBeam(LINE_PATH, PROFILE)
+        assert "up" not in sb.to_dict()

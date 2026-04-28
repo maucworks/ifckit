@@ -10,11 +10,13 @@ from ifckit.builders.wall import WallBuilder
 from ifckit.builders.slab import SlabBuilder
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
+from ifckit.builders.swept import SweptElementBuilder
 from ifckit.builders.bridge import AlignmentBuilder
 
 # Convenience aliases
-BeamBuilder   = ExtrudedElementBuilder("basic_beam",   "IfcBeam")
+BeamBuilder = ExtrudedElementBuilder("basic_beam", "IfcBeam")
 ColumnBuilder = ExtrudedElementBuilder("basic_column", "IfcColumn")
+SweptBeamBuilder = SweptElementBuilder("swept_beam", "IfcBeam")
 
 
 def default_registry() -> BuilderRegistry:
@@ -22,9 +24,10 @@ def default_registry() -> BuilderRegistry:
     registry = BuilderRegistry()
     registry.register(WallBuilder())
     registry.register(SlabBuilder())
-    registry.register(ExtrudedElementBuilder("basic_beam",   "IfcBeam"))
+    registry.register(ExtrudedElementBuilder("basic_beam", "IfcBeam"))
     registry.register(ExtrudedElementBuilder("basic_column", "IfcColumn"))
     registry.register(RevolvedBeamBuilder())
+    registry.register(SweptElementBuilder("swept_beam", "IfcBeam"))
     registry.register(AlignmentBuilder())
     return registry
 
@@ -38,6 +41,8 @@ __all__ = [
     "BeamBuilder",
     "ColumnBuilder",
     "RevolvedBeamBuilder",
+    "SweptElementBuilder",
+    "SweptBeamBuilder",
     "AlignmentBuilder",
     "default_registry",
 ]

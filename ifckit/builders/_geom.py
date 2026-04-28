@@ -14,7 +14,7 @@ from typing import List, Sequence, TYPE_CHECKING
 import ifcopenshell
 
 if TYPE_CHECKING:
-    from ifckit.geometry import Plane, Vec
+    from ifckit.geometry import Arc, Line, Path, Plane, Vec
 
 
 def pt2(f: ifcopenshell.file, x: float, y: float) -> ifcopenshell.entity_instance:
@@ -88,6 +88,7 @@ def extrude_profile(
     """Create IfcExtrudedAreaSolid."""
     if position is None:
         from ifckit.geometry import Vec
+
         _o = Vec(0, 0, 0)
         _z = Vec(0, 0, 1)
         _x = Vec(1, 0, 0)
@@ -148,15 +149,96 @@ def storey_elevation(container: ifcopenshell.entity_instance) -> float:
     Returns 0.0 if the storey has no ObjectPlacement (backward-compat).
     """
     try:
-        coords = (
-            container.ObjectPlacement
-            .RelativePlacement
-            .Location
-            .Coordinates
-        )
+        coords = container.ObjectPlacement.RelativePlacement.Location.Coordinates
         return float(coords[2]) if len(coords) > 2 else 0.0
     except AttributeError:
         return 0.0
+
+
+def directrix_from_line(
+    f: ifcopenshell.file,
+    line: "Line",
+) -> ifcopenshell.entity_instance:
+    """Create an IfcPolyline (2-point) directrix from a Line segment."""
+    return f.create_entity(
+        "IfcPolyline",
+        Points=[
+            pt3(f, line.start.x, line.start.y, line.start.z),
+            pt3(f, line.end.x, line.end.y, line.end.z),
+        ],
+    )
+
+
+def directrix_from_arc(
+    f: ifcopenshell.file,
+    arc: "Arc",
+) -> ifcopenshell.entity_instance:
+    """
+    Create an IfcTrimmedCurve directrix from an Arc.
+
+    The underlying IfcCircle is placed so that:
+      - Axis       = arc.normal   (rotation axis)
+      - RefDirection = (arc.start - arc.center).normalized()  (0° reference)
+
+    Trim parameters are in degrees (IFC4 default).
+    CCW arc (angle > 0): SenseAgreement=True,  Trim1=0°, Trim2=|angle|°
+    CW  arc (angle < 0): SenseAgreement=False, Trim1=0°, Trim2=|angle|°
+    """
+    radial = (arc.start - arc.center).normalized()
+    placement = axis2placement3d(f, arc.center, arc.normal, radial)
+    circle = f.create_entity(
+        "IfcCircle",
+        Position=placement,
+        Radius=float(arc.radius),
+    )
+    angle_deg = abs(math.degrees(arc.angle))
+    trim1 = f.create_entity("IfcParameterValue", wrappedValue=0.0)
+    trim2 = f.create_entity("IfcParameterValue", wrappedValue=angle_deg)
+    sense = arc.angle >= 0
+    return f.create_entity(
+        "IfcTrimmedCurve",
+        BasisCurve=circle,
+        Trim1=[trim1],
+        Trim2=[trim2],
+        SenseAgreement=sense,
+        MasterRepresentation="PARAMETER",
+    )
+
+
+def directrix_from_path(
+    f: ifcopenshell.file,
+    path: "Path",
+) -> ifcopenshell.entity_instance:
+    """
+    Create an IfcCompositeCurve directrix from a mixed Line/Arc Path.
+
+    Each segment becomes one IfcCompositeCurveSegment.
+    Interior transitions use CONTSAMEGRADIENT; the last uses DISCONTINUOUS.
+    """
+    from ifckit.geometry import Arc as _Arc, Line as _Line
+
+    segments = path.segments
+    ifc_segments = []
+    for i, seg in enumerate(segments):
+        is_last = i == len(segments) - 1
+        transition = "DISCONTINUOUS" if is_last else "CONTSAMEGRADIENT"
+        if isinstance(seg, _Arc):
+            curve = directrix_from_arc(f, seg)
+        else:
+            curve = directrix_from_line(f, seg)
+        ifc_segments.append(
+            f.create_entity(
+                "IfcCompositeCurveSegment",
+                Transition=transition,
+                SameSense=True,
+                ParentCurve=curve,
+            )
+        )
+    return f.create_entity(
+        "IfcCompositeCurve",
+        Segments=ifc_segments,
+        SelfIntersect=False,
+    )
 
 
 def get_body_context(
@@ -176,3 +258,12 @@ def get_body_context(
         "No suitable geometric representation context found. "
         "Call IfcModel() first, which creates a Model context."
     )
+
+
+def _arbitrary_perp(v: "Vec") -> "Vec":
+    """Return an arbitrary unit vector perpendicular to v."""
+    from ifckit.geometry import Vec as _Vec
+
+    n = v.normalized()
+    candidate = _Vec(1.0, 0.0, 0.0) if abs(n @ _Vec(1, 0, 0)) < 0.9 else _Vec(0.0, 1.0, 0.0)
+    return (candidate - n * (n @ candidate)).normalized()
