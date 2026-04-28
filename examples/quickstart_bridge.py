@@ -60,7 +60,7 @@ profile = IBeamProfile(
     width=300,
     web_thickness=10,
     flange_thickness=10,
-    anchor="ne",
+    anchor="nw",
 )
 
 beam = PendingBeam(
