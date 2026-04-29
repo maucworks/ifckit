@@ -43,6 +43,7 @@ from ifckit.geometry import (
 )
 from ifckit.json_build import build, build_from_json, validate_json
 from ifckit.model import IfcModel
+import ifckit.rhinokit as rk
 from ifckit.handles import (
     SiteHandle,
     BuildingHandle,
@@ -114,4 +115,5 @@ __all__ = [
     "AlignmentHandle",
     "EntityHandle",
     "IfcMeshImporter",
+    "rhinnokit",
 ]

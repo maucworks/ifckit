@@ -11,6 +11,7 @@ import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ifckit.elements.base import PendingElement
+from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Arc, Line, Plane, Vec
 
 # A profile point can be a Vec or a plain (x, y) or (x, y, z) tuple.
@@ -82,7 +83,7 @@ class PendingExtrudedElement(PendingElement):
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
-        style=None,
+        style: Optional[RenderStyle] = None,
     ) -> None:
         super().__init__(name=name, style=style)
         self.axis = axis
@@ -180,7 +181,7 @@ class PendingBeam(PendingExtrudedElement):
         end_clip: Optional[Plane] = None,
         name: str = "",
         ref_line: Optional[Line] = None,
-        style=None,
+        style: Optional[RenderStyle] = None,
     ) -> None:
         super().__init__(
             axis=axis, profile=profile, up=up, start_clip=start_clip, end_clip=end_clip, name=name, style=style,
@@ -271,7 +272,7 @@ class PendingRevolvedBeam(PendingElement):
         profile: Sequence[ProfilePoint],
         name: str = "",
         ref_line: Optional[Line] = None,
-        style=None,
+        style: Optional[RenderStyle] = None,
     ) -> None:
         super().__init__(name=name, style=style)
         self.arc = arc

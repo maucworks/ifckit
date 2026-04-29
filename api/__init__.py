@@ -1,1 +1,0 @@
-"""ifckit stateful FastAPI service."""

@@ -1,6 +1,6 @@
 """
 gh_create_wall.py  —  GH Script component: "Create IFC Wall"
-==============================================================
+=============================================================
 
 Stateless component: serializes wall curves to JSON strings.
 
@@ -18,22 +18,7 @@ json_out : list — List of JSON strings (one per wall).
 """
 
 import json
-from ifckit import PendingWall, Vec, Plane
-
-
-def _pt(pt):
-    return Vec(pt.X, pt.Y, pt.Z)
-
-
-def _polyline_to_footprint(crv):
-    pl = crv.ToPolyline() if hasattr(crv, "ToPolyline") else crv
-    pts = [_pt(p) for p in pl]
-    if len(pts) > 1:
-        f, l = pts[0], pts[-1]
-        if abs(f.x - l.x) < 1e-6 and abs(f.y - l.y) < 1e-6:
-            pts = pts[:-1]
-    return pts
-
+from ifckit import PendingWall, Plane, rhinokit as rk
 
 messages = []
 json_outputs = []
@@ -44,9 +29,9 @@ if wall_curves:
     for i, crv in enumerate(curves):
         if crv is None:
             continue
+        el_name = f"{name or 'Wall'}-{i + 1}"
         try:
-            footprint = _polyline_to_footprint(crv)
-            el_name = f"{name or 'Wall'}-{i + 1}"
+            footprint = rk.polyline_to_vecs(crv)
             wall = PendingWall(
                 footprint=footprint,
                 plane=Plane.world_xy(),

@@ -42,7 +42,9 @@ class WallBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        if not isinstance(pending, PendingWall):
+        # Use element_type string comparison instead of isinstance() to handle
+        # class identity mismatches from module reloading in Rhino/Grasshopper.
+        if not hasattr(pending, 'element_type') or pending.element_type != 'basic_wall':
             raise TypeError(
                 f"WallBuilder expects PendingWall, got {type(pending).__name__}"
             )

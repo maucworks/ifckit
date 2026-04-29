@@ -203,9 +203,17 @@ class Plane:
     __slots__ = ("origin", "x_axis", "y_axis")
 
     def __init__(self, origin: "Vec", x_axis: "Vec", y_axis: "Vec") -> None:
+        x_norm = x_axis.normalized()
+        y_norm = y_axis.normalized()
+        dot = x_norm @ y_norm
+        if abs(dot) > 1e-6:
+            raise ValueError(
+                f"Plane x_axis and y_axis must be orthogonal (dot={dot:.2e}). "
+                f"Use Plane.from_origin_and_normal() to derive from a normal vector."
+            )
         self.origin = origin
-        self.x_axis = x_axis.normalized()
-        self.y_axis = y_axis.normalized()
+        self.x_axis = x_norm
+        self.y_axis = y_norm
 
     @property
     def z_axis(self) -> "Vec":

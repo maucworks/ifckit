@@ -84,7 +84,9 @@ class AlignmentBuilder:
             IfcSite (not contained in a storey), and its geometry is populated separately
             rather than via ``model.add()``.
         """
-        if not isinstance(pending, PendingAlignment):
+        # Use element_type string comparison instead of isinstance() to handle
+        # class identity mismatches from module reloading in Rhino/Grasshopper.
+        if not hasattr(pending, 'element_type') or pending.element_type != 'alignment':
             raise TypeError(
                 f"AlignmentBuilder expects PendingAlignment, got {type(pending).__name__}"
             )

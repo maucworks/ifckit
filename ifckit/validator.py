@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Type
 
 from ifckit.elements.base import PendingElement
+from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.bridge import (
     AlignmentSegment,
     PendingAlignment,
@@ -49,6 +50,10 @@ class ValidatorRegistry:
     """Registry for element validators with decorator-based auto-registration."""
 
     _validators: Dict[Type[PendingElement], Callable[..., ValidationResult]] = {}
+    # Secondary mapping by element_type string to validator callable. This
+    # helps when modules are reloaded and class objects differ between
+    # importers — matching by element_type string remains stable.
+    _validators_by_type: Dict[str, Callable[..., ValidationResult]] = {}
 
     @classmethod
     def register(
@@ -58,20 +63,54 @@ class ValidatorRegistry:
         """Decorator to register a validator for a PendingElement subclass."""
         def decorator(func: Callable[..., ValidationResult]) -> Callable[..., ValidationResult]:
             cls._validators[element_cls] = func
+            # Also register by element_type string when available
+            elem_type = getattr(element_cls, "element_type", None)
+            if elem_type:
+                cls._validators_by_type[elem_type] = func
             return func
         return decorator
 
     @classmethod
     def get(cls, element_cls: Type[PendingElement]) -> Callable[..., ValidationResult]:
         """Get validator for an element class."""
-        if element_cls not in cls._validators:
-            raise TypeError(f"No validator registered for {element_cls.__name__}")
-        return cls._validators[element_cls]
+        # Exact match
+        if element_cls in cls._validators:
+            return cls._validators[element_cls]
+
+        # Fallback 1: match by element_type attribute (robust across reloads)
+        elem_type = getattr(element_cls, "element_type", None)
+        if elem_type is not None:
+            if elem_type in cls._validators_by_type:
+                return cls._validators_by_type[elem_type]
+            # older registrations may not have populated the by_type map,
+            # fall back to scanning registered classes
+            for reg_cls, validator in cls._validators.items():
+                if getattr(reg_cls, "element_type", None) == elem_type:
+                    return validator
+
+        # Fallback 2: match by class name (handles duplicate class objects from reloads)
+        for reg_cls, validator in cls._validators.items():
+            if reg_cls.__name__ == element_cls.__name__:
+                return validator
+
+        raise TypeError(f"No validator registered for {element_cls.__name__}")
 
     @classmethod
     def has(cls, element_cls: Type[PendingElement]) -> bool:
         """Check if validator exists for element class."""
-        return element_cls in cls._validators
+        if element_cls in cls._validators:
+            return True
+        elem_type = getattr(element_cls, "element_type", None)
+        if elem_type is not None:
+            if elem_type in cls._validators_by_type:
+                return True
+            for reg_cls in cls._validators:
+                if getattr(reg_cls, "element_type", None) == elem_type:
+                    return True
+        for reg_cls in cls._validators:
+            if reg_cls.__name__ == element_cls.__name__:
+                return True
+        return False
 
 
 register_validator = ValidatorRegistry.register
@@ -381,5 +420,35 @@ def validate(pending: PendingElement) -> ValidationResult:
     Raises:
         TypeError: If the type is not recognised by any validator.
     """
-    validator = ValidatorRegistry.get(type(pending))
-    return validator(pending)
+    try:
+        validator = ValidatorRegistry.get(type(pending))
+        return validator(pending)
+    except TypeError:
+        # Best-effort fallback: try to match by element_type or class name.
+        pending_cls = type(pending)
+        elem_type = getattr(pending_cls, "element_type", None)
+
+        # Try matching by element_type via ElementRegistry to get the canonical class
+        if elem_type is not None:
+            try:
+                canonical = ElementRegistry.get(elem_type)
+                # If we can get a validator for the canonical class, use it
+                if ValidatorRegistry.has(canonical):
+                    validator = ValidatorRegistry.get(canonical)
+                    return validator(pending)
+            except KeyError:
+                # element type not in ElementRegistry — fall through to scanning
+                pass
+
+        for reg_cls, validator in ValidatorRegistry._validators.items():
+            if elem_type is not None and getattr(reg_cls, "element_type", None) == elem_type:
+                return validator(pending)
+            if reg_cls.__name__ == pending_cls.__name__:
+                return validator(pending)
+
+        # Nothing found — provide helpful error listing registered validators
+        registered = [f"{c.__name__} (type={getattr(c,'element_type',None)!r})" for c in ValidatorRegistry._validators.keys()]
+        raise TypeError(
+            f"No validator registered for {pending_cls.__name__}."
+            f" Available: {registered}"
+        )

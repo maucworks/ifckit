@@ -1,65 +1,88 @@
 """
-gh_create_beam.py  —  GH Script component: "Create IFC Beam"
-===============================================================
+gh_create_beam.py  —  GH Script component: "Create IFC Swept Beam"
+===================================================================
 
-Stateless component: serializes beam lines to JSON strings.
+Stateless component: serializes swept beam paths to JSON strings.
 
 Component inputs
 ----------------
-beam_lines   : list  — One or more Rhino Line objects (beam axes).
-profile_pts  : list  — Rhino Point3d objects defining the cross-section
-                       polygon in the local XY plane (X = width, Y = up).
-                       All beams share the same profile shape.
-                       Minimum 3 points; no closing duplicate needed.
-name         : str   — Optional element name prefix.
+path_curves  : list — Rhino LineCurve and/or ArcCurve objects defining the
+                      sweep path. Connected segments are merged into one path.
+profile_pts : list — Rhino Point3d objects defining the cross-section
+                      polygon in the local XY plane (X = width, Y = up).
+                      Minimum 3 points; no closing duplicate needed.
+profile_json: str  — JSON string from gh_profile.py (alternative to profile_pts).
+                      Takes precedence if both are provided.
+name         : str  — Optional element name prefix.
 
 Component outputs
 -----------------
 out     : str  — Status message.
 json_out : list — List of JSON strings (one per beam).
 
-Profile example — 200 × 300 mm rectangle (model unit = mm):
+Usage
+-----
+1. Direct profile points:
     profile_pts = [(-100,0,0), (100,0,0), (100,300,0), (-100,300,0)]
+
+2. From gh_profile component:
+    profile_json = (output from gh_profile.py)
 """
 
 import json
-from ifckit import PendingBeam, Line, Vec
+from ifckit import PendingSweptBeam, Vec, rhinokit as rk
 
 
-def _pt(pt):
-    return Vec(pt.X, pt.Y, pt.Z)
+def _path_from_curves(curves):
+    """Convert Rhino curve(s) to an ifckit Path via rhinokit helper."""
+    return rk.curves_to_path(curves)
 
 
-def _line(ln):
-    return Line(start=_pt(ln.From), end=_pt(ln.To))
+def _get_profile():
+    """Get profile from profile_json or profile_pts."""
+    if profile_json:
+        try:
+            data = json.loads(profile_json)
+            pts = data.get("profile", [])
+            return [Vec(*pt) for pt in pts]
+        except Exception:
+            pass
 
+    if profile_pts:
+        return rk.pts_to_vecs(profile_pts)
 
-def _profile(pts):
-    vecs = [_pt(p) for p in pts]
-    if len(vecs) > 1:
-        f, l = vecs[0], vecs[-1]
-        if abs(f.x - l.x) < 1e-6 and abs(f.y - l.y) < 1e-6:
-            vecs = vecs[:-1]
-    return vecs
+    return None
 
 
 messages = []
 json_outputs = []
 
-if beam_lines and profile_pts:
-    lines = beam_lines if hasattr(beam_lines, "__iter__") else [beam_lines]
-    prof = _profile(profile_pts)
+if path_curves:
+    curves = path_curves if hasattr(path_curves, "__iter__") else [path_curves]
+    path = _path_from_curves(curves)
 
-    for i, ln in enumerate(lines):
-        if ln is None:
-            continue
-        try:
-            el_name = f"{name or 'Beam'}-{i + 1}"
-            beam = PendingBeam(axis=_line(ln), profile=prof, name=el_name)
-            json_outputs.append(beam.to_json())
-            messages.append(f"OK  {el_name}")
-        except Exception as exc:
-            messages.append(f"ERR line[{i}]: {exc}")
+    if not path:
+        messages.append("ERR: no valid path segments")
+    else:
+        prof = _get_profile()
+        if not prof:
+            messages.append("ERR: no profile (provide profile_pts or profile_json)")
+        else:
+            for i, _ in enumerate([curves[0]]):  # single beam from path
+                try:
+                    el_name = f"{name or 'SweptBeam'}-{i + 1}"
+                    beam = PendingSweptBeam(
+                        path=path,
+                        profile=prof,
+                        name=el_name,
+                    )
+                    json_outputs.append(beam.to_json())
+                    messages.append(f"OK  {el_name}")
+                except Exception as exc:
+                    messages.append(f"ERR {el_name}: {exc}")
+
+elif not path_curves:
+    messages.append("No path curves")
 
 out = "\n".join(messages) if messages else "No beams processed."
 json_out = json_outputs if json_outputs else []

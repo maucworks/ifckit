@@ -35,6 +35,7 @@ Workflow
 import json
 import os
 import sys
+import importlib
 
 # Ensure local ifckit is on path (for development).
 # Set the IFCKIT_PATH environment variable or edit this fallback to your checkout.
@@ -42,6 +43,28 @@ _fallback_path = r'/Users/Mauc/L140-py-ifckit'
 pkg_path = os.environ.get('IFCKIT_PATH', _fallback_path)
 if pkg_path not in sys.path:
     sys.path.insert(0, pkg_path)
+
+# Rhino/Grasshopper: force reload to pick up code changes and avoid
+# class-identity mismatches that break isinstance() checks.
+# NOTE: Must import and reload submodules explicitly (reload() doesn't cascade).
+import ifckit
+import ifckit.json_build
+import ifckit.builders
+import ifckit.builders.swept  # <-- MUST import explicitly
+import ifckit.elements
+import ifckit.elements.swept
+import ifckit.geometry
+import ifckit.validator
+
+# Reload in dependency order (leaves before roots)
+importlib.reload(ifckit.geometry)
+importlib.reload(ifckit.elements)
+importlib.reload(ifckit.elements.swept)
+importlib.reload(ifckit.builders.swept)  # <-- MUST reload explicitly
+importlib.reload(ifckit.builders)
+importlib.reload(ifckit.validator)
+importlib.reload(ifckit.json_build)
+importlib.reload(ifckit)
 
 from ifckit.json_build import build
 

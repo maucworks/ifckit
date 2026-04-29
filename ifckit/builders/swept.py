@@ -66,29 +66,30 @@ class SweptElementBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        if not isinstance(pending, PendingSweptBeam):
+        # Use element_type string comparison instead of isinstance() to handle
+        # class identity mismatches from module reloading in Rhino/Grasshopper.
+        if not hasattr(pending, "element_type") or pending.element_type != "swept_beam":
             raise TypeError(
                 f"SweptElementBuilder expects PendingSweptBeam, got {type(pending).__name__}"
             )
 
         elev = storey_elevation(container)
 
-        # Resolve up vector
+        # Resolve up vector and compute first tangent for FixedReference
         path = pending.path
+        if isinstance(path, Line):
+            first_tangent = path.direction
+        elif isinstance(path, Arc):
+            first_tangent = path.tangent_at_start()
+        else:
+            first_tangent = path.start_tangent()
+            if first_tangent is None:
+                raise ValueError("SweptElementBuilder: path has no segments")
+
         if pending.up is not None:
             up = pending.up.normalized()
         else:
             # Derive a sensible default from the first tangent
-            if isinstance(path, Line):
-                first_tangent: Optional[Vec] = path.direction
-            elif isinstance(path, Arc):
-                first_tangent = path.tangent_at_start()
-            else:
-                first_tangent = path.start_tangent()
-                if first_tangent is None:
-                    raise ValueError(
-                        "SweptElementBuilder: path has no segments — cannot derive up vector"
-                    )
             up = Vec(0.0, 0.0, 1.0)
             if abs(first_tangent @ up) > 0.999:
                 up = Vec(0.0, 1.0, 0.0)
@@ -102,10 +103,22 @@ class SweptElementBuilder:
             directrix = directrix_from_path(ifc_file, path)
 
         # Profile (2-D points in cross-section XY plane)
-        pts_2d = [(p.x, p.y) for p in pending.profile]
+        # Convention: User defines profile with X=width, Y=up
+        # IfcFixedReferenceSweptAreaSolid (IFC standard):
+        #   Axis1 (X) = FixedReference direction (orthogonal projection)
+        #   Axis3 (Z) = tangent of directrix at point
+        #   Axis2 (Y) = Z × X
+        # We set FixedReference = up × tangent, so:
+        #   X = horizontal (perpendicular to up and tangent)
+        #   Y = tangent × X = up (projected perpendicular to tangent)
+        # Thus profile X maps to width, Y maps to up as intended.
+        # Profile (no rotation - use as provided)
+        pts_2d = [(p.y, p.x) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
 
-        # FixedReference — the world-space vector that profile Y tracks
+        # FixedReference = up (Axis1 of profile plane)
+        # DEBUG: print to verify up is being used
+        print(f"DEBUG: up={up}, fixed_ref will be ({up.x}, {up.y}, {up.z})")
         fixed_ref = dir3(ifc_file, up.x, up.y, up.z)
 
         solid = ifc_file.create_entity(
@@ -130,7 +143,9 @@ class SweptElementBuilder:
         # ObjectPlacement: world origin (IfcFixedReferenceSweptAreaSolid uses world coords)
         world_origin = Vec(0.0, 0.0, 0.0)
         world_plane = Plane(world_origin, Vec(1, 0, 0), Vec(0, 1, 0))
-        op = local_placement(ifc_file, world_plane, relative_to=container.ObjectPlacement)
+        op = local_placement(
+            ifc_file, world_plane, relative_to=container.ObjectPlacement
+        )
 
         element = ifcopenshell.api.run(
             "root.create_entity",
@@ -179,7 +194,9 @@ def _apply_clip_world(
     ref = _arbitrary_perp(n)
     half_space_pos = ifc_file.create_entity(
         "IfcAxis2Placement3D",
-        Location=pt3(ifc_file, clip_plane.origin.x, clip_plane.origin.y, clip_plane.origin.z),
+        Location=pt3(
+            ifc_file, clip_plane.origin.x, clip_plane.origin.y, clip_plane.origin.z
+        ),
         Axis=dir3(ifc_file, n.x, n.y, n.z),
         RefDirection=dir3(ifc_file, ref.x, ref.y, ref.z),
     )

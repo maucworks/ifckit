@@ -12,6 +12,7 @@ import math
 from typing import Any, Dict, Optional, Union
 
 from ifckit.elements.base import PendingElement
+from ifckit.elements.style import RenderStyle
 from ifckit.elements.structural import (
     ProfileInput,
     _coerce_profile,
@@ -41,11 +42,19 @@ def _validate_up_for_path(up: Vec, path: PathInput, cls_name: str) -> None:
                 f"{tangent!r} — cannot define a cross-section frame"
             )
 
+    # Accept both Path instances and plain lists/tuples of segments
     if isinstance(path, Line):
         _check(path.direction)
     elif isinstance(path, Arc):
         _check(path.tangent_at_start())
         _check(path.tangent_at_end())
+    elif isinstance(path, (list, tuple)):
+        for seg in path:
+            if isinstance(seg, Line):
+                _check(seg.direction)
+            else:
+                _check(seg.tangent_at_start())
+                _check(seg.tangent_at_end())
     else:  # Path
         for seg in path.segments:
             if isinstance(seg, Line):
@@ -85,7 +94,7 @@ class PendingSweptBeam(PendingElement):
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
-        style=None,
+        style: Optional[RenderStyle] = None,
     ) -> None:
         super().__init__(name=name, style=style)
         self.path = path
@@ -102,6 +111,7 @@ class PendingSweptBeam(PendingElement):
 
     @staticmethod
     def _path_to_dict(path: PathInput) -> Dict[str, Any]:
+        # Accept Path, or plain lists/tuples of Line/Arc segments (compat shim for Rhino/GH)
         if isinstance(path, Line):
             return {
                 "type": "line",
@@ -116,9 +126,15 @@ class PendingSweptBeam(PendingElement):
                 "start": path.start.to_tuple(),
                 "angle_deg": math.degrees(path.angle),
             }
-        # Path
+        # Path or sequence of segments
         segs = []
-        for seg in path.segments:
+        segments = None
+        if isinstance(path, (list, tuple)):
+            segments = path
+        else:
+            segments = path.segments
+
+        for seg in segments:
             if isinstance(seg, Line):
                 segs.append(
                     {
