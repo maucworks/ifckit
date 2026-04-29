@@ -1,0 +1,105 @@
+{
+  "ifc_version": "IFC4",
+  "project": {
+    "name": "Example Building",
+    "author": "ifckit CLI"
+  },
+  "unit": "MILLIMETRE",
+  "site": {
+    "name": "Main Site"
+  },
+  "buildings": [
+    {
+      "name": "Building A",
+      "storeys": [
+        {
+          "name": "Ground Floor",
+          "elevation": 0.0,
+          "elements": [
+            {
+              "type": "basic_wall",
+              "data": {
+                "type": "basic_wall",
+                "name": "Ext Wall North",
+                "footprint": [
+                  [0.0, 0.0, 0.0],
+                  [10000.0, 0.0, 0.0],
+                  [10000.0, 200.0, 0.0],
+                  [0.0, 200.0, 0.0]
+                ],
+                "height": 3000.0,
+                "plane": {
+                  "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                  "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                  "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0}
+                }
+              }
+            },
+            {
+              "type": "basic_wall",
+              "data": {
+                "type": "basic_wall",
+                "name": "Ext Wall East",
+                "footprint": [
+                  [10000.0, 0.0, 0.0],
+                  [12000.0, 0.0, 0.0],
+                  [12000.0, 8000.0, 0.0],
+                  [10000.0, 8000.0, 0.0]
+                ],
+                "height": 3000.0,
+                "plane": {
+                  "origin": {"x": 10000.0, "y": 0.0, "z": 0.0},
+                  "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                  "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0}
+                }
+              }
+            },
+            {
+              "type": "beam",
+              "data": {
+                "type": "basic_beam",
+                "name": "Floor Beam 1",
+                "axis": {
+                  "start": [0.0, 1000.0, 2500.0],
+                  "end": [10000.0, 1000.0, 2500.0]
+                },
+                "profile": [
+                  [-100.0, 0.0, 0.0],
+                  [100.0, 0.0, 0.0],
+                  [100.0, 300.0, 0.0],
+                  [-100.0, 300.0, 0.0]
+                ],
+                "up": [0.0, 0.0, 1.0]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Floor 1",
+          "elevation": 3000.0,
+          "elements": [
+            {
+              "type": "basic_wall",
+              "data": {
+                "type": "basic_wall",
+                "name": "Ext Wall North F1",
+                "footprint": [
+                  [0.0, 0.0, 0.0],
+                  [10000.0, 0.0, 0.0],
+                  [10000.0, 200.0, 0.0],
+                  [0.0, 200.0, 0.0]
+                ],
+                "height": 2800.0,
+                "plane": {
+                  "origin": {"x": 0.0, "y": 0.0, "z": 3000.0},
+                  "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                  "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0}
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
