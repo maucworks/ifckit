@@ -16,109 +16,20 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.schema import IfcSchema, LengthUnit, get_schema_name
-
+from ifckit.handles import (
+    SiteHandle,
+    BuildingHandle,
+    StoreyHandle,
+    BridgeHandle,
+    BridgePartHandle,
+    AlignmentHandle,
+    EntityHandle,
+)
 
 _UNIT_PREFIX: dict = {
     LengthUnit.METRE: None,
     LengthUnit.MILLIMETRE: "MILLI",
 }
-
-
-class Handle:
-    """Base class for all entity wrappers."""
-
-    __slots__ = ("_entity", "_model")
-
-    def __init__(self, entity: ifcopenshell.entity_instance, model: "IfcModel") -> None:
-        object.__setattr__(self, "_entity", entity)
-        object.__setattr__(self, "_model", model)
-
-    @property
-    def entity(self) -> ifcopenshell.entity_instance:
-        return object.__getattribute__(self, "_entity")
-
-    @property
-    def _model_ref(self) -> "IfcModel":
-        return object.__getattribute__(self, "_model")
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.entity.is_a()})"
-
-
-class SiteHandle(Handle):
-    """Thin wrapper around an ifcopenshell IfcSite entity."""
-
-    def add_building(
-        self,
-        name: str,
-        description: Optional[str] = None,
-    ) -> "BuildingHandle":
-        """Create an IfcBuilding under this site."""
-        return self._model_ref.add_building(self, name, description=description)
-
-    def add_bridge(
-        self,
-        name: str,
-        description: Optional[str] = None,
-    ) -> "BridgeHandle":
-        """Create an IfcBridge under this site (IFC4X3 only)."""
-        return self._model_ref.add_bridge(self, name, description=description)
-
-    def add_alignment(self, name: str) -> "AlignmentHandle":
-        """Create an IfcAlignment under this site (IFC4X3 only)."""
-        return self._model_ref.add_alignment(self, name)
-
-
-class BuildingHandle(Handle):
-    """Thin wrapper around an ifcopenshell IfcBuilding entity."""
-
-    def add_storey(
-        self,
-        name: str,
-        elevation: float = 0.0,
-    ) -> "StoreyHandle":
-        """Create an IfcBuildingStorey under this building."""
-        return self._model_ref.add_storey(self, name, elevation=elevation)
-
-
-class StoreyHandle(Handle):
-    """Thin wrapper around an ifcopenshell IfcBuildingStorey entity."""
-
-    def add(self, pending: "PendingElement") -> "EntityHandle":
-        """Validate and build *pending*, placing it in this storey."""
-        return self._model_ref.add(pending, self)
-
-
-class BridgeHandle(Handle):
-    """Thin wrapper around an ifcopenshell IfcBridge entity (IFC4X3)."""
-
-    def add_bridge_part(
-        self,
-        name: str,
-        part_type: str = "NOTDEFINED",
-    ) -> "BridgePartHandle":
-        """Create an IfcBridgePart under this bridge."""
-        return self._model_ref.add_bridge_part(self, name, part_type=part_type)
-
-
-class BridgePartHandle(Handle):
-    """Thin wrapper around an ifcopenshell IfcBridgePart entity (IFC4X3)."""
-
-    def add(self, pending: "PendingElement") -> "EntityHandle":
-        """Validate and build *pending*, placing it in this bridge part."""
-        return self._model_ref.add(pending, self)
-
-
-class AlignmentHandle(Handle):
-    """Thin wrapper around an ifcopenshell IfcAlignment entity (IFC4X3)."""
-
-    pass
-
-
-class EntityHandle(Handle):
-    """Generic wrapper around any ifcopenshell product entity."""
-
-    pass
 
 
 class IfcModel:
@@ -155,7 +66,6 @@ class IfcModel:
         schema_str = get_schema_name(schema)
         self._file = ifcopenshell.file(schema=schema_str)
 
-        # Create IfcProject
         self._project = ifcopenshell.api.run(
             "root.create_entity",
             self._file,
@@ -163,8 +73,6 @@ class IfcModel:
             name=name,
         )
 
-        # Assign SI units according to the requested length unit.
-        # Also add area and volume units for complete unit assignment.
         if unit in _UNIT_PREFIX:
             prefix = _UNIT_PREFIX[unit]
             kwargs: dict = {"unit_type": "LENGTHUNIT"}
@@ -187,7 +95,6 @@ class IfcModel:
                 "Use LengthUnit.METRE or LengthUnit.MILLIMETRE."
             )
 
-        # Record author in IfcOwnerHistory if provided.
         if author:
             ifcopenshell.api.run(
                 "owner.add_person",
@@ -196,14 +103,12 @@ class IfcModel:
                 family_name=author,
             )
 
-        # Add geometric representation context (needed for geometry)
         self._context = ifcopenshell.api.run(
             "context.add_context",
             self._file,
             context_type="Model",
         )
 
-        # Builder registry (lazy import to avoid circular deps at module load)
         from ifckit.builders import default_registry
 
         self._registry = default_registry()
@@ -233,7 +138,6 @@ class IfcModel:
             LookupError:  If no builder is registered for the element type.
             ValueError:   If validation fails (message lists all errors).
         """
-        from ifckit.elements.base import PendingElement
         from ifckit.validator import validate
 
         if not isinstance(container, (StoreyHandle, BridgePartHandle)):
@@ -242,7 +146,6 @@ class IfcModel:
                 f"got {type(container).__name__}"
             )
 
-        # Validate — raise on errors, warn on warnings
         result = validate(pending)
         for w in result.warnings:
             _warnings.warn(w, stacklevel=2)
@@ -252,15 +155,14 @@ class IfcModel:
                 f"'{pending.name}':\n" + "\n".join(f"  - {e}" for e in result.errors)
             )
 
-        # Resolve builder
-        builder = self._registry.get(pending.element_type)
-        if builder is None:
+        try:
+            builder = self._registry.get(pending.element_type)
+        except KeyError:
             raise LookupError(
                 f"No builder registered for element type {pending.element_type!r}. "
                 "Register one via model._registry.register() or use default_registry()."
             )
 
-        # Build using the model's body context
         from ifckit.builders._geom import get_body_context
 
         ctx = get_body_context(self._file)
@@ -314,8 +216,8 @@ class IfcModel:
         if elevation is not None:
             site.RefElevation = elevation
         if location is not None:
-            from ifckit.geometry import Vec, Plane
             from ifckit.builders._geom import local_placement
+            from ifckit.geometry import Plane, Vec
 
             origin = Vec(*location)
             plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
@@ -372,9 +274,8 @@ class IfcModel:
         )
         storey.Elevation = elevation
 
-        # Create ObjectPlacement: origin at (0, 0, elevation) in project space.
-        from ifckit.geometry import Vec, Plane
         from ifckit.builders._geom import local_placement
+        from ifckit.geometry import Plane, Vec
 
         origin = Vec(0.0, 0.0, float(elevation))
         plane = Plane(origin, Vec(1, 0, 0), Vec(0, 1, 0))
@@ -549,6 +450,97 @@ class IfcModel:
         """Serialise the IFC model to a STEP string (no file I/O)."""
         return self._file.to_string()
 
+    def export(self, path: str) -> None:
+        """
+        Export the model to a geometry format via ifcopenshell serializers.
+
+        The output format is inferred from the file extension:
+
+        ============  ========================================================
+        Extension     Format
+        ============  ========================================================
+        ``.ifc``      Native IFC STEP (same as ``save()``)
+        ``.obj``      Wavefront OBJ (+ a ``.mtl`` sidecar written alongside)
+        ``.glb``      Binary glTF 2.0
+        ``.gltf``     Binary glTF 2.0 (same as ``.glb``)
+        ``.svg``      2-D SVG plan views
+        ``.xml``      ifcXML
+        ``.dae``      Collada (only if ifcopenshell is built with Collada support)
+        ``.ttl``      TTL/WKT geometry (only if supported by installed build)
+        ============  ========================================================
+
+        Args:
+            path: Destination file path including extension.
+
+        Raises:
+            ValueError:  If the extension is not recognised.
+            ImportError: If the requested serializer is not available in the
+                         current ifcopenshell build (e.g. Collada, HDF5).
+
+        Example::
+
+            model.save("output/bridge.ifc")        # always works
+            model.export("output/bridge.obj")      # Wavefront OBJ + .mtl
+            model.export("output/bridge.glb")      # binary glTF
+            model.export("output/bridge.svg")      # SVG floor plan
+        """
+        import os
+        import tempfile
+
+        ext = os.path.splitext(path)[1].lower().lstrip(".")
+
+        if ext == "ifc":
+            self.save(path)
+            return
+
+        try:
+            import ifcopenshell.geom as _geom
+        except ImportError as exc:
+            raise ImportError(
+                "ifcopenshell.geom is required for geometry export. "
+                "Make sure ifcopenshell is installed with geometry support."
+            ) from exc
+
+        try:
+            serializer_factory = _geom.serializers.guess_from_extension(path)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+        if serializer_factory is None:
+            raise ImportError(
+                f"The serializer for .{ext} is not available in this ifcopenshell build."
+            )
+
+        geom_settings = _geom.settings()
+        geom_settings.set(geom_settings.USE_WORLD_COORDS, True)
+        s_settings = _geom.serializer_settings()
+
+        with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            self._file.write(tmp_path)
+
+            it = _geom.iterator(geom_settings, tmp_path)
+
+            if ext == "obj":
+                mtl_path = os.path.splitext(path)[0] + ".mtl"
+                serializer = serializer_factory(path, mtl_path, geom_settings, s_settings)
+            else:
+                serializer = serializer_factory(path, geom_settings, s_settings)
+
+            serializer.setFile(it.file)
+            serializer.writeHeader()
+
+            if it.initialize():
+                while True:
+                    serializer.write(it.get())
+                    if not it.next():
+                        break
+
+            serializer.finalize()
+        finally:
+            os.unlink(tmp_path)
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
@@ -564,3 +556,34 @@ class IfcModel:
     def ifc_file(self) -> ifcopenshell.file:
         """Direct access to the underlying ifcopenshell file (advanced use)."""
         return self._file
+
+    def clear(self) -> int:
+        """
+        Remove all elements from the entire model (all sites, buildings, storeys).
+
+        Returns:
+            The number of elements removed.
+        """
+        removed = 0
+        for rel in self._project.ContainsElements or []:
+            for product in rel.RelatedElements:
+                self._file.remove(product)
+                removed += 1
+        return removed
+
+    def _clear_container(self, container) -> int:
+        """
+        Remove all products contained in a spatial container (storey, building, site, etc).
+
+        Args:
+            container: An ifcopenshell entity (IfcBuildingStorey, IfcBuilding, IfcSite, etc).
+
+        Returns:
+            The number of elements removed.
+        """
+        removed = 0
+        for rel in container.ContainsElements or []:
+            for product in rel.RelatedElements:
+                self._file.remove(product)
+                removed += 1
+        return removed

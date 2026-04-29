@@ -16,8 +16,23 @@ Quick start::
     model.save("/output/project.ifc")
 """
 
-# Geometry primitives
-from ifckit.geometry import (  # noqa: F401
+from ifckit.builders import BuilderRegistry, default_registry
+from ifckit.elements import (
+    AlignmentSegment,
+    BridgePartType,
+    PendingAlignment,
+    PendingBeam,
+    PendingBridge,
+    PendingBridgePart,
+    PendingColumn,
+    PendingExtrudedElement,
+    PendingRevolvedBeam,
+    PendingSlab,
+    PendingSweptBeam,
+    PendingWall,
+)
+from ifckit.elements.registry import ElementRegistry
+from ifckit.geometry import (
     Arc,
     Line,
     Path,
@@ -26,42 +41,24 @@ from ifckit.geometry import (  # noqa: F401
     Vec,
     parallel_transport_frames,
 )
-
-# Schema
-from ifckit.schema import IfcSchema, LengthUnit  # noqa: F401
-
-# Model
-from ifckit.model import IfcModel  # noqa: F401
-
-# Elements
-from ifckit.elements import (  # noqa: F401
-    PendingWall,
-    PendingSlab,
-    PendingBeam,
-    PendingColumn,
-    PendingRevolvedBeam,
-    PendingSweptBeam,
-    PendingBridge,
-    PendingBridgePart,
-    PendingAlignment,
-    AlignmentSegment,
-    BridgePartType,
+from ifckit.json_build import build, build_from_json, validate_json
+from ifckit.model import IfcModel
+from ifckit.handles import (
+    SiteHandle,
+    BuildingHandle,
+    StoreyHandle,
+    BridgeHandle,
+    BridgePartHandle,
+    AlignmentHandle,
+    EntityHandle,
 )
-
-# Validator
-from ifckit.validator import validate, ValidationResult  # noqa: F401
-
-# Builder registry
-from ifckit.builders import BuilderRegistry, default_registry  # noqa: F401
-from ifckit.builders import SweptElementBuilder, SweptBeamBuilder  # noqa: F401
-
-# Profiles
-from ifckit.profiles import IBeamProfile, LBeamProfile  # noqa: F401
+from ifckit.profiles import IBeamProfile, LBeamProfile
+from ifckit.schema import IfcSchema, LengthUnit
+from ifckit.validator import ValidationResult, validate
 
 __version__ = "0.1.0"
 
 __all__ = [
-    # geometry
     "Vec",
     "Plane",
     "Line",
@@ -69,16 +66,14 @@ __all__ = [
     "Polyline",
     "Path",
     "parallel_transport_frames",
-    # schema
     "IfcSchema",
     "LengthUnit",
-    # model
     "IfcModel",
-    # elements
     "PendingWall",
     "PendingSlab",
     "PendingBeam",
     "PendingColumn",
+    "PendingExtrudedElement",
     "PendingRevolvedBeam",
     "PendingSweptBeam",
     "PendingBridge",
@@ -86,15 +81,21 @@ __all__ = [
     "PendingAlignment",
     "AlignmentSegment",
     "BridgePartType",
-    # validator
+    "ElementRegistry",
     "validate",
     "ValidationResult",
-    # builders
     "BuilderRegistry",
     "default_registry",
-    "SweptElementBuilder",
-    "SweptBeamBuilder",
-    # profiles
     "IBeamProfile",
     "LBeamProfile",
+    "build",
+    "build_from_json",
+    "validate_json",
+    "SiteHandle",
+    "BuildingHandle",
+    "StoreyHandle",
+    "BridgeHandle",
+    "BridgePartHandle",
+    "AlignmentHandle",
+    "EntityHandle",
 ]
