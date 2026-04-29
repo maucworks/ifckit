@@ -23,14 +23,13 @@ a world-space Plane whose z_axis points toward material to keep.
 
 from __future__ import annotations
 
-from __future__ import annotations
-
 import ifcopenshell
 import ifcopenshell.api
 from typing import Optional
 
 from ifckit.builders._geom import (
     _arbitrary_perp,
+    apply_style,
     dir3,
     directrix_from_arc,
     directrix_from_line,
@@ -149,6 +148,7 @@ class SweptElementBuilder:
             relating_structure=container,
         )
 
+        apply_style(ifc_file, element, pending.style)
         return element
 
 

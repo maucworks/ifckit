@@ -40,6 +40,7 @@ import ifcopenshell.api
 
 from ifckit.builders._geom import (
     _arbitrary_perp,
+    apply_style,
     axis2placement3d,
     dir3,
     extrude_profile,
@@ -148,6 +149,7 @@ class ExtrudedElementBuilder:
             relating_structure=container,
         )
 
+        apply_style(ifc_file, element, pending.style)
         return element
 
 

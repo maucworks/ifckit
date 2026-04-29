@@ -11,9 +11,9 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
+    apply_style,
     axis2placement3d,
     extrude_profile,
-    get_body_context,
     local_placement,
     product_definition_shape,
     profile_from_points,
@@ -73,8 +73,7 @@ class WallBuilder:
         solid = extrude_profile(ifc_file, profile, pending.height, position=placement)
 
         # Representation
-        body_ctx = get_body_context(ifc_file)
-        shape_rep = shape_representation(ifc_file, body_ctx, solid)
+        shape_rep = shape_representation(ifc_file, context, solid)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         # Entity
@@ -94,4 +93,5 @@ class WallBuilder:
             relating_structure=container,
         )
 
+        apply_style(ifc_file, wall, pending.style)
         return wall

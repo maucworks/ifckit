@@ -15,49 +15,39 @@ Layer hierarchy mirrors IFC spatial structure::
 
 Inputs
 ------
-ifc_path : str — Path to IFC file (.ifc)
+ifc_path : str  — Path to IFC file (.ifc)
 clear    : bool — Clear existing before import (default: False)
 delete   : bool — Delete removed elements (default: False)
+quality  : str  — Mesh quality: superfine/fine/default/coarse/supercoarse
+run      : bool — Set True to trigger import
 
 Outputs
 -------
 out     : str — Status message
 count   : int — Number of elements imported
-
-Usage
------
-1. Connect IFC file path to ifc_path
-2. Optional: toggle clear to clear existing meshes first
-3. Optional: toggle delete to remove meshes no longer in IFC
-4. Read count to verify import
 """
 
-import scriptcontext as sc
-import Rhino
+import importlib
+import ifckit.rhino_import
+importlib.reload(ifckit.rhino_import)
+
+from ifckit.rhino_import import IfcMeshImporter
+
+count = 0
 
 if not ifc_path:
     out = "No IFC file"
-    count = 0
+elif not run:
+    out = f"Ready. Set run=True to import:\n  {ifc_path}"
 else:
-    try:
-        from ifckit.rhino_import import IfcMeshImporter
-    except ImportError as e:
-        out = f"Import failed: {e}"
-        count = 0
-    else:
-        scale = float(scale) if scale else 1.0  # default: METRE
-
-        importer = IfcMeshImporter(
-            layer_root="IFC",
-            clear_on_import=bool(clear),
-            use_active_doc=True,
-            scale_factor=scale
-        )
-
-        if delete:
-            importer.set_delete_removed(True)
-
-        count = importer.import_file(ifc_path)
-        out = f"Imported {count} elements"
+    q = (quality or "default").strip().lower()
+    importer = IfcMeshImporter(
+        layer_root="IFC",
+        clear_on_import=bool(clear),
+        delete_removed=bool(delete),
+        mesh_quality=q,
+    )
+    count = importer.import_file(ifc_path)
+    out = f"Imported {count} elements from:\n  {ifc_path}"
 
 print(out)

@@ -85,8 +85,9 @@ class PendingSweptBeam(PendingElement):
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
+        style=None,
     ) -> None:
-        super().__init__(name=name)
+        super().__init__(name=name, style=style)
         self.path = path
         self.profile = _coerce_profile(profile)
         self.start_clip = start_clip
@@ -189,4 +190,5 @@ class PendingSweptBeam(PendingElement):
             start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
             end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
             name=d.get("name", ""),
+            style=cls._style_from_dict(d),
         )

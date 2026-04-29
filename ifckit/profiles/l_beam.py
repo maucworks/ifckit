@@ -22,8 +22,10 @@ Anchor points (where (0, 0) is placed relative to the profile):
     n   mid top
     ne  top-right corner
 
-Points are returned in the local YZ plane (Y = horizontal, Z = vertical),
-suitable for use as a PendingBeam / PendingColumn profile in ifckit.
+Points are returned as (x, y) tuples in the local XY plane (X = horizontal,
+Y = vertical), consistent with IBeamProfile and the profile coordinate system
+used throughout ifckit builders (``_coerce_profile`` maps the first tuple value
+to X, the second to Y).
 """
 
 from __future__ import annotations
@@ -124,7 +126,8 @@ class LBeamProfile:
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """
-        Return 6 (y, z) points defining the closed L-section in the local YZ plane.
+        Return 6 (x, y) points defining the closed L-section in the local XY plane.
+        X = horizontal, Y = vertical — consistent with IBeamProfile and ifckit builders.
         The closing duplicate is NOT included; profile_from_points() adds it automatically.
 
         Profile shape (anchor='sw', origin at bottom-left):

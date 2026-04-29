@@ -55,9 +55,9 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
 
 def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     """Build an IfcModel from a JSON dict."""
-    result = validate_json(data)
-    if not result.ok:
-        raise ValueError(f"Invalid JSON: {'; '.join(result.errors)}")
+    json_result = validate_json(data)
+    if not json_result.ok:
+        raise ValueError(f"Invalid JSON: {'; '.join(json_result.errors)}")
 
     schema_str = data.get("ifc_version", "IFC4")
     schema = IfcSchema.IFC4 if schema_str == "IFC4" else IfcSchema.IFC4X3
@@ -84,7 +84,15 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                 # Support both formats: {"type": "...", "data": {...}} or {"type": "...", ...}
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
                 
-                cls = ElementRegistry.get(elem_type)
+                try:
+                    cls = ElementRegistry.get(elem_type)
+                except KeyError:
+                    raise KeyError(
+                        f"Unknown element type {elem_type!r} in "
+                        f"building '{bldg_data.get('name')}' / "
+                        f"storey '{storey_data.get('name')}'. "
+                        f"Available: {list(ElementRegistry.types().keys())}"
+                    )
                 pending = cls.from_dict(elem_dict)
                 
                 result = validate(pending)

@@ -297,7 +297,7 @@ class TestPendingElementSerialization:
         assert len(wall2.footprint) == 4
 
     def test_from_json_unknown_type_raises(self):
-        with pytest.raises(ValueError, match="Unknown element type"):
+        with pytest.raises(KeyError, match="unknown_type"):
             PendingWall.from_json('{"type": "unknown_type"}')
 
 

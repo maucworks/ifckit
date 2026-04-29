@@ -13,6 +13,7 @@ import json as _json
 from typing import Any, Dict, Optional
 
 from ifckit.elements.registry import ElementRegistry, RegisterElementType
+from ifckit.elements.style import RenderStyle
 
 ClipData = Dict[str, Any]
 
@@ -34,15 +35,19 @@ class PendingElement(metaclass=RegisterElementType):
         self,
         name: str = "",
         clip_data: Optional[ClipData] = None,
+        style: Optional[RenderStyle] = None,
     ) -> None:
         self.name = name
         self.clip_data = clip_data
+        self.style = style
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict (useful for JSON transport / debugging)."""
         d: Dict[str, Any] = {"type": self.element_type, "name": self.name}
         if self.clip_data:
             d["clip_data"] = self.clip_data
+        if self.style is not None:
+            d["style"] = self.style.to_dict()
         return d
 
     def to_json(self, **kwargs) -> str:
@@ -91,6 +96,12 @@ class PendingElement(metaclass=RegisterElementType):
         if key not in d:
             raise ValueError(f"{cls.__name__}: missing required field '{key}'")
         return d[key]
+
+    @classmethod
+    def _style_from_dict(cls, d: Dict[str, Any]) -> Optional[RenderStyle]:
+        """Helper: deserialise optional style from dict."""
+        raw = d.get("style")
+        return RenderStyle.from_dict(raw) if raw is not None else None
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"

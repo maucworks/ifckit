@@ -11,8 +11,8 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
+    apply_style,
     dir3,
-    get_body_context,
     local_placement,
     product_definition_shape,
     profile_from_points,
@@ -76,7 +76,6 @@ class RevolvedBeamBuilder:
         # but IfcRevolvedAreaSolid places the profile at the start and sweeps.
         # Position: local X = radial direction from center to start
         radial = (arc.start - arc.center).normalized()
-        tangent = arc.tangent_at_start()
 
         local_arc_start = _local_pt(arc.start)
         local_arc_center = _local_pt(arc.center)
@@ -84,7 +83,7 @@ class RevolvedBeamBuilder:
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
             Location=pt3(ifc_file, *local_arc_start.to_tuple()),
-            Axis=dir3(ifc_file, *tangent.to_tuple()),  # local Z = extrusion direction
+            Axis=dir3(ifc_file, *start_tangent.to_tuple()),  # local Z = extrusion direction
             RefDirection=dir3(ifc_file, *radial.to_tuple()),
         )
 
@@ -103,7 +102,7 @@ class RevolvedBeamBuilder:
             Angle=abs(arc.angle),  # IFC expects positive angle
         )
 
-        body_ctx = get_body_context(ifc_file)
+        body_ctx = context
         shape_rep = shape_representation(ifc_file, body_ctx, solid, rep_type="SweptSolid")
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
@@ -122,4 +121,5 @@ class RevolvedBeamBuilder:
             relating_structure=container,
         )
 
+        apply_style(ifc_file, beam, pending.style)
         return beam

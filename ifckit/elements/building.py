@@ -36,8 +36,9 @@ class PendingWall(PendingElement):
         height: float,
         name: str = "",
         clip_data: Optional[ClipData] = None,
+        style=None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data)
+        super().__init__(name=name, clip_data=clip_data, style=style)
         self.footprint = list(footprint)
         self.plane = plane
         self.height = float(height)
@@ -60,6 +61,7 @@ class PendingWall(PendingElement):
             height=height,
             name=d.get("name", ""),
             clip_data=d.get("clip_data"),
+            style=cls._style_from_dict(d),
         )
 
 
@@ -85,8 +87,9 @@ class PendingSlab(PendingElement):
         thickness: float,
         name: str = "",
         clip_data: Optional[ClipData] = None,
+        style=None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data)
+        super().__init__(name=name, clip_data=clip_data, style=style)
         self.footprint = list(footprint)
         self.plane = plane
         self.thickness = float(thickness)
@@ -95,21 +98,19 @@ class PendingSlab(PendingElement):
         d = super().to_dict()
         d["footprint"] = [p.to_tuple() for p in self.footprint]
         d["thickness"] = self.thickness
+        d["plane"] = self.plane.to_dict()
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingSlab":
-        """
-        Deserialize from dict.
-
-        Note: Plane is not serialised. Deserialised instances always use world XY plane.
-        """
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         thickness = cls._require(d, "thickness")
+        plane = Plane.from_dict(d["plane"]) if "plane" in d else Plane.world_xy()
         return cls(
             footprint=footprint,
-            plane=Plane.world_xy(),
+            plane=plane,
             thickness=thickness,
             name=d.get("name", ""),
             clip_data=d.get("clip_data"),
+            style=cls._style_from_dict(d),
         )

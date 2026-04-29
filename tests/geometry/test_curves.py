@@ -138,13 +138,13 @@ class TestPolyline:
 
     def test_length(self):
         pl = Polyline([Vec(0, 0, 0), Vec(3, 0, 0), Vec(3, 4, 0)])
-        assert pl.length() == pytest.approx(7.0)
+        assert pl.length == pytest.approx(7.0)
 
     def test_length_closed(self):
         # unit square closed: perimeter = 4
         pl = self._square()
         closed = pl.close()
-        assert closed.length() == pytest.approx(4.0)
+        assert closed.length == pytest.approx(4.0)
 
     def test_close(self):
         pl = self._square().close()

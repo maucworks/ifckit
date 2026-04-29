@@ -590,3 +590,63 @@ class TestLengthUnitImperial:
 
         with pytest.raises(NotImplementedError, match="LengthUnit.INCH"):
             IfcModel(name="T", schema=IfcSchema.IFC4, unit=LengthUnit.INCH)
+
+
+# ---------------------------------------------------------------------------
+# TC6 — export_step()
+# ---------------------------------------------------------------------------
+
+
+class TestExportStep:
+    """TC6: IfcModel.export_step() delegates to ifcconvert."""
+
+    def _simple_model(self):
+        m = IfcModel(name="StepTest", schema=IfcSchema.IFC4)
+        site = m.add_site("S")
+        bldg = m.add_building(site, "B")
+        m.add_storey(bldg, "GF", elevation=0.0)
+        return m
+
+    def test_raises_when_ifcconvert_missing(self, tmp_path):
+        """FileNotFoundError when ifcconvert is not on PATH."""
+        import unittest.mock as mock
+
+        m = self._simple_model()
+        with mock.patch("shutil.which", return_value=None):
+            with pytest.raises(FileNotFoundError, match="ifcconvert not found"):
+                m.export_step(str(tmp_path / "out.stp"))
+
+    def test_raises_on_nonzero_exit(self, tmp_path):
+        """RuntimeError when ifcconvert exits non-zero."""
+        import subprocess
+        import unittest.mock as mock
+
+        m = self._simple_model()
+        fake_result = mock.Mock()
+        fake_result.returncode = 1
+        fake_result.stderr = "conversion failed"
+        fake_result.stdout = ""
+
+        with mock.patch("shutil.which", return_value="/usr/local/bin/ifcconvert"):
+            with mock.patch("subprocess.run", return_value=fake_result):
+                with pytest.raises(RuntimeError, match="ifcconvert failed"):
+                    m.export_step(str(tmp_path / "out.stp"))
+
+    def test_calls_ifcconvert_with_correct_args(self, tmp_path):
+        """subprocess.run is called with [ifcconvert, ifc_tmp, output_path]."""
+        import subprocess
+        import unittest.mock as mock
+
+        m = self._simple_model()
+        output = str(tmp_path / "out.stp")
+        fake_result = mock.Mock()
+        fake_result.returncode = 0
+
+        with mock.patch("shutil.which", return_value="/usr/local/bin/ifcconvert"):
+            with mock.patch("subprocess.run", return_value=fake_result) as mock_run:
+                m.export_step(output)
+
+        call_args = mock_run.call_args[0][0]  # positional argv list
+        assert call_args[0] == "/usr/local/bin/ifcconvert"
+        assert call_args[1].endswith(".ifc")   # temp file
+        assert call_args[2] == output

@@ -82,8 +82,9 @@ class PendingExtrudedElement(PendingElement):
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
+        style=None,
     ) -> None:
-        super().__init__(name=name)
+        super().__init__(name=name, style=style)
         self.axis = axis
         self.profile = _coerce_profile(profile)
         self.start_clip = start_clip
@@ -143,6 +144,7 @@ class PendingExtrudedElement(PendingElement):
             start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
             end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
             name=d.get("name", ""),
+            style=cls._style_from_dict(d),
         )
 
 
@@ -178,9 +180,10 @@ class PendingBeam(PendingExtrudedElement):
         end_clip: Optional[Plane] = None,
         name: str = "",
         ref_line: Optional[Line] = None,
+        style=None,
     ) -> None:
         super().__init__(
-            axis=axis, profile=profile, up=up, start_clip=start_clip, end_clip=end_clip, name=name
+            axis=axis, profile=profile, up=up, start_clip=start_clip, end_clip=end_clip, name=name, style=style,
         )
         self.ref_line = ref_line
 
@@ -207,9 +210,22 @@ class PendingBeam(PendingExtrudedElement):
             ref_line=ref_line,
         )
 
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        if self.ref_line is not None:
+            d["ref_line"] = {
+                "start": self.ref_line.start.to_tuple(),
+                "end": self.ref_line.end.to_tuple(),
+            }
+        return d
+
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBeam":
-        return cls._from_dict_fields(d)  # type: ignore[return-value]
+        obj = cls._from_dict_fields(d)  # type: ignore[return-value]
+        ref_line_d = d.get("ref_line")
+        if ref_line_d is not None:
+            obj.ref_line = Line(Vec(*ref_line_d["start"]), Vec(*ref_line_d["end"]))
+        return obj  # type: ignore[return-value]
 
 
 class PendingColumn(PendingExtrudedElement):
@@ -255,8 +271,9 @@ class PendingRevolvedBeam(PendingElement):
         profile: Sequence[ProfilePoint],
         name: str = "",
         ref_line: Optional[Line] = None,
+        style=None,
     ) -> None:
-        super().__init__(name=name)
+        super().__init__(name=name, style=style)
         self.arc = arc
         self.profile = _coerce_profile(profile)
         self.ref_line = ref_line
@@ -282,4 +299,4 @@ class PendingRevolvedBeam(PendingElement):
             angle=math.radians(arc_d["angle_deg"]),
         )
         profile = [Vec(*pt) for pt in cls._require(d, "profile")]
-        return cls(arc=arc, profile=profile, name=d.get("name", ""))
+        return cls(arc=arc, profile=profile, name=d.get("name", ""), style=cls._style_from_dict(d))

@@ -72,7 +72,7 @@ class ElementRegistry:
         if alias_type and alias_type in cls._registry:
             return cls._registry[alias_type]
         
-        raise ValueError(f"Unknown element type: {element_type}. Available: {list(cls._registry.keys())}")
+        raise KeyError(f"Unknown element type: {element_type!r}. Available: {list(cls._registry.keys())}")
 
     @classmethod
     def has(cls, element_type: str) -> bool:

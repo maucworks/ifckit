@@ -21,12 +21,14 @@ from ifckit.elements.structural import (
     PendingExtrudedElement,
     PendingRevolvedBeam,
 )
+from ifckit.elements.style import RenderStyle
 from ifckit.elements.swept import PendingSweptBeam
 
 __all__ = [
     "PendingElement",
     "ClipData",
     "ElementRegistry",
+    "RenderStyle",
     "PendingWall",
     "PendingSlab",
     "PendingBeam",

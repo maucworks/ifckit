@@ -207,7 +207,7 @@ class IfcModel:
             ifc_class="IfcSite",
             name=name,
         )
-        if description:
+        if description is not None:
             site.Description = description
         if latitude is not None:
             site.RefLatitude = latitude
@@ -243,7 +243,7 @@ class IfcModel:
             ifc_class="IfcBuilding",
             name=name,
         )
-        if description:
+        if description is not None:
             building.Description = description
         ifcopenshell.api.run(
             "aggregate.assign_object",
@@ -341,7 +341,7 @@ class IfcModel:
             ifc_class="IfcBridge",
             name=name,
         )
-        if description:
+        if description is not None:
             bridge.Description = description
         ifcopenshell.api.run(
             "aggregate.assign_object",
@@ -541,6 +541,56 @@ class IfcModel:
         finally:
             os.unlink(tmp_path)
 
+    def export_step(self, output_path: str) -> None:
+        """Export the model to an ISO 10303 STEP file via ``ifcconvert``.
+
+        ``ifcconvert`` must be installed and available on ``PATH``.  It is
+        part of the `IfcOpenShell distribution
+        <https://ifcopenshell.org/ifcconvert>`_.
+
+        The model is first written to a temporary ``.ifc`` file, then
+        ``ifcconvert`` converts it to STEP (``.stp`` / ``.step``).
+
+        Args:
+            output_path: Destination path; should end in ``.stp`` or ``.step``.
+
+        Raises:
+            FileNotFoundError: If ``ifcconvert`` is not found on ``PATH``.
+            RuntimeError:      If ``ifcconvert`` exits with a non-zero code.
+
+        Example::
+
+            model.export_step("output/bridge.stp")
+        """
+        import os
+        import shutil
+        import subprocess
+        import tempfile
+
+        ifcconvert = shutil.which("ifcconvert")
+        if ifcconvert is None:
+            raise FileNotFoundError(
+                "ifcconvert not found on PATH. "
+                "Install it from https://ifcopenshell.org/ifcconvert or add it to PATH."
+            )
+
+        with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            self._file.write(tmp_path)
+            result = subprocess.run(
+                [ifcconvert, tmp_path, output_path],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"ifcconvert failed (exit {result.returncode}):\n"
+                    f"{result.stderr.strip() or result.stdout.strip()}"
+                )
+        finally:
+            os.unlink(tmp_path)
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
@@ -559,16 +609,32 @@ class IfcModel:
 
     def clear(self) -> int:
         """
-        Remove all elements from the entire model (all sites, buildings, storeys).
+        Remove all products from the entire model (all sites, buildings, storeys,
+        bridge parts).
+
+        Traverses the full spatial hierarchy under IfcProject and removes every
+        product found in a ``ContainsElements`` relationship.
 
         Returns:
-            The number of elements removed.
+            The number of products removed.
         """
         removed = 0
-        for rel in self._project.ContainsElements or []:
-            for product in rel.RelatedElements:
-                self._file.remove(product)
-                removed += 1
+
+        def _remove_from(container) -> None:
+            nonlocal removed
+            for rel in getattr(container, "ContainsElements", None) or []:
+                for product in list(rel.RelatedElements):
+                    self._file.remove(product)
+                    removed += 1
+            # recurse into aggregated children
+            for rel in getattr(container, "IsDecomposedBy", None) or []:
+                for child in rel.RelatedObjects:
+                    _remove_from(child)
+
+        for rel in getattr(self._project, "IsDecomposedBy", None) or []:
+            for child in rel.RelatedObjects:
+                _remove_from(child)
+
         return removed
 
     def _clear_container(self, container) -> int:
@@ -587,3 +653,25 @@ class IfcModel:
                 self._file.remove(product)
                 removed += 1
         return removed
+
+    def preview_rhino(self, mesh_quality: str = "default", clear: bool = True) -> int:
+        """Import the model into the active Rhino document as meshes.
+
+        Requires Rhino 8+ with ifcopenshell installed. Intended for use
+        in Grasshopper to preview the IFC model without saving to disk.
+
+        Args:
+            mesh_quality: Tessellation quality preset
+                          (superfine/fine/default/coarse/supercoarse).
+            clear: If True, clear existing IFC meshes before import.
+
+        Returns:
+            Number of elements imported.
+        """
+        from ifckit.rhino_import import IfcMeshImporter
+
+        importer = IfcMeshImporter(
+            clear_on_import=clear,
+            mesh_quality=mesh_quality,
+        )
+        return importer.import_model(self)

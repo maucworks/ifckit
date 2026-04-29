@@ -267,3 +267,69 @@ def _arbitrary_perp(v: "Vec") -> "Vec":
     n = v.normalized()
     candidate = _Vec(1.0, 0.0, 0.0) if abs(n @ _Vec(1, 0, 0)) < 0.9 else _Vec(0.0, 1.0, 0.0)
     return (candidate - n * (n @ candidate)).normalized()
+
+
+def apply_style(ifc_file: Any, product: Any, style: Any) -> None:
+    """Assign a RenderStyle to an IFC product via IfcStyledItem.
+
+    Creates the minimal IFC style graph::
+
+        IfcShapeRepresentation.Items[0]
+            ← IfcStyledItem
+                → IfcSurfaceStyle
+                    → IfcSurfaceStyleRendering
+                        → IfcColourRgb
+                        .Transparency
+
+    If the product has no body representation or no items, this is a no-op.
+
+    Args:
+        ifc_file: An ``ifcopenshell.file`` instance.
+        product:  An IFC product entity (IfcWall, IfcSlab, …).
+        style:    A :class:`ifckit.elements.style.RenderStyle` instance.
+    """
+    if style is None:
+        return
+
+    rep = getattr(product, "Representation", None)
+    if rep is None:
+        return
+
+    # Find the body representation
+    body_rep = None
+    for shape_rep in rep.Representations or []:
+        if getattr(shape_rep, "RepresentationIdentifier", None) == "Body":
+            body_rep = shape_rep
+            break
+    if body_rep is None:
+        return
+
+    items = list(body_rep.Items or [])
+    if not items:
+        return
+
+    colour_rgb = ifc_file.create_entity(
+        "IfcColourRgb",
+        Name=None,
+        Red=style.r,
+        Green=style.g,
+        Blue=style.b,
+    )
+    rendering = ifc_file.create_entity(
+        "IfcSurfaceStyleRendering",
+        SurfaceColour=colour_rgb,
+        Transparency=style.transparency,
+        ReflectanceMethod="FLAT",
+    )
+    surface_style = ifc_file.create_entity(
+        "IfcSurfaceStyle",
+        Name=None,
+        Side="BOTH",
+        Styles=[rendering],
+    )
+    ifc_file.create_entity(
+        "IfcStyledItem",
+        Item=items[0],
+        Styles=[surface_style],
+        Name=None,
+    )

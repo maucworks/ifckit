@@ -84,20 +84,28 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# ARCH-1 guard: fail fast when accidentally started with multiple workers.
-# WEB_CONCURRENCY is set by gunicorn/uvicorn when workers > 1.
+# Routers
 # ---------------------------------------------------------------------------
-_workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
-if _workers > 1:
-    raise RuntimeError(
-        f"ifckit API uses in-memory session state and cannot run with "
-        f"WEB_CONCURRENCY={_workers}. Use a single worker or switch to Redis."
-    )
 
 app.include_router(sessions.router)
 app.include_router(site.router)
 app.include_router(elements.router)
 app.include_router(export.router)
+
+
+@app.on_event("startup")
+def _check_single_worker() -> None:
+    """Fail fast when accidentally started with multiple workers.
+
+    WEB_CONCURRENCY is set by gunicorn/uvicorn when ``--workers > 1``.
+    In-memory session state cannot be shared across processes.
+    """
+    workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
+    if workers > 1:
+        raise RuntimeError(
+            f"ifckit API uses in-memory session state and cannot run with "
+            f"WEB_CONCURRENCY={workers}. Use a single worker or switch to Redis."
+        )
 
 
 @app.get("/health", tags=["system"], summary="Health check")

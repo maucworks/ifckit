@@ -107,6 +107,9 @@ class Vec:
             return False
         return self.x == other.x and self.y == other.y and self.z == other.z
 
+    def __hash__(self) -> int:
+        return hash((self.x, self.y, self.z))
+
     def __repr__(self) -> str:
         return f"Vec({self.x}, {self.y}, {self.z})"
 
@@ -429,6 +432,7 @@ class Polyline:
             return self.points[0].equals(self.points[-1])
         return False
 
+    @property
     def length(self) -> float:
         total = 0.0
         pts = self.points

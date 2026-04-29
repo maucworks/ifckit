@@ -61,7 +61,15 @@ try:
     _RHINO_IMPORT_AVAILABLE = True
 except ImportError:
     _RHINO_IMPORT_AVAILABLE = False
-    IfcMeshImporter = None
+
+    class IfcMeshImporter:  # type: ignore[no-redef]
+        """Stub raised when Rhino is not available."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "IfcMeshImporter requires Rhino 8+ with ifcopenshell. "
+                "Run this code inside Rhino / Grasshopper."
+            )
 
 __version__ = "0.1.0"
 
@@ -105,7 +113,5 @@ __all__ = [
     "BridgePartHandle",
     "AlignmentHandle",
     "EntityHandle",
+    "IfcMeshImporter",
 ]
-
-if _RHINO_IMPORT_AVAILABLE:
-    __all__.append("IfcMeshImporter")

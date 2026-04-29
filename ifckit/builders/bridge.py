@@ -69,6 +69,21 @@ class AlignmentBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
+        """Build horizontal alignment geometry onto an existing IfcAlignment entity.
+
+        .. note::
+            This builder intentionally deviates from the ``IIfcBuilder`` protocol
+            contract: ``container`` here is the **IfcAlignment entity** (created by
+            ``IfcModel.add_alignment``), not a spatial structure container such as
+            ``IfcBuildingStorey``.  The alignment workflow is:
+
+            1. ``handle = model.add_alignment(site, name)``  — creates IfcAlignment
+            2. ``builder.build(ifc_file, pending, handle.entity, ctx)``  — adds geometry
+
+            This two-step approach is necessary because IfcAlignment is aggregated under
+            IfcSite (not contained in a storey), and its geometry is populated separately
+            rather than via ``model.add()``.
+        """
         if not isinstance(pending, PendingAlignment):
             raise TypeError(
                 f"AlignmentBuilder expects PendingAlignment, got {type(pending).__name__}"
