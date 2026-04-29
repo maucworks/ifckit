@@ -2,71 +2,45 @@
 grasshopper_adapter.py
 ======================
 
-Shows how to use ifckit from a Grasshopper Python component (GHPython).
+Shared conversion helpers for using ifckit from Grasshopper Python 3
+Script components (Rhino 8+).
 
-This file is NOT runnable standalone — it uses Rhino/Grasshopper types
-(``rg.Point3d``, ``rg.LineCurve``, ``rg.Arc``, ``rg.Polyline``) that only
-exist inside Rhino.  Read it as annotated pseudocode.
+This module is NOT runnable standalone — it imports Rhino types only
+available inside the Rhino process.  See ``examples/gh_scripts/`` for
+ready-to-paste GH Script component code.
 
-Pattern
--------
-The adapter is a thin translation layer.  It converts Rhino geometry objects
-to ifckit primitives, builds a ``PendingElement``, validates it, and hands it
-to a shared ``IfcModel``.  The model is kept in the GH script's ``sticky``
-dictionary so it persists across GH solver runs.
+Integration paths
+-----------------
+**Option A — ifckit on PyPI (future)**
+Add at the top of every GH Script component::
+
+    # requirements: ifckit
+
+Grasshopper will pip-install ifckit automatically.
+
+**Option B — local install (works today)**
+Add at the top of every GH Script component::
+
+    # env: /path/to/L140-py-ifckit
+
+Replace the path with the absolute path to the repo root on your machine.
+This adds the folder to ``sys.path`` so ``import ifckit`` works.
 
 Typical GH component workflow
 ------------------------------
-1.  One "Init" component creates the IfcModel and stores it in sticky.
-2.  Per-element components (Wall, Beam, …) convert Rhino geometry → ifckit
-    pending elements → stored in a list.
-3.  A "Build" component calls builders on all pending elements and saves.
+1. **Init** component — creates ``IfcModel``, stores it in ``sc.sticky``.
+2. **Element** components — convert Rhino geometry → ``PendingElement``
+   objects using the helpers below, accumulate them in a list.
+3. **Export** component — iterates the list, calls ``storey.add(el)`` for
+   each element, then calls ``model.export(path)``.
 
-Usage inside a GHPython component::
+See ``examples/gh_scripts/`` for a complete working example of each step.
 
-    # Component inputs:
-    #   wall_curves  : list of rg.Curve  (closed planar footprints)
-    #   height       : float
-    #   run          : bool  (button to trigger export)
-
-    import scriptcontext as sc
-    import Rhino.Geometry as rg
-
-    # sys.path must include the ifckit package directory — set via GH Python path
-    from examples.grasshopper_adapter import (
-        rhino_point_to_vec,
-        rhino_polyline_to_footprint,
-        rhino_line_to_axis,
-        make_wall,
-        make_beam,
-    )
-    from ifckit import IfcModel, IfcSchema
-    from ifckit.geometry import Plane
-
-    if "ifc_model" not in sc.sticky:
-        sc.sticky["ifc_model"] = IfcModel("GH Project", IfcSchema.IFC4, "GH")
-        site = sc.sticky["ifc_model"].add_site("Site")
-        bldg = sc.sticky["ifc_model"].add_building(site, "Building")
-        sc.sticky["storey"] = sc.sticky["ifc_model"].add_storey(bldg, "L0")
-
-    model  = sc.sticky["ifc_model"]
-    storey = sc.sticky["storey"]
-
-    pending_walls = [
-        make_wall(crv, height=height)
-        for crv in wall_curves
-        if crv is not None
-    ]
-
-    if run:
-        from ifckit.builders import default_registry
-        from ifckit.builders._geom import get_body_context
-        reg = default_registry()
-        ctx = get_body_context(model.ifc_file)
-        for pw in pending_walls:
-            reg.get("basic_wall").build(model.ifc_file, pw, storey.entity, ctx)
-        model.save(r"C:\\output\\gh_export.ifc")
-        print("Exported!")
+Coordinate system note
+-----------------------
+ifckit geometry is unitless — the caller decides the unit via ``LengthUnit``
+on ``IfcModel``.  Rhino's default unit is metres; make sure your model unit
+matches.  ``LengthUnit.MILLIMETRE`` is the IFC convention for structural work.
 """
 
 from __future__ import annotations
@@ -81,6 +55,7 @@ from ifckit.geometry import Vec, Plane, Line
 # ---------------------------------------------------------------------------
 # Primitive converters  (Rhino → ifckit)
 # ---------------------------------------------------------------------------
+
 
 def rhino_point_to_vec(pt) -> Vec:
     """
@@ -161,6 +136,7 @@ def rhino_plane_to_plane(rg_plane) -> Plane:
 # ---------------------------------------------------------------------------
 # Element factories
 # ---------------------------------------------------------------------------
+
 
 def make_wall(
     footprint_curve,

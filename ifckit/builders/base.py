@@ -7,7 +7,7 @@ IIfcBuilder protocol and BuilderRegistry.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Protocol, Type, runtime_checkable
+from typing import Dict, Protocol, runtime_checkable
 
 import ifcopenshell
 

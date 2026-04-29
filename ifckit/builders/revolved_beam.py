@@ -11,17 +11,17 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
+    dir3,
     get_body_context,
     local_placement,
     product_definition_shape,
     profile_from_points,
     pt3,
-    dir3,
     shape_representation,
     storey_elevation,
 )
-from ifckit.elements.structural import PendingRevolvedBeam
 from ifckit.elements.base import PendingElement
+from ifckit.elements.structural import PendingRevolvedBeam
 from ifckit.geometry import Plane
 
 

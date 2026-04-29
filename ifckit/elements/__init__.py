@@ -5,10 +5,7 @@ ifckit.elements
 Pending IFC element data containers.
 """
 
-from ifckit.elements.base import PendingElement, ClipData
-from ifckit.elements.building import PendingWall, PendingSlab
-from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
-from ifckit.elements.swept import PendingSweptBeam
+from ifckit.elements.base import ClipData, PendingElement
 from ifckit.elements.bridge import (
     AlignmentSegment,
     BridgePartType,
@@ -16,14 +13,25 @@ from ifckit.elements.bridge import (
     PendingBridge,
     PendingBridgePart,
 )
+from ifckit.elements.building import PendingSlab, PendingWall
+from ifckit.elements.registry import ElementRegistry
+from ifckit.elements.structural import (
+    PendingBeam,
+    PendingColumn,
+    PendingExtrudedElement,
+    PendingRevolvedBeam,
+)
+from ifckit.elements.swept import PendingSweptBeam
 
 __all__ = [
     "PendingElement",
     "ClipData",
+    "ElementRegistry",
     "PendingWall",
     "PendingSlab",
     "PendingBeam",
     "PendingColumn",
+    "PendingExtrudedElement",
     "PendingRevolvedBeam",
     "PendingSweptBeam",
     "AlignmentSegment",

@@ -22,22 +22,25 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ifckit import (
-    IfcModel, IfcSchema,
-    PendingWall, PendingSlab, PendingBeam, PendingColumn,
-    Vec, Plane, Line,
-    validate,
+    IfcModel,
+    IfcSchema,
+    PendingWall,
+    PendingSlab,
+    PendingBeam,
+    PendingColumn,
+    Vec,
+    Plane,
+    Line,
 )
-from ifckit.builders import default_registry
-from ifckit.builders._geom import get_body_context
 
 
 # ---------------------------------------------------------------------------
 # Building geometry parameters
 # ---------------------------------------------------------------------------
 
-WIDTH = 12.0        # m  (X)
-DEPTH = 8.0         # m  (Y)
-STOREY_HEIGHT = 3.5 # m  (Z per storey)
+WIDTH = 12.0  # m  (X)
+DEPTH = 8.0  # m  (Y)
+STOREY_HEIGHT = 3.5  # m  (Z per storey)
 WALL_THICKNESS = 0.3
 SLAB_THICKNESS = 0.25
 COLUMN_SIZE = 0.4
@@ -72,28 +75,52 @@ COLUMN_X = [0.0, WIDTH / 2, WIDTH]
 COLUMN_Y = [0.0, DEPTH]
 
 
-def build_storey(model, storey, elevation: float, reg, ctx) -> None:
+def build_storey(storey, elevation: float) -> None:
     """Add walls, slab, columns, and a span beam to one storey."""
     z = elevation
 
     # --- Perimeter wall (one per face, simple approach: one wall per side) ---
     wall_planes_and_footprints = [
         # South face
-        (Plane.world_xy(),
-         [Vec(0, 0, z), Vec(WIDTH, 0, z),
-          Vec(WIDTH, WALL_THICKNESS, z), Vec(0, WALL_THICKNESS, z)]),
+        (
+            Plane.world_xy(),
+            [
+                Vec(0, 0, z),
+                Vec(WIDTH, 0, z),
+                Vec(WIDTH, WALL_THICKNESS, z),
+                Vec(0, WALL_THICKNESS, z),
+            ],
+        ),
         # North face
-        (Plane.world_xy(),
-         [Vec(0, DEPTH - WALL_THICKNESS, z), Vec(WIDTH, DEPTH - WALL_THICKNESS, z),
-          Vec(WIDTH, DEPTH, z), Vec(0, DEPTH, z)]),
+        (
+            Plane.world_xy(),
+            [
+                Vec(0, DEPTH - WALL_THICKNESS, z),
+                Vec(WIDTH, DEPTH - WALL_THICKNESS, z),
+                Vec(WIDTH, DEPTH, z),
+                Vec(0, DEPTH, z),
+            ],
+        ),
         # West face
-        (Plane.world_xy(),
-         [Vec(0, 0, z), Vec(WALL_THICKNESS, 0, z),
-          Vec(WALL_THICKNESS, DEPTH, z), Vec(0, DEPTH, z)]),
+        (
+            Plane.world_xy(),
+            [
+                Vec(0, 0, z),
+                Vec(WALL_THICKNESS, 0, z),
+                Vec(WALL_THICKNESS, DEPTH, z),
+                Vec(0, DEPTH, z),
+            ],
+        ),
         # East face
-        (Plane.world_xy(),
-         [Vec(WIDTH - WALL_THICKNESS, 0, z), Vec(WIDTH, 0, z),
-          Vec(WIDTH, DEPTH, z), Vec(WIDTH - WALL_THICKNESS, DEPTH, z)]),
+        (
+            Plane.world_xy(),
+            [
+                Vec(WIDTH - WALL_THICKNESS, 0, z),
+                Vec(WIDTH, 0, z),
+                Vec(WIDTH, DEPTH, z),
+                Vec(WIDTH - WALL_THICKNESS, DEPTH, z),
+            ],
+        ),
     ]
 
     for i, (plane, fp) in enumerate(wall_planes_and_footprints):
@@ -103,9 +130,7 @@ def build_storey(model, storey, elevation: float, reg, ctx) -> None:
             height=STOREY_HEIGHT,
             name=f"Wall_{storey.entity.Name}_{i}",
         )
-        result = validate(wall)
-        assert result.ok, f"Wall validation failed: {result.errors}"
-        reg.get("basic_wall").build(model.ifc_file, wall, storey.entity, ctx)
+        storey.add(wall)
 
     # --- Floor slab ---
     slab = PendingSlab(
@@ -114,9 +139,7 @@ def build_storey(model, storey, elevation: float, reg, ctx) -> None:
         thickness=SLAB_THICKNESS,
         name=f"Slab_{storey.entity.Name}",
     )
-    result = validate(slab)
-    assert result.ok, f"Slab validation failed: {result.errors}"
-    reg.get("basic_slab").build(model.ifc_file, slab, storey.entity, ctx)
+    storey.add(slab)
 
     # --- Columns at grid intersections ---
     for cx in COLUMN_X:
@@ -127,23 +150,20 @@ def build_storey(model, storey, elevation: float, reg, ctx) -> None:
                 profile=COLUMN_PROFILE,
                 name=f"Col_{storey.entity.Name}_{cx:.0f}_{cy:.0f}",
             )
-            result = validate(col)
-            assert result.ok, f"Column validation failed: {result.errors}"
-            reg.get("basic_column").build(model.ifc_file, col, storey.entity, ctx)
+            storey.add(col)
 
     # --- Span beams along X-axis at Y=DEPTH/2 ---
     for i in range(len(COLUMN_X) - 1):
         x0, x1 = COLUMN_X[i], COLUMN_X[i + 1]
-        beam_axis = Line(Vec(x0, DEPTH / 2, z + STOREY_HEIGHT - 0.5),
-                         Vec(x1, DEPTH / 2, z + STOREY_HEIGHT - 0.5))
+        beam_axis = Line(
+            Vec(x0, DEPTH / 2, z + STOREY_HEIGHT - 0.5), Vec(x1, DEPTH / 2, z + STOREY_HEIGHT - 0.5)
+        )
         beam = PendingBeam(
             axis=beam_axis,
             profile=BEAM_PROFILE,
             name=f"Beam_{storey.entity.Name}_{i}",
         )
-        result = validate(beam)
-        assert result.ok, f"Beam validation failed: {result.errors}"
-        reg.get("basic_beam").build(model.ifc_file, beam, storey.entity, ctx)
+        storey.add(beam)
 
 
 def main(output_path: str = "output/simple_building.ifc") -> None:
@@ -155,20 +175,17 @@ def main(output_path: str = "output/simple_building.ifc") -> None:
         author="ifckit example",
     )
 
-    site = model.add_site("Campus Site", description="Example site")
-    building = model.add_building(site, "Office Block A")
-
-    reg = default_registry()
-    ctx = get_body_context(model.ifc_file)
+    building = model.add_site("Campus Site", description="Example site").add_building(
+        "Office Block A"
+    )
 
     for level in range(NUM_STOREYS):
         elevation = level * STOREY_HEIGHT
-        storey = model.add_storey(
-            building,
+        storey = building.add_storey(
             name=f"Level {level}",
             elevation=elevation,
         )
-        build_storey(model, storey, elevation, reg, ctx)
+        build_storey(storey, elevation)
 
     model.save(output_path)
     print(f"Saved: {output_path}")

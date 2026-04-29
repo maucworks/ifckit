@@ -552,3 +552,11 @@ class TestValidateSweptBeam:
         result = validate(short)
         assert result.ok  # warning, not error
         assert any("very short" in w for w in result.warnings)
+
+    def test_empty_path_errors(self):
+        """TC2: Empty Path (no segments) must produce a validation error."""
+        empty_path = Path()
+        sb = PendingSweptBeam(empty_path, [Vec(0, 0), Vec(1, 0), Vec(1, 1), Vec(0, 1)])
+        result = validate(sb)
+        assert not result.ok
+        assert any("path length" in e for e in result.errors)

@@ -36,28 +36,36 @@ try:
     from fastapi import FastAPI, HTTPException
     from fastapi.responses import PlainTextResponse
     from pydantic import BaseModel, Field
+
     _FASTAPI_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _FASTAPI_AVAILABLE = False
+
     # Define stubs so the rest of the module is importable without FastAPI
     class BaseModel:  # type: ignore
         pass
+
     def Field(*a, **kw):  # type: ignore
         return None
 
+
 from ifckit import (
-    IfcModel, IfcSchema,
-    PendingWall, PendingSlab, PendingBeam, PendingColumn,
-    Vec, Plane, Line,
-    validate,
+    IfcModel,
+    IfcSchema,
+    PendingWall,
+    PendingSlab,
+    PendingBeam,
+    PendingColumn,
+    Vec,
+    Plane,
+    Line,
 )
-from ifckit.builders import default_registry
-from ifckit.builders._geom import get_body_context
 
 
 # ---------------------------------------------------------------------------
 # Request / response models  (Pydantic)
 # ---------------------------------------------------------------------------
+
 
 class Vec3Input(BaseModel):
     x: float
@@ -119,6 +127,7 @@ class BuildingInput(BaseModel):
 # Conversion helpers
 # ---------------------------------------------------------------------------
 
+
 def _vec(v: Vec3Input) -> Vec:
     return Vec(v.x, v.y, v.z)
 
@@ -135,12 +144,10 @@ def _footprint(pts: List[Vec3Input]) -> List[Vec]:
 # Builder helper
 # ---------------------------------------------------------------------------
 
+
 def _build_storey(
-    model: IfcModel,
     storey_handle,
     storey_input: StoreyInput,
-    reg,
-    ctx,
 ) -> None:
     for w in storey_input.walls:
         pw = PendingWall(
@@ -149,10 +156,10 @@ def _build_storey(
             height=w.height,
             name=w.name,
         )
-        result = validate(pw)
-        if not result.ok:
-            raise HTTPException(status_code=422, detail=result.errors)
-        reg.get("basic_wall").build(model.ifc_file, pw, storey_handle.entity, ctx)
+        try:
+            storey_handle.add(pw)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     for s in storey_input.slabs:
         ps = PendingSlab(
@@ -161,10 +168,10 @@ def _build_storey(
             thickness=s.thickness,
             name=s.name,
         )
-        result = validate(ps)
-        if not result.ok:
-            raise HTTPException(status_code=422, detail=result.errors)
-        reg.get("basic_slab").build(model.ifc_file, ps, storey_handle.entity, ctx)
+        try:
+            storey_handle.add(ps)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     for b in storey_input.beams:
         pb = PendingBeam(
@@ -172,10 +179,10 @@ def _build_storey(
             profile=_footprint(b.profile),
             name=b.name,
         )
-        result = validate(pb)
-        if not result.ok:
-            raise HTTPException(status_code=422, detail=result.errors)
-        reg.get("basic_beam").build(model.ifc_file, pb, storey_handle.entity, ctx)
+        try:
+            storey_handle.add(pb)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     for c in storey_input.columns:
         pc = PendingColumn(
@@ -183,10 +190,10 @@ def _build_storey(
             profile=_footprint(c.profile),
             name=c.name,
         )
-        result = validate(pc)
-        if not result.ok:
-            raise HTTPException(status_code=422, detail=result.errors)
-        reg.get("basic_column").build(model.ifc_file, pc, storey_handle.entity, ctx)
+        try:
+            storey_handle.add(pc)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -218,19 +225,14 @@ if _FASTAPI_AVAILABLE:
             schema=IfcSchema.IFC4,
             author=body.author,
         )
-        site = model.add_site(body.site_name)
-        building = model.add_building(site, body.building_name)
-
-        reg = default_registry()
-        ctx = get_body_context(model.ifc_file)
+        building = model.add_site(body.site_name).add_building(body.building_name)
 
         for storey_input in body.storeys:
-            storey = model.add_storey(
-                building,
+            storey = building.add_storey(
                 name=storey_input.name,
                 elevation=storey_input.elevation,
             )
-            _build_storey(model, storey, storey_input, reg, ctx)
+            _build_storey(storey, storey_input)
 
         return model.to_string()
 

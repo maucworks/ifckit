@@ -6,17 +6,12 @@ Builder implementations and default registry.
 """
 
 from ifckit.builders.base import BuilderRegistry, IIfcBuilder
-from ifckit.builders.wall import WallBuilder
-from ifckit.builders.slab import SlabBuilder
+from ifckit.builders.bridge import AlignmentBuilder
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
+from ifckit.builders.slab import SlabBuilder
 from ifckit.builders.swept import SweptElementBuilder
-from ifckit.builders.bridge import AlignmentBuilder
-
-# Convenience aliases
-BeamBuilder = ExtrudedElementBuilder("basic_beam", "IfcBeam")
-ColumnBuilder = ExtrudedElementBuilder("basic_column", "IfcColumn")
-SweptBeamBuilder = SweptElementBuilder("swept_beam", "IfcBeam")
+from ifckit.builders.wall import WallBuilder
 
 
 def default_registry() -> BuilderRegistry:
@@ -38,11 +33,8 @@ __all__ = [
     "WallBuilder",
     "SlabBuilder",
     "ExtrudedElementBuilder",
-    "BeamBuilder",
-    "ColumnBuilder",
     "RevolvedBeamBuilder",
     "SweptElementBuilder",
-    "SweptBeamBuilder",
     "AlignmentBuilder",
     "default_registry",
 ]

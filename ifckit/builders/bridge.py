@@ -15,7 +15,6 @@ AlignmentBuilder handles the geometry/nesting of IfcAlignment.
 from __future__ import annotations
 
 import math
-from typing import Union
 
 import ifcopenshell
 import ifcopenshell.api

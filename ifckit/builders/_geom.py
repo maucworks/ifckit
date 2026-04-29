@@ -9,7 +9,7 @@ Creates IfcCartesianPoint, IfcDirection, IfcAxis2Placement3D, etc.
 from __future__ import annotations
 
 import math
-from typing import List, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Sequence
 
 import ifcopenshell
 
@@ -215,7 +215,7 @@ def directrix_from_path(
     Each segment becomes one IfcCompositeCurveSegment.
     Interior transitions use CONTSAMEGRADIENT; the last uses DISCONTINUOUS.
     """
-    from ifckit.geometry import Arc as _Arc, Line as _Line
+    from ifckit.geometry import Arc as _Arc
 
     segments = path.segments
     ifc_segments = []

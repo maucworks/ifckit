@@ -16,22 +16,18 @@ import sys
 # Allow running from the project root without installing the package.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from ifckit import IfcModel, IfcSchema, PendingWall, Vec, Plane, validate
-from ifckit.builders import default_registry
-from ifckit.builders._geom import get_body_context
+from ifckit import IfcModel, IfcSchema, PendingWall, Vec, Plane
 
-# Build the spatial hierarchy
+# Build the spatial hierarchy (handle chaining)
 model = IfcModel(name="My Project", schema=IfcSchema.IFC4, author="you")
-site = model.add_site("Site A")
-bldg = model.add_building(site, "Building 1")
-floor = model.add_storey(bldg, "Ground Floor", elevation=0.0)
-floor_1 = model.add_storey(bldg, "First Floor", elevation=3.0)
-
+bldg = model.add_site("Site A").add_building("Building 1")
+floor = bldg.add_storey("Ground Floor", elevation=0.0)
+floor_1 = bldg.add_storey("First Floor", elevation=3.0)
 
 # Define the elements — plane origin Z must be in world space
 wall_gf = PendingWall(
     footprint=[Vec(0, 0, 0), Vec(10, 0, 0), Vec(10, 0.3, 0), Vec(0, 0.3, 0)],
-    plane=Plane.world_xy(),                              # Z=0, elevation=0 → local Z=0
+    plane=Plane.world_xy(),  # Z=0, elevation=0 → local Z=0
     height=3.0,
     name="North Facade GF",
 )
@@ -42,15 +38,9 @@ wall_1f = PendingWall(
     name="North Facade 1F",
 )
 
-# Validate, then build into the IFC file
-for wall in (wall_gf, wall_1f):
-    result = validate(wall)
-    assert result.ok, result.errors
-
-reg = default_registry()
-ctx = get_body_context(model.ifc_file)
-reg.get("basic_wall").build(model.ifc_file, wall_gf, floor.entity, ctx)
-reg.get("basic_wall").build(model.ifc_file, wall_1f, floor_1.entity, ctx)
+# Validate and build in one call — raises ValueError if invalid
+floor.add(wall_gf)
+floor_1.add(wall_1f)
 
 
 # Save

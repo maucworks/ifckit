@@ -22,35 +22,41 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ifckit import (
-    IfcModel, IfcSchema,
-    PendingAlignment, PendingBeam, PendingSlab,
-    AlignmentSegment, BridgePartType,
-    Vec, Plane, Line, Arc,
+    IfcModel,
+    IfcSchema,
+    PendingAlignment,
+    PendingBeam,
+    PendingSlab,
+    AlignmentSegment,
+    BridgePartType,
+    Vec,
+    Plane,
+    Line,
+    Arc,
     validate,
 )
 from ifckit.builders import default_registry
-from ifckit.builders._geom import get_body_context
 
 
 # ---------------------------------------------------------------------------
 # Bridge parameters
 # ---------------------------------------------------------------------------
 
-SPAN_LENGTH = 50.0          # m  straight approach tangent
-CURVE_RADIUS = 40.0         # m  horizontal curve
-CURVE_ANGLE = math.pi / 4   # 45° right-hand curve
-EXIT_TANGENT = 30.0         # m  exit tangent
-DECK_WIDTH = 8.0            # m
-BEAM_SPACING = 2.0          # m  between longitudinal beams
+SPAN_LENGTH = 50.0  # m  straight approach tangent
+CURVE_RADIUS = 40.0  # m  horizontal curve
+CURVE_ANGLE = math.pi / 4  # 45° right-hand curve
+EXIT_TANGENT = 30.0  # m  exit tangent
+DECK_WIDTH = 8.0  # m
+BEAM_SPACING = 2.0  # m  between longitudinal beams
 NUM_BEAMS = int(DECK_WIDTH / BEAM_SPACING)
 
 # Rectangular beam profile in cross-section XY plane:
 # X = horizontal (width), Y = vertical (height), centred on (0,0)
 BEAM_PROFILE = [
     Vec(-0.2, -0.3),
-    Vec( 0.2, -0.3),
-    Vec( 0.2,  0.3),
-    Vec(-0.2,  0.3),
+    Vec(0.2, -0.3),
+    Vec(0.2, 0.3),
+    Vec(-0.2, 0.3),
 ]
 
 
@@ -75,7 +81,7 @@ def build_alignment() -> PendingAlignment:
         center=arc_center,
         normal=Vec(0, 0, 1),
         start=Vec(SPAN_LENGTH, 0, 0),
-        angle=-CURVE_ANGLE,   # CW
+        angle=-CURVE_ANGLE,  # CW
     )
     seg2 = AlignmentSegment(geometry=arc, station_start=SPAN_LENGTH)
 
@@ -108,7 +114,7 @@ def build_alignment() -> PendingAlignment:
     return alignment
 
 
-def build_deck_beams(model, deck, reg, ctx) -> None:
+def build_deck_beams(deck) -> None:
     """Add longitudinal deck beams (simplified: parallel to bridge X-axis)."""
     total_length = SPAN_LENGTH + abs(CURVE_ANGLE) * CURVE_RADIUS + EXIT_TANGENT
     y_start = -(DECK_WIDTH / 2)
@@ -120,9 +126,7 @@ def build_deck_beams(model, deck, reg, ctx) -> None:
             profile=BEAM_PROFILE,
             name=f"DeckBeam_{i}",
         )
-        result = validate(beam)
-        assert result.ok, f"Beam validation failed: {result.errors}"
-        reg.get("basic_beam").build(model.ifc_file, beam, deck.entity, ctx)
+        deck.add(beam)
 
 
 def main(output_path: str = "output/simple_bridge.ifc") -> None:
@@ -135,22 +139,18 @@ def main(output_path: str = "output/simple_bridge.ifc") -> None:
     )
 
     site = model.add_site("Bridge Site")
-    bridge = model.add_bridge(site, "Modulo Brug")
-    deck = model.add_bridge_part(bridge, "Deck", BridgePartType.DECK.value)
-    sub = model.add_bridge_part(bridge, "Substructure", BridgePartType.SUBSTRUCTURE.value)
-    align_handle = model.add_alignment(site, "BridgeAlignment")
+    bridge = site.add_bridge("Modulo Brug")
+    deck = bridge.add_bridge_part("Deck", BridgePartType.DECK.value)
+    bridge.add_bridge_part("Substructure", BridgePartType.SUBSTRUCTURE.value)
+    align_handle = site.add_alignment("BridgeAlignment")
 
+    # Alignment geometry has no spatial container — use low-level builder directly
     reg = default_registry()
-    ctx = get_body_context(model.ifc_file)
-
-    # Build and attach alignment geometry
     alignment = build_alignment()
-    reg.get("alignment").build(
-        model.ifc_file, alignment, align_handle.entity, None
-    )
+    reg.get("alignment").build(model.ifc_file, alignment, align_handle.entity, None)
 
-    # Add deck beams
-    build_deck_beams(model, deck, reg, ctx)
+    # Add deck beams via handle chaining
+    build_deck_beams(deck)
 
     model.save(output_path)
     print(f"Saved: {output_path}")

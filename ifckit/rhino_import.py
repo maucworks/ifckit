@@ -75,6 +75,7 @@ class IfcMeshImporter:
         layer_root: str = "IFC",
         clear_on_import: bool = False,
         use_active_doc: bool = True,
+        scale_factor: float = 1.0,
     ) -> None:
         if doc is None:
             import Rhino
@@ -87,9 +88,25 @@ class IfcMeshImporter:
 
         self.layer_root = layer_root
         self.clear_on_import = clear_on_import
+        self.scale_factor = scale_factor
         self._guid_to_rhino_guid: dict[str, Any] = {}
         self._layer_cache: dict[str, int] = {}
-        self._delete_removed: bool = False
+        self._delete_removed: bool = True
+        self._ifc_unit_scale: float = 1.0
+
+        # Detect Rhino document unit
+        self._rhino_unit = self.doc.ModelUnitSystem
+
+    def _detect_unit(self, ifc_file: Any) -> None:
+        """Compute scale: ifcopenshell.geom always returns meters."""
+        import Rhino
+
+        # ifcopenshell.geom always returns meters
+        # Scale to match Rhino's unit system
+        if self._rhino_unit == Rhino.UnitSystem.Millimeters:
+            self._ifc_unit_scale = 1000.0  # meters -> mm
+        else:
+            self._ifc_unit_scale = 1.0  # meters -> meters
 
     def import_file(self, ifc_path: str) -> int:
         """
@@ -122,6 +139,9 @@ class IfcMeshImporter:
             self.clear()
 
         ifc_file = getattr(ifc_model, "ifc_file", ifc_model)
+
+        # Detect unit from IFC
+        self._detect_unit(ifc_file)
 
         settings = ic_geom.settings()
         settings.set(settings.USE_WORLD_COORDS, True)
@@ -202,10 +222,6 @@ class IfcMeshImporter:
 
         self._guid_to_rhino_guid.clear()
         self._layer_cache.clear()
-
-        root_index = self.doc.Layers.FindByName(self.layer_root, -1)
-        if root_index >= 0:
-            self._delete_layer_recursive(root_index)
 
         return count
 
@@ -291,9 +307,10 @@ class IfcMeshImporter:
         import Rhino
 
         mesh = Rhino.Geometry.Mesh()
+        s = self.scale_factor * self._ifc_unit_scale
 
         for i in range(0, len(verts), 3):
-            mesh.Vertices.Add(verts[i], verts[i + 1], verts[i + 2])
+            mesh.Vertices.Add(verts[i] * s, verts[i + 1] * s, verts[i + 2] * s)
 
         for i in range(0, len(faces), 3):
             mesh.Faces.AddFace(faces[i], faces[i + 1], faces[i + 2])

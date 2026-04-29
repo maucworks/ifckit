@@ -56,6 +56,13 @@ from ifckit.profiles import IBeamProfile, LBeamProfile
 from ifckit.schema import IfcSchema, LengthUnit
 from ifckit.validator import ValidationResult, validate
 
+try:
+    from ifckit.rhino_import import IfcMeshImporter
+    _RHINO_IMPORT_AVAILABLE = True
+except ImportError:
+    _RHINO_IMPORT_AVAILABLE = False
+    IfcMeshImporter = None
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -99,3 +106,6 @@ __all__ = [
     "AlignmentHandle",
     "EntityHandle",
 ]
+
+if _RHINO_IMPORT_AVAILABLE:
+    __all__.append("IfcMeshImporter")

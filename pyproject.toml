@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "ifckit"
 version = "0.1.0"
 description = "Framework-agnostic IFC builder library for architecture and infrastructure"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = [
     "ifcopenshell>=0.7.0",
@@ -39,3 +39,6 @@ select = ["E", "F", "I"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[project.scripts]
+ifckit = "ifckit.__main__:main"

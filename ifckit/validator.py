@@ -1,13 +1,18 @@
 """
 ifckit.validator
-================
+===============
 
 Structural validation of PendingElement objects before they are passed
 to builders.  No ifcopenshell calls — pure Python geometry checks.
 
 Usage::
 
-    from ifckit.validator import validate
+    from ifckit.validator import validate, register_validator
+
+    @register_validator(MyPendingElement)
+    def _validate_my_element(pending: "MyPendingElement") -> ValidationResult:
+        # validation logic
+        ...
 
     result = validate(pending_wall)
     if not result.ok:
@@ -19,21 +24,57 @@ Usage::
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
-from typing import List
+from typing import Any, Callable, Dict, List, Type
 
 from ifckit.elements.base import PendingElement
-from ifckit.elements.building import PendingSlab, PendingWall
 from ifckit.elements.bridge import (
     AlignmentSegment,
     PendingAlignment,
     PendingBridge,
     PendingBridgePart,
 )
+from ifckit.elements.building import PendingSlab, PendingWall
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
 from ifckit.elements.swept import PendingSweptBeam
-from ifckit.geometry import Arc, Line, Vec
+from ifckit.geometry import Vec
+
+
+# ---------------------------------------------------------------------------
+# Validator registry with auto-registration
+# ---------------------------------------------------------------------------
+
+
+class ValidatorRegistry:
+    """Registry for element validators with decorator-based auto-registration."""
+
+    _validators: Dict[Type[PendingElement], Callable[..., ValidationResult]] = {}
+
+    @classmethod
+    def register(
+        cls,
+        element_cls: Type[PendingElement],
+    ) -> Callable[[Callable[..., ValidationResult]], Callable[..., ValidationResult]]:
+        """Decorator to register a validator for a PendingElement subclass."""
+        def decorator(func: Callable[..., ValidationResult]) -> Callable[..., ValidationResult]:
+            cls._validators[element_cls] = func
+            return func
+        return decorator
+
+    @classmethod
+    def get(cls, element_cls: Type[PendingElement]) -> Callable[..., ValidationResult]:
+        """Get validator for an element class."""
+        if element_cls not in cls._validators:
+            raise TypeError(f"No validator registered for {element_cls.__name__}")
+        return cls._validators[element_cls]
+
+    @classmethod
+    def has(cls, element_cls: Type[PendingElement]) -> bool:
+        """Check if validator exists for element class."""
+        return element_cls in cls._validators
+
+
+register_validator = ValidatorRegistry.register
 
 # Tolerances
 _MIN_LENGTH = 1e-6  # minimum meaningful length (metres)
@@ -89,6 +130,7 @@ def _seg_end(seg: AlignmentSegment) -> Vec:
 # ---------------------------------------------------------------------------
 
 
+@register_validator(PendingWall)
 def _validate_wall(w: PendingWall) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -117,6 +159,7 @@ def _validate_wall(w: PendingWall) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingSlab)
 def _validate_slab(s: PendingSlab) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -138,6 +181,7 @@ def _validate_slab(s: PendingSlab) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingBeam)
 def _validate_beam(b: PendingBeam) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -160,6 +204,7 @@ def _validate_beam(b: PendingBeam) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingColumn)
 def _validate_column(c: PendingColumn) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -182,6 +227,7 @@ def _validate_column(c: PendingColumn) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingRevolvedBeam)
 def _validate_revolved_beam(rb: PendingRevolvedBeam) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -208,6 +254,7 @@ def _validate_revolved_beam(rb: PendingRevolvedBeam) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingAlignment)
 def _validate_alignment(a: PendingAlignment) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -239,6 +286,7 @@ def _validate_alignment(a: PendingAlignment) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingBridgePart)
 def _validate_bridge_part(bp: PendingBridgePart) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -261,6 +309,7 @@ def _validate_bridge_part(bp: PendingBridgePart) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingBridge)
 def _validate_bridge(b: PendingBridge) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -285,20 +334,14 @@ def _validate_bridge(b: PendingBridge) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
+@register_validator(PendingSweptBeam)
 def _validate_swept_beam(sb: PendingSweptBeam) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
 
-    # Path length
-    from ifckit.geometry import Path as _Path
-
+    # Path length — Line, Arc, and Path all expose .length as a property
     path = sb.path
-    if isinstance(path, Line):
-        path_len = path.length
-    elif isinstance(path, Arc):
-        path_len = path.length
-    else:
-        path_len = path.length()
+    path_len = path.length
 
     if path_len < _MIN_LENGTH:
         errors.append(f"PendingSweptBeam '{sb.name}': path length must be > 0, got {path_len:.6f}")
@@ -323,18 +366,6 @@ def _validate_swept_beam(sb: PendingSweptBeam) -> ValidationResult:
 # Public API
 # ---------------------------------------------------------------------------
 
-_VALIDATORS = {
-    PendingWall: _validate_wall,
-    PendingSlab: _validate_slab,
-    PendingBeam: _validate_beam,
-    PendingColumn: _validate_column,
-    PendingRevolvedBeam: _validate_revolved_beam,
-    PendingSweptBeam: _validate_swept_beam,
-    PendingAlignment: _validate_alignment,
-    PendingBridgePart: _validate_bridge_part,
-    PendingBridge: _validate_bridge,
-}
-
 
 def validate(pending: PendingElement) -> ValidationResult:
     """
@@ -350,7 +381,5 @@ def validate(pending: PendingElement) -> ValidationResult:
     Raises:
         TypeError: If the type is not recognised by any validator.
     """
-    validator = _VALIDATORS.get(type(pending))
-    if validator is None:
-        raise TypeError(f"No validator registered for type {type(pending).__name__!r}")
+    validator = ValidatorRegistry.get(type(pending))
     return validator(pending)

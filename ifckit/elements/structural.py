@@ -34,10 +34,10 @@ def _coerce_profile(profile: ProfileInput) -> List[Vec]:
     for p in profile:
         if isinstance(p, Vec):
             result.append(p)
-        elif len(p) == 2:
+        elif len(p) == 2:  # type: ignore[arg-type]
             result.append(Vec(p[0], p[1], 0.0))
         else:
-            result.append(Vec(p[0], p[1], p[2]))
+            result.append(Vec(p[0], p[1], p[2]))  # type: ignore[index]
     return result
 
 
@@ -55,7 +55,7 @@ def _plane_from_dict(d: Dict[str, Any]) -> Plane:
 
 def _validate_up(up: Vec, axis: Line, cls_name: str) -> None:
     """Raise ValueError if up is parallel to axis direction."""
-    if abs(up) == 0.0:
+    if abs(up) < 1e-12:
         raise ValueError(f"{cls_name}: up vector must not be zero-length")
     t = axis.direction.normalized()
     u = up.normalized()
@@ -66,7 +66,87 @@ def _validate_up(up: Vec, axis: Line, cls_name: str) -> None:
         )
 
 
-class PendingBeam(PendingElement):
+class PendingExtrudedElement(PendingElement):
+    """
+    Shared base for straight extruded structural elements (beam, column).
+
+    Holds the common data: axis, profile, up, start_clip, end_clip.
+    Subclasses must declare ``element_type``.
+    """
+
+    def __init__(
+        self,
+        axis: Line,
+        profile: "Sequence[ProfilePoint]",
+        up: Optional[Vec] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
+        name: str = "",
+    ) -> None:
+        super().__init__(name=name)
+        self.axis = axis
+        self.profile = _coerce_profile(profile)
+        self.start_clip = start_clip
+        self.end_clip = end_clip
+        if up is not None:
+            _validate_up(up, axis, type(self).__name__)
+        self.up = up
+
+    @classmethod
+    def from_plane(
+        cls,
+        axis: Line,
+        profile: "List[Vec]",
+        plane: Plane,
+        up: Optional[Vec] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
+        name: str = "",
+    ) -> "PendingExtrudedElement":
+        """Construct with up extracted from plane.y_axis."""
+        return cls(
+            axis=axis,
+            profile=profile,
+            up=plane.y_axis,
+            start_clip=start_clip,
+            end_clip=end_clip,
+            name=name,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["axis"] = {
+            "start": self.axis.start.to_tuple(),
+            "end": self.axis.end.to_tuple(),
+        }
+        d["profile"] = [p.to_tuple() for p in self.profile]
+        if self.up is not None:
+            d["up"] = self.up.to_tuple()
+        if self.start_clip is not None:
+            d["start_clip"] = _plane_to_dict(self.start_clip)
+        if self.end_clip is not None:
+            d["end_clip"] = _plane_to_dict(self.end_clip)
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, d: Dict[str, Any]) -> "PendingExtrudedElement":
+        """Shared from_dict logic; subclasses call this."""
+        axis_d = cls._require(d, "axis")
+        axis = Line(Vec(*axis_d["start"]), Vec(*axis_d["end"]))
+        profile = [Vec(*pt) for pt in cls._require(d, "profile")]
+        up_raw = d.get("up")
+        up = Vec(*up_raw) if up_raw is not None else None
+        return cls(
+            axis=axis,
+            profile=profile,
+            up=up,
+            start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
+            end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
+            name=d.get("name", ""),
+        )
+
+
+class PendingBeam(PendingExtrudedElement):
     """
     A straight beam defined by an axis (Line) and a cross-section profile.
 
@@ -92,28 +172,23 @@ class PendingBeam(PendingElement):
     def __init__(
         self,
         axis: Line,
-        profile: Sequence[ProfilePoint],
+        profile: "Sequence[ProfilePoint]",
         up: Optional[Vec] = None,
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
         ref_line: Optional[Line] = None,
     ) -> None:
-        super().__init__(name=name)
-        self.axis = axis
-        self.profile = _coerce_profile(profile)
+        super().__init__(
+            axis=axis, profile=profile, up=up, start_clip=start_clip, end_clip=end_clip, name=name
+        )
         self.ref_line = ref_line
-        self.start_clip = start_clip
-        self.end_clip = end_clip
-        if up is not None:
-            _validate_up(up, axis, "PendingBeam")
-        self.up = up
 
     @classmethod
-    def from_plane(
+    def from_plane(  # type: ignore[override]
         cls,
         axis: Line,
-        profile: List[Vec],
+        profile: "List[Vec]",
         plane: Plane,
         up: Optional[Vec] = None,
         start_clip: Optional[Plane] = None,
@@ -132,39 +207,12 @@ class PendingBeam(PendingElement):
             ref_line=ref_line,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
-        d = super().to_dict()
-        d["axis"] = {
-            "start": self.axis.start.to_tuple(),
-            "end": self.axis.end.to_tuple(),
-        }
-        d["profile"] = [p.to_tuple() for p in self.profile]
-        if self.up is not None:
-            d["up"] = self.up.to_tuple()
-        if self.start_clip is not None:
-            d["start_clip"] = _plane_to_dict(self.start_clip)
-        if self.end_clip is not None:
-            d["end_clip"] = _plane_to_dict(self.end_clip)
-        return d
-
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBeam":
-        axis_d = cls._require(d, "axis")
-        axis = Line(Vec(*axis_d["start"]), Vec(*axis_d["end"]))
-        profile = [Vec(*pt) for pt in cls._require(d, "profile")]
-        up_raw = d.get("up")
-        up = Vec(*up_raw) if up_raw is not None else None
-        return cls(
-            axis=axis,
-            profile=profile,
-            up=up,
-            start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
-            end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
-            name=d.get("name", ""),
-        )
+        return cls._from_dict_fields(d)  # type: ignore[return-value]
 
 
-class PendingColumn(PendingElement):
+class PendingColumn(PendingExtrudedElement):
     """
     A column defined by an axis (Line) and a cross-section profile.
 
@@ -182,75 +230,9 @@ class PendingColumn(PendingElement):
 
     element_type = "basic_column"
 
-    def __init__(
-        self,
-        axis: Line,
-        profile: Sequence[ProfilePoint],
-        up: Optional[Vec] = None,
-        start_clip: Optional[Plane] = None,
-        end_clip: Optional[Plane] = None,
-        name: str = "",
-    ) -> None:
-        super().__init__(name=name)
-        self.axis = axis
-        self.profile = _coerce_profile(profile)
-        self.start_clip = start_clip
-        self.end_clip = end_clip
-        if up is not None:
-            _validate_up(up, axis, "PendingColumn")
-        self.up = up
-
-    @classmethod
-    def from_plane(
-        cls,
-        axis: Line,
-        profile: List[Vec],
-        plane: Plane,
-        up: Optional[Vec] = None,
-        start_clip: Optional[Plane] = None,
-        end_clip: Optional[Plane] = None,
-        name: str = "",
-    ) -> "PendingColumn":
-        """Construct with up extracted from plane.y_axis."""
-        return cls(
-            axis=axis,
-            profile=profile,
-            up=plane.y_axis,
-            start_clip=start_clip,
-            end_clip=end_clip,
-            name=name,
-        )
-
-    def to_dict(self) -> Dict[str, Any]:
-        d = super().to_dict()
-        d["axis"] = {
-            "start": self.axis.start.to_tuple(),
-            "end": self.axis.end.to_tuple(),
-        }
-        d["profile"] = [p.to_tuple() for p in self.profile]
-        if self.up is not None:
-            d["up"] = self.up.to_tuple()
-        if self.start_clip is not None:
-            d["start_clip"] = _plane_to_dict(self.start_clip)
-        if self.end_clip is not None:
-            d["end_clip"] = _plane_to_dict(self.end_clip)
-        return d
-
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingColumn":
-        axis_d = cls._require(d, "axis")
-        axis = Line(Vec(*axis_d["start"]), Vec(*axis_d["end"]))
-        profile = [Vec(*pt) for pt in cls._require(d, "profile")]
-        up_raw = d.get("up")
-        up = Vec(*up_raw) if up_raw is not None else None
-        return cls(
-            axis=axis,
-            profile=profile,
-            up=up,
-            start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
-            end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
-            name=d.get("name", ""),
-        )
+        return cls._from_dict_fields(d)  # type: ignore[return-value]
 
 
 class PendingRevolvedBeam(PendingElement):

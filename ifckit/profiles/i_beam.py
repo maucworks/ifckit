@@ -22,7 +22,7 @@ Anchor points (where (0, 0) is placed relative to the profile):
     n   mid top
     ne  top-right corner
 
-Points are returned in the local YZ plane (Y = horizontal, Z = vertical),
+Points are returned in the local XY plane (X = horizontal, Y = vertical),
 suitable for use as a PendingBeam / PendingColumn profile in ifckit.
 """
 
@@ -30,19 +30,18 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
-
 # Anchor → (x_fraction_of_width, y_fraction_of_height)
 # Applied as: offset = (-fraction * width, -fraction * height)
 _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
-    'sw': (-0.5,  0.0),
-    's':  ( 0.0,  0.0),
-    'se': ( 0.5,  0.0),
-    'w':  (-0.5,  0.5),
-    'c':  ( 0.0,  0.5),
-    'e':  ( 0.5,  0.5),
-    'nw': (-0.5,  1.0),
-    'n':  ( 0.0,  1.0),
-    'ne': ( 0.5,  1.0),
+    "sw": (-0.5, 0.0),
+    "s": (0.0, 0.0),
+    "se": (0.5, 0.0),
+    "w": (-0.5, 0.5),
+    "c": (0.0, 0.5),
+    "e": (0.5, 0.5),
+    "nw": (-0.5, 1.0),
+    "n": (0.0, 1.0),
+    "ne": (0.5, 1.0),
 }
 
 
@@ -65,7 +64,7 @@ class IBeamProfile:
         width: float = 0.3,
         web_thickness: float = 0.02,
         flange_thickness: float = 0.025,
-        anchor: str = 's',
+        anchor: str = "s",
         name: str = "I-Profile",
     ) -> None:
         self.height = float(height)
@@ -105,10 +104,7 @@ class IBeamProfile:
 
     @property
     def area(self) -> float:
-        return (
-            2 * self.width * self.flange_thickness
-            + self.web_height * self.web_thickness
-        )
+        return 2 * self.width * self.flange_thickness + self.web_height * self.web_thickness
 
     @property
     def centroid_z(self) -> float:
@@ -121,7 +117,7 @@ class IBeamProfile:
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """
-        Return 12 (y, z) points defining the closed I-section in the local YZ plane.
+        Return 12 (x, y) points defining the closed I-section in the local XY plane.
         The closing duplicate is NOT included; profile_from_points() adds it automatically.
 
         Point order (counter-clockwise from bottom-left):
@@ -140,27 +136,27 @@ class IBeamProfile:
         oy = -oy
         oz = -oz
 
-        h  = self.height
-        w  = self.width
+        h = self.height
+        w = self.width
         tf = self.flange_thickness
         tw = self.web_thickness
 
-        hw  = w  / 2
+        hw = w / 2
         htw = tw / 2
 
         return [
-            (oy - hw,       oz        ),   # 0  bottom-left  outer flange
-            (oy + hw,       oz        ),   # 1  bottom-right outer flange
-            (oy + hw,       oz + tf   ),   # 2  bottom-right inner flange
-            (oy + htw,      oz + tf   ),   # 3  web bottom-right
-            (oy + htw,      oz + h-tf ),   # 4  web top-right
-            (oy + hw,       oz + h-tf ),   # 5  top-right inner flange
-            (oy + hw,       oz + h    ),   # 6  top-right outer flange
-            (oy - hw,       oz + h    ),   # 7  top-left  outer flange
-            (oy - hw,       oz + h-tf ),   # 8  top-left  inner flange
-            (oy - htw,      oz + h-tf ),   # 9  web top-left
-            (oy - htw,      oz + tf   ),   # 10 web bottom-left
-            (oy - hw,       oz + tf   ),   # 11 bottom-left inner flange
+            (oy - hw, oz),  # 0  bottom-left  outer flange
+            (oy + hw, oz),  # 1  bottom-right outer flange
+            (oy + hw, oz + tf),  # 2  bottom-right inner flange
+            (oy + htw, oz + tf),  # 3  web bottom-right
+            (oy + htw, oz + h - tf),  # 4  web top-right
+            (oy + hw, oz + h - tf),  # 5  top-right inner flange
+            (oy + hw, oz + h),  # 6  top-right outer flange
+            (oy - hw, oz + h),  # 7  top-left  outer flange
+            (oy - hw, oz + h - tf),  # 8  top-left  inner flange
+            (oy - htw, oz + h - tf),  # 9  web top-left
+            (oy - htw, oz + tf),  # 10 web bottom-left
+            (oy - hw, oz + tf),  # 11 bottom-left inner flange
         ]
 
     def to_dict(self) -> dict:

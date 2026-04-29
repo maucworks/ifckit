@@ -46,20 +46,17 @@ class PendingWall(PendingElement):
         d = super().to_dict()
         d["footprint"] = [p.to_tuple() for p in self.footprint]
         d["height"] = self.height
+        d["plane"] = self.plane.to_dict()
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingWall":
-        """
-        Deserialize from dict.
-
-        Note: Plane is not serialised. Deserialised instances always use world XY plane.
-        """
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         height = cls._require(d, "height")
+        plane = Plane.from_dict(d["plane"]) if "plane" in d else Plane.world_xy()
         return cls(
             footprint=footprint,
-            plane=Plane.world_xy(),  # serialisation of Plane deferred
+            plane=plane,
             height=height,
             name=d.get("name", ""),
             clip_data=d.get("clip_data"),

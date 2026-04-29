@@ -43,7 +43,6 @@ from ifckit.builders._geom import (
     axis2placement3d,
     dir3,
     extrude_profile,
-    get_body_context,
     local_placement,
     product_definition_shape,
     profile_from_points,
@@ -128,8 +127,7 @@ class ExtrudedElementBuilder:
             geometry = _apply_clip(ifc_file, geometry, clip_plane, op_plane, elev)
 
         rep_type = "SweptSolid" if geometry is solid else "Clipping"
-        body_ctx = get_body_context(ifc_file)
-        shape_rep = shape_representation(ifc_file, body_ctx, geometry, rep_type=rep_type)
+        shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         element = ifcopenshell.api.run(

@@ -23,17 +23,18 @@ a world-space Plane whose z_axis points toward material to keep.
 
 from __future__ import annotations
 
+from __future__ import annotations
+
 import ifcopenshell
 import ifcopenshell.api
+from typing import Optional
 
 from ifckit.builders._geom import (
     _arbitrary_perp,
-    axis2placement3d,
     dir3,
     directrix_from_arc,
     directrix_from_line,
     directrix_from_path,
-    get_body_context,
     local_placement,
     product_definition_shape,
     profile_from_points,
@@ -80,11 +81,15 @@ class SweptElementBuilder:
         else:
             # Derive a sensible default from the first tangent
             if isinstance(path, Line):
-                first_tangent = path.direction
+                first_tangent: Optional[Vec] = path.direction
             elif isinstance(path, Arc):
                 first_tangent = path.tangent_at_start()
             else:
                 first_tangent = path.start_tangent()
+                if first_tangent is None:
+                    raise ValueError(
+                        "SweptElementBuilder: path has no segments — cannot derive up vector"
+                    )
             up = Vec(0.0, 0.0, 1.0)
             if abs(first_tangent @ up) > 0.999:
                 up = Vec(0.0, 1.0, 0.0)
@@ -120,8 +125,7 @@ class SweptElementBuilder:
             geometry = _apply_clip_world(ifc_file, geometry, clip_plane)
 
         rep_type = "SweptSolid" if geometry is solid else "Clipping"
-        body_ctx = get_body_context(ifc_file)
-        shape_rep = shape_representation(ifc_file, body_ctx, geometry, rep_type=rep_type)
+        shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         # ObjectPlacement: world origin (IfcFixedReferenceSweptAreaSolid uses world coords)

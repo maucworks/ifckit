@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
-
 # Anchor → (x_fraction_of_width, y_fraction_of_height)
 _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
     'sw': ( 0.0,  0.0),

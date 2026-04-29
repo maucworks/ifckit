@@ -21,8 +21,8 @@ from ifckit.builders._geom import (
     shape_representation,
     storey_elevation,
 )
-from ifckit.elements.building import PendingSlab
 from ifckit.elements.base import PendingElement
+from ifckit.elements.building import PendingSlab
 
 
 class SlabBuilder:

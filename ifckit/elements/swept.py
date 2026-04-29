@@ -9,7 +9,7 @@ IfcFixedReferenceSweptAreaSolid.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Union
 
 from ifckit.elements.base import PendingElement
 from ifckit.elements.structural import (

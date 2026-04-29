@@ -294,3 +294,29 @@ class TestPendingSweptBeam:
     def test_no_up_not_in_dict(self):
         sb = PendingSweptBeam(LINE_PATH, PROFILE)
         assert "up" not in sb.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# TC4 — from_dict round-trip documents plane loss (D3)
+# ---------------------------------------------------------------------------
+
+
+class TestFromDictPlaneLoss:
+    """TC4: Documents that PendingWall/PendingSlab.from_dict does not round-trip plane."""
+
+    def test_wall_from_dict_plane_loss(self):
+        """
+        PendingWall.from_dict silently drops the plane; this is a known
+        limitation (D3). The test asserts the current behaviour so that
+        any accidental change is caught.
+        """
+        from ifckit.elements.building import PendingWall
+
+        footprint = [Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0.3, 0), Vec(0, 0.3, 0)]
+        plane = Plane(Vec(0, 0, 1), Vec(1, 0, 0), Vec(0, 1, 0))
+        w = PendingWall(footprint, plane, 3.0, name="W")
+        d = w.to_dict()
+        w2 = PendingWall.from_dict(d)
+        # plane is NOT preserved — this is expected (D3)
+        assert w2.name == "W"
+        assert len(w2.footprint) == 4

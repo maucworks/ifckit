@@ -45,10 +45,13 @@ else:
         out = f"Import failed: {e}"
         count = 0
     else:
+        scale = float(scale) if scale else 1.0  # default: METRE
+
         importer = IfcMeshImporter(
             layer_root="IFC",
             clear_on_import=bool(clear),
-            use_active_doc=True
+            use_active_doc=True,
+            scale_factor=scale
         )
 
         if delete:

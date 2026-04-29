@@ -1,4 +1,5 @@
 """Tests for ifckit.geometry — Line, Arc, Polyline, Path"""
+
 import math
 import pytest
 from ifckit.geometry import Vec, Plane, Line, Arc, Polyline, Path
@@ -7,6 +8,7 @@ from ifckit.geometry import Vec, Plane, Line, Arc, Polyline, Path
 # ---------------------------------------------------------------------------
 # Line
 # ---------------------------------------------------------------------------
+
 
 class TestLine:
     def test_direction(self):
@@ -41,6 +43,7 @@ class TestLine:
 # ---------------------------------------------------------------------------
 # Arc
 # ---------------------------------------------------------------------------
+
 
 class TestArc:
     def _quarter_arc(self):
@@ -109,6 +112,7 @@ class TestArc:
 # Polyline
 # ---------------------------------------------------------------------------
 
+
 class TestPolyline:
     def _square(self):
         pts = [Vec(0, 0, 0), Vec(1, 0, 0), Vec(1, 1, 0), Vec(0, 1, 0)]
@@ -159,6 +163,7 @@ class TestPolyline:
         pl = Polyline(pts)
         ccw = pl.ensure_ccw(Vec(0, 0, 1))
         from ifckit.geometry import _signed_area
+
         assert _signed_area(ccw.points, Vec(0, 0, 1)) > 0
 
     def test_project_to_plane(self):
@@ -181,20 +186,21 @@ class TestPolyline:
 # Path
 # ---------------------------------------------------------------------------
 
+
 class TestPath:
     def test_empty_path_length(self):
         p = Path()
-        assert p.length() == pytest.approx(0.0)
+        assert p.length == pytest.approx(0.0)
 
     def test_add_line(self):
         p = Path().add_line(Vec(0, 0, 0), Vec(5, 0, 0))
         assert len(p.segments) == 1
-        assert p.length() == pytest.approx(5.0)
+        assert p.length == pytest.approx(5.0)
 
     def test_add_arc(self):
         p = Path().add_arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), math.pi / 2)
         assert len(p.segments) == 1
-        assert p.length() == pytest.approx(math.pi / 2)
+        assert p.length == pytest.approx(math.pi / 2)
 
     def test_mixed_path_length(self):
         p = (
@@ -203,7 +209,7 @@ class TestPath:
             .add_arc(Vec(5, 1, 0), Vec(0, 0, 1), Vec(5, 0, 0), math.pi / 2)
         )
         expected = 5.0 + (math.pi / 2) * 1.0
-        assert p.length() == pytest.approx(expected, rel=1e-3)
+        assert p.length == pytest.approx(expected, rel=1e-3)
 
     def test_start_point(self):
         p = Path().add_line(Vec(1, 2, 3), Vec(4, 5, 6))
@@ -230,11 +236,7 @@ class TestPath:
 
     def test_sample_dedup(self):
         """Consecutive segments sharing endpoint must not duplicate it."""
-        p = (
-            Path()
-            .add_line(Vec(0, 0, 0), Vec(1, 0, 0))
-            .add_line(Vec(1, 0, 0), Vec(2, 0, 0))
-        )
+        p = Path().add_line(Vec(0, 0, 0), Vec(1, 0, 0)).add_line(Vec(1, 0, 0), Vec(2, 0, 0))
         pl = p.sample()
         # should be 3 points, not 4
         assert len(pl.points) == 3
@@ -248,6 +250,7 @@ class TestPath:
 # Coverage gap fillers
 # ---------------------------------------------------------------------------
 
+
 def test_polyline_single_point_not_closed():
     pl = Polyline([Vec(0, 0, 0)])
     assert not pl.is_closed
@@ -259,6 +262,7 @@ def test_ensure_ccw_already_ccw():
     pl = Polyline(pts)
     ccw = pl.ensure_ccw(Vec(0, 0, 1))
     from ifckit.geometry import _signed_area
+
     assert _signed_area(ccw.points, Vec(0, 0, 1)) > 0
 
 
@@ -278,8 +282,8 @@ def test_path_end_tangent_arc():
 
 def test_polygon_normal_xy_square():
     from ifckit.geometry import _polygon_normal
+
     pts = [Vec(0, 0, 0), Vec(1, 0, 0), Vec(1, 1, 0), Vec(0, 1, 0)]
     n = _polygon_normal(pts)
     # Newell's method for flat XY polygon → should align with +Z or -Z
     assert abs(n.z) == pytest.approx(1.0, abs=1e-6)
-

@@ -36,11 +36,8 @@ from ifckit import (
     Plane,
     Line,
     BridgePartType,
-    validate,
     IBeamProfile,
 )
-from ifckit.builders import default_registry
-from ifckit.builders._geom import get_body_context
 
 # ---------------------------------------------------------------------------
 # Model — millimetres throughout, no conversion needed
@@ -52,9 +49,8 @@ model = IfcModel(
     author="you",
     unit=LengthUnit.MILLIMETRE,
 )
-site = model.add_site("Site A")
-bridge = model.add_bridge(site, "Main Bridge")
-deck = model.add_bridge_part(bridge, "Deck", BridgePartType.DECK.value)
+bridge = model.add_site("Site A").add_bridge("Main Bridge")
+deck = bridge.add_bridge_part("Deck", BridgePartType.DECK.value)
 
 profile = IBeamProfile(
     height=600,
@@ -64,31 +60,25 @@ profile = IBeamProfile(
     anchor="nw",
 )
 
+# profile object passed directly — no list comprehension needed
 beam = PendingBeam(
     axis=Line(Vec(0, 0, 0), Vec(3000, 0, 0)),
     up=Vec(0, 1, 1),
     profile=profile,
     name="I-Beam 300x600x10",
 )
-result = validate(beam)
-assert result.ok, result.errors
-
 
 beam1 = PendingBeam(
     axis=Line(Vec(0, 500, 0), Vec(3000, 500, 0)),
-    profile=[Vec(x, y) for x, y in profile.get_profile_points()],
+    profile=profile,
     start_clip=Plane(Vec(600, 0, 0), Vec(1, 0, 1), Vec(0, 1, 0)),  # 45° mitre at start
     end_clip=Plane(Vec(2400, 0, 0), Vec(-1, 0, 1), Vec(0, -1, 0)),  # 45° mitre at end
     name="I-Beam clipped",
 )
-result = validate(beam1)
-assert result.ok, result.errors
 
-
-reg = default_registry()
-ctx = get_body_context(model.ifc_file)
-reg.get("basic_beam").build(model.ifc_file, beam, deck.entity, ctx)
-reg.get("basic_beam").build(model.ifc_file, beam1, deck.entity, ctx)
+# Validate and build in one call — raises ValueError if invalid
+deck.add(beam)
+deck.add(beam1)
 
 os.makedirs("output", exist_ok=True)
 model.save("output/quickstart_bridge.ifc")

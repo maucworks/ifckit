@@ -1,49 +1,40 @@
 """
-gh_collector.py  —  GH Script component: "Collect JSON Elements"
-==================================================================
+gh_collector.py — GH Script: "Collect Elements"
+================================================
 
-Stateless component: merges multiple JSON element lists and adds storey info.
+Stateless: merges any element JSON lists into storey structure.
 
 Flow:  [Walls JSON] ─┐
-                   ──┼──→ [Collector] ──→ [Combined JSON] ──→ [Export]
+                   ──┼──→ [Collector] ──→ [JSON] ──→ [Export]
      [Beams JSON] ──┘
+     [Columns JSON] ─┘
 
 No sticky, no state - pure data flow.
 
-Component inputs
-----------------
-walls_json  : list — List of JSON strings from CreateWalls.
-beams_json  : list — List of JSON strings from CreateBeams.
-storey_name : str  — Name of the storey for all elements.
-                     Example: "Ground Floor", "Floor 1", etc.
+Inputs
+------
+elements : list — List of JSON strings (any element type: walls, beams, etc.)
+storey   : str  — Storey name, e.g. "Ground Floor"
 
-Component outputs
------------------
+Output
+------
 out     : str  — Status message.
-json_out : str — JSON string with storey-wrapped elements.
-                 Connect directly to Export.
+json_out : str — JSON with {"storeys": {storey_name: elements}}
 """
 
 import json
 
-messages = []
-all_elements = []
+if not elements:
+    out = "No elements"
+    json_out = ""
+elif not storey:
+    out = "No storey name"
+    json_out = ""
+else:
+    flat_elements = elements if isinstance(elements, list) else [elements]
+    valid = [e for e in flat_elements if e]
 
-if walls_json:
-    walls = walls_json if isinstance(walls_json, list) else [walls_json]
-    all_elements.extend([e for e in walls if e])
-    messages.append(f"Added {len(walls)} walls")
+    out = f"Collected {len(valid)} elements into '{storey}'"
+    json_out = json.dumps({"storeys": {storey: valid}}, separators=(",", ":"))
 
-if beams_json:
-    beams = beams_json if isinstance(beams_json, list) else [beams_json]
-    all_elements.extend([e for e in beams if e])
-    messages.append(f"Added {len(beams)} beams")
-
-out = ", ".join(messages) if messages else "No elements"
-
-output_data = {
-    "storeys": {
-        storey_name if storey_name else "Default": all_elements
-    }
-}
-json_out = json.dumps(output_data, separators=(",", ":"))
+print(out)

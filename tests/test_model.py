@@ -516,3 +516,77 @@ class TestHandleChaining:
         l1.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="L1 Beam"))
         assert len(m.ifc_file.by_type("IfcBeam")) == 2
         assert len(m.ifc_file.by_type("IfcBuildingStorey")) == 2
+
+
+# ---------------------------------------------------------------------------
+# TC1 — model.export()
+# ---------------------------------------------------------------------------
+
+
+class TestModelExport:
+    """TC1: model.export() writes a valid file for each supported format."""
+
+    def _model_with_beam(self):
+        m = IfcModel(name="ExportTest", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        floor.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="Beam"))
+        return m
+
+    def test_export_ifc(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.ifc")
+        m.export(out)
+        import ifcopenshell
+
+        f = ifcopenshell.open(out)
+        assert len(f.by_type("IfcBeam")) == 1
+
+    def test_export_unknown_extension_raises(self, tmp_path):
+        m = self._model_with_beam()
+        with pytest.raises((ValueError, ImportError)):
+            m.export(str(tmp_path / "out.xyz"))
+
+
+# ---------------------------------------------------------------------------
+# TC3 — handle.add() raises ValueError on invalid element
+# ---------------------------------------------------------------------------
+
+
+class TestHandleAddValidation:
+    """TC3: storey.add() / bridge_part.add() raises ValueError on bad element."""
+
+    def test_add_zero_length_beam_raises(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        zero_axis = Line(Vec(0, 0, 0), Vec(0, 0, 0))
+        with pytest.raises(ValueError):
+            # Line with zero length → validator error → ValueError from model.add
+            floor.add(PendingBeam(zero_axis, _SQUARE_PROFILE))
+
+    def test_add_beam_with_too_few_profile_points_raises(self):
+        m = IfcModel(name="T", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        tiny_profile = [Vec(0, 0), Vec(1, 0)]  # only 2 points
+        with pytest.raises(ValueError):
+            floor.add(PendingBeam(_BEAM_AXIS, tiny_profile))
+
+
+# ---------------------------------------------------------------------------
+# TC5 — LengthUnit.FOOT / INCH raise NotImplementedError in IfcModel
+# ---------------------------------------------------------------------------
+
+
+class TestLengthUnitImperial:
+    """TC5: IfcModel raises NotImplementedError for FOOT and INCH units."""
+
+    def test_foot_raises(self):
+        from ifckit.schema import LengthUnit
+
+        with pytest.raises(NotImplementedError, match="LengthUnit.FOOT"):
+            IfcModel(name="T", schema=IfcSchema.IFC4, unit=LengthUnit.FOOT)
+
+    def test_inch_raises(self):
+        from ifckit.schema import LengthUnit
+
+        with pytest.raises(NotImplementedError, match="LengthUnit.INCH"):
+            IfcModel(name="T", schema=IfcSchema.IFC4, unit=LengthUnit.INCH)

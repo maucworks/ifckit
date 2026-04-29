@@ -16,12 +16,12 @@ Classes:
 from __future__ import annotations
 
 import math
-from typing import Iterator, List, Optional, Sequence, Tuple
-
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 # ---------------------------------------------------------------------------
 # "Vec"
 # ---------------------------------------------------------------------------
+
 
 class Vec:
     """
@@ -77,7 +77,7 @@ class Vec:
         return Vec(-self.x, -self.y, -self.z)
 
     def __abs__(self) -> float:
-        return math.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
     def __matmul__(self, other: "Vec") -> float:
         """Dot product: a @ b"""
@@ -119,7 +119,7 @@ class Vec:
         return self @ other
 
     def cross(self, other: "Vec") -> "Vec":
-        return self ** other
+        return self**other
 
     def length(self) -> float:
         return abs(self)
@@ -151,7 +151,7 @@ class Vec:
         n = axis.normalized()
         a = self.normalized()
         b = other.normalized()
-        return math.atan2((a ** b) @ n, a @ b)
+        return math.atan2((a**b) @ n, a @ b)
 
     def angle_to_plane(self, plane_normal: "Vec") -> float:
         """Angle between self and a plane defined by its normal (-pi/2..pi/2)."""
@@ -168,17 +168,25 @@ class Vec:
         k = axis.normalized()
         cos_a = math.cos(angle)
         sin_a = math.sin(angle)
-        return self * cos_a + (k ** self) * sin_a + k * (k @ self) * (1 - cos_a)
+        return self * cos_a + (k**self) * sin_a + k * (k @ self) * (1 - cos_a)
 
     # --- conversion ---------------------------------------------------------
 
     def to_tuple(self) -> Tuple[float, float, float]:
         return (self.x, self.y, self.z)
 
+    def to_dict(self) -> Dict[str, float]:
+        return {"x": self.x, "y": self.y, "z": self.z}
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, float]) -> "Vec":
+        return cls(d["x"], d["y"], d["z"])
+
 
 # ---------------------------------------------------------------------------
 # Plane  (right-handed frame: origin, x_axis, y_axis; z = x ** y)
 # ---------------------------------------------------------------------------
+
 
 class Plane:
     """
@@ -198,7 +206,7 @@ class Plane:
 
     @property
     def z_axis(self) -> "Vec":
-        return (self.x_axis ** self.y_axis).normalized()
+        return (self.x_axis**self.y_axis).normalized()
 
     @classmethod
     def world_xy(cls) -> "Plane":
@@ -215,8 +223,8 @@ class Plane:
         # pick world axis least aligned with n to derive x
         world_axes = [Vec(1, 0, 0), Vec(0, 1, 0), Vec(0, 0, 1)]
         ref = min(world_axes, key=lambda a: abs(n @ a))
-        x = (n ** ref).normalized()  # n × ref: right-handed, perpendicular to n
-        y = (n ** x).normalized()
+        x = (n**ref).normalized()  # n × ref: right-handed, perpendicular to n
+        y = (n**x).normalized()
         return cls(origin, x, y)
 
     @classmethod
@@ -237,26 +245,16 @@ class Plane:
             # tangent nearly parallel to up — use +Y as fallback
             up = Vec(0, 1, 0)
         y = (up - t * (t @ up)).normalized()
-        x = (t ** y).normalized()  # convention: x = tangent (extrusion direction in IFC beam placement)
-        # convention: x = tangent (extrusion direction in IFC beam placement)
+        x = (t**y).normalized()
         return cls(origin, t, y)
 
     def transform_point(self, local: "Vec") -> "Vec":
         """Transform a point from local frame coordinates to world coordinates."""
-        return (
-            self.origin
-            + self.x_axis * local.x
-            + self.y_axis * local.y
-            + self.z_axis * local.z
-        )
+        return self.origin + self.x_axis * local.x + self.y_axis * local.y + self.z_axis * local.z
 
     def transform_vector(self, local: "Vec") -> "Vec":
         """Transform a vector (no translation) from local to world."""
-        return (
-            self.x_axis * local.x
-            + self.y_axis * local.y
-            + self.z_axis * local.z
-        )
+        return self.x_axis * local.x + self.y_axis * local.y + self.z_axis * local.z
 
     def closest_point(self, world_pt: "Vec") -> "Vec":
         """Project a world point onto the plane (closest point on plane surface)."""
@@ -268,6 +266,21 @@ class Plane:
         d = world_pt - self.origin
         return Vec(d @ self.x_axis, d @ self.y_axis, d @ self.z_axis)
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "origin": self.origin.to_dict(),
+            "x_axis": self.x_axis.to_dict(),
+            "y_axis": self.y_axis.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Plane":
+        return cls(
+            origin=Vec.from_dict(d["origin"]),
+            x_axis=Vec.from_dict(d["x_axis"]),
+            y_axis=Vec.from_dict(d["y_axis"]),
+        )
+
     def __repr__(self) -> str:
         return f"Plane(origin={self.origin}, x={self.x_axis}, y={self.y_axis})"
 
@@ -275,6 +288,7 @@ class Plane:
 # ---------------------------------------------------------------------------
 # Line3
 # ---------------------------------------------------------------------------
+
 
 class Line:
     """A finite line segment from start to end."""
@@ -312,6 +326,7 @@ class Line:
 # Arc3
 # ---------------------------------------------------------------------------
 
+
 class Arc:
     """
     A circular arc in 3D space.
@@ -346,12 +361,12 @@ class Arc:
 
     @property
     def end(self) -> "Vec":
-        radial = (self.start - self.center)
+        radial = self.start - self.center
         return self.center + radial.rotate_around(self.normal, self.angle)
 
     @property
     def midpoint(self) -> "Vec":
-        radial = (self.start - self.center)
+        radial = self.start - self.center
         return self.center + radial.rotate_around(self.normal, self.angle / 2)
 
     def point_at(self, t: float) -> "Vec":
@@ -375,23 +390,23 @@ class Arc:
     def tangent_at_start(self) -> "Vec":
         radial = (self.start - self.center).normalized()
         sign = 1.0 if self.angle >= 0 else -1.0
-        return (self.normal ** radial) * sign
+        return (self.normal**radial) * sign
 
     def tangent_at_end(self) -> "Vec":
         radial = (self.end - self.center).normalized()
         sign = 1.0 if self.angle >= 0 else -1.0
-        return (self.normal ** radial) * sign
+        return (self.normal**radial) * sign
 
     def __repr__(self) -> str:
         return (
-            f"Arc(center={self.center}, r={self.radius:.3f}, "
-            f"angle={math.degrees(self.angle):.1f}°)"
+            f"Arc(center={self.center}, r={self.radius:.3f}, angle={math.degrees(self.angle):.1f}°)"
         )
 
 
 # ---------------------------------------------------------------------------
 # "Polyline"
 # ---------------------------------------------------------------------------
+
 
 class Polyline:
     """An ordered sequence of "Vec" points forming a polyline."""
@@ -401,7 +416,9 @@ class Polyline:
         self.closed = closed
 
     @classmethod
-    def from_tuples(cls, tuples: List[Tuple[float, float, float]], closed: bool = False) -> "Polyline":
+    def from_tuples(
+        cls, tuples: List[Tuple[float, float, float]], closed: bool = False
+    ) -> "Polyline":
         return cls([Vec(*t) for t in tuples], closed=closed)
 
     @property
@@ -459,6 +476,7 @@ class Polyline:
 # "Path"  — mixed polyline + arc path (for bridge alignments)
 # ---------------------------------------------------------------------------
 
+
 class Path:
     """
     A G1-continuous path made of Line3 and Arc3 segments.
@@ -486,6 +504,7 @@ class Path:
         self._segments.append(Arc(center, normal, start, angle))
         return self
 
+    @property
     def length(self) -> float:
         return sum(seg.length for seg in self._segments)
 
@@ -532,12 +551,13 @@ class Path:
         return seg.tangent_at_end()
 
     def __repr__(self) -> str:
-        return f"Path({len(self._segments)} segments, length={self.length():.3f})"
+        return f"Path({len(self._segments)} segments, length={self.length:.3f})"
 
 
 # ---------------------------------------------------------------------------
 # Parallel transport frames along a "Path"
 # ---------------------------------------------------------------------------
+
 
 def parallel_transport_frames(
     path: "Path",
@@ -579,15 +599,15 @@ def parallel_transport_frames(
             t = (pts[i + 1] - pts[i - 1]).normalized()
 
         if i > 0:
-            axis = prev_tangent ** t
+            axis = prev_tangent**t
             axis_len = abs(axis)
             if axis_len > 1e-8:
                 angle = prev_tangent.angle_to(t)
                 prev_normal = prev_normal.rotate_around(axis, angle)
             prev_tangent = t
 
-        binormal = (t ** prev_normal).normalized()
-        normal = (binormal ** t).normalized()
+        binormal = (t**prev_normal).normalized()
+        normal = (binormal**t).normalized()
         frames.append(Plane(pt, t, normal))
 
     return frames
@@ -596,6 +616,7 @@ def parallel_transport_frames(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _polygon_normal(points: List["Vec"]) -> "Vec":
     """Newell's method: compute the normal of a (possibly non-planar) polygon."""

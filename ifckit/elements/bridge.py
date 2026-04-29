@@ -19,24 +19,10 @@ from ifckit.geometry import Arc, Line, Vec
 
 def _element_from_dict(d: Dict[str, Any]) -> PendingElement:
     """Dispatch a serialised PendingElement dict to the correct subclass."""
-    # Import here to avoid circular imports at module level.
-    from ifckit.elements.building import PendingWall, PendingSlab
-    from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+    from ifckit.elements.registry import ElementRegistry
 
-    _registry: Dict[str, type] = {
-        "basic_wall": PendingWall,
-        "basic_slab": PendingSlab,
-        "basic_beam": PendingBeam,
-        "basic_column": PendingColumn,
-        "revolved_beam": PendingRevolvedBeam,
-        "alignment": PendingAlignment,
-        "bridge_part": PendingBridgePart,
-        "bridge": PendingBridge,
-    }
     etype = d.get("type", "")
-    cls = _registry.get(etype)
-    if cls is None:
-        raise ValueError(f"Unknown element type in dict: {etype!r}")
+    cls = ElementRegistry.get(etype)
     return cls.from_dict(d)
 
 
