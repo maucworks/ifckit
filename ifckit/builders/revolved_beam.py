@@ -60,8 +60,6 @@ class RevolvedBeamBuilder:
         # Calculate radial direction and radius for CP
         # radius = (arc.start - arc.center).length()
         radius = arc.radius
-        print(f"DEBUG: arc.radius = {radius}, arc.angle = {arc.angle}")
-        print(f"DEBUG: arc.start = {arc.start}, arc.center = {arc.center}")
         # Profile points - offset by radius in local X to position at arc start in CP
         pts_2d = [(p.x - radius, p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
@@ -82,7 +80,6 @@ class RevolvedBeamBuilder:
             Axis=dir3(ifc_file, *cpn.to_tuple()),
             RefDirection=dir3(ifc_file, *cpx.to_tuple()),
         )
-        print(f"DEBUG: cpo ={cpo}, cpx={cpx}")
 
         # Axis of revolution - at arc center, direction = arc normal
         # IfcAxis1Placement only has Location and Axis (no RefDirection)
