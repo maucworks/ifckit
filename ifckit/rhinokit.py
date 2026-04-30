@@ -22,6 +22,7 @@ Usage::
 
 from __future__ import annotations
 
+import math
 from typing import Any, List
 
 from ifckit.geometry import Arc, Line, Vec, Path
@@ -78,27 +79,34 @@ def line_to_line(rhino_line: Any) -> Line:
 
 
 def arc_to_arc(rhino_arc: Any) -> Arc:
-    """Rhino ArcCurve → ifckit Arc.
+    """Rhino Arc or ArcCurve → ifckit Arc.
 
-    Uses rhino_arc.Arc to get center, start, and angle.
-    Normal is computed from the arc plane using cross product.
+    Handles both Rhino Arc (primitive) and ArcCurve (geometry with curve methods).
+    Uses .Arc property if available (ArcCurve), otherwise assumes it's already an Arc.
+    
+    Rhino Arc has a Plane property which contains the plane of the arc.
+    Arc.Plane.Normal gives the normal vector to the arc's plane.
     """
-    arc = rhino_arc.Arc
+    try:
+        arc = rhino_arc.Arc
+    except AttributeError:
+        arc = rhino_arc
+
     center = arc.Center
     start = arc.StartPoint
-    angle = arc.Angle
+    angle_rad = arc.Angle  # Rhino Arc.Angle is already in radians
 
-    # Compute normal = (start - center) × tangent_at_start
-    v_center = Vec(start.X - center.X, start.Y - center.Y, start.Z - center.Z)
-    tangent = rhino_arc.TangentAtStart
-    v_tangent = Vec(tangent.X, tangent.Y, tangent.Z)
-    normal = (v_center ** v_tangent).normalized()
+    # Rhino Arc.Plane.Normal gives the normal to the arc's plane
+    # This works for 3D arcs (arcs not in World XY)
+    plane = arc.Plane
+    normal_vec = plane.Normal
+    normal = Vec(normal_vec.X, normal_vec.Y, normal_vec.Z)
 
     return Arc(
         center=pt_to_vec(center),
         normal=normal,
         start=pt_to_vec(start),
-        angle=angle,
+        angle=angle_rad,
     )
 
 

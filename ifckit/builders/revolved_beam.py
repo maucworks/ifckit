@@ -1,8 +1,15 @@
 """
 ifckit.builders.revolved_beam
-==============================
+=============================
 
 RevolvedBeamBuilder: PendingRevolvedBeam → IfcBeam with IfcRevolvedAreaSolid.
+
+Implementation based on Construction Plane (CP) concept:
+- Position = CP at arc center with local X = radial, local Y = arc normal
+- Profile drawn in CP's local XY, offset by +radius to arc start
+- Axis = arc normal at arc center, in world coordinates
+
+Reference: IFC4 IfcRevolvedAreaSolid spec
 """
 
 from __future__ import annotations
@@ -26,20 +33,6 @@ from ifckit.geometry import Plane
 
 
 class RevolvedBeamBuilder:
-    """
-    Builds an IfcBeam from a PendingRevolvedBeam via IfcRevolvedAreaSolid.
-
-    The arc defines the sweep path.
-    The profile is the cross-section, defined in 2D (local u,v).
-
-    The IFC revolve works as follows:
-      - Position: placement of the profile at the arc start (frame at start)
-      - Axis: the revolution axis (passes through the arc center, along arc normal)
-      - Angle: the arc sweep angle (radians). Positive = CCW, negative = CW.
-        Note: Negative angles (CW arcs) are converted to positive by taking abs();
-        the placement frame determines the actual solid orientation.
-    """
-
     entity_type = "revolved_beam"
 
     def build(
@@ -49,9 +42,10 @@ class RevolvedBeamBuilder:
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        # Use element_type string comparison instead of isinstance() to handle
-        # class identity mismatches from module reloading in Rhino/Grasshopper.
-        if not hasattr(pending, 'element_type') or pending.element_type != 'revolved_beam':
+        if (
+            not hasattr(pending, "element_type")
+            or pending.element_type != "revolved_beam"
+        ):
             raise TypeError(
                 f"RevolvedBeamBuilder expects PendingRevolvedBeam, got {type(pending).__name__}"
             )
@@ -63,58 +57,74 @@ class RevolvedBeamBuilder:
         def _local_pt(v):
             return Vec(v.x, v.y, v.z - elev)
 
-        # Frame at the start of the arc (storey-local coords)
-        start_tangent = arc.tangent_at_start()
-        local_start = _local_pt(arc.start)
-        frame = Plane.from_tangent(local_start, start_tangent)
-
-        # Profile points are already local 2D offsets in the YZ cross-section.
-        pts_2d = [(p.x, p.y) for p in pending.profile]
-
+        # Calculate radial direction and radius for CP
+        # radius = (arc.start - arc.center).length()
+        radius = arc.radius
+        print(f"DEBUG: arc.radius = {radius}, arc.angle = {arc.angle}")
+        print(f"DEBUG: arc.start = {arc.start}, arc.center = {arc.center}")
+        # Profile points - offset by radius in local X to position at arc start in CP
+        pts_2d = [(p.x - radius, p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
 
-        # Profile position = frame at arc start
-        # The profile plane: Z = tangent (extrusion direction into sweep),
-        # but IfcRevolvedAreaSolid places the profile at the start and sweeps.
-        # Position: local X = radial direction from center to start
-        radial = (arc.start - arc.center).normalized()
+        # Position = CP at arc center
+        # CP origin = arc center
+        # CP local X = radial direction (from center toward start)
+        # CP local Y = arc normal (perpendicular to arc plane)
+        # Position's local XY = radial-normal plane = CP
 
-        local_arc_start = _local_pt(arc.start)
-        local_arc_center = _local_pt(arc.center)
-
+        cpo = arc.center
+        cpx = (arc.center - arc.start).normalized()
+        cpn = arc.tangent_at_start().normalized()
+        cpy = arc.normal.normalized()
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
-            Location=pt3(ifc_file, *local_arc_start.to_tuple()),
-            Axis=dir3(ifc_file, *start_tangent.to_tuple()),  # local Z = extrusion direction
-            RefDirection=dir3(ifc_file, *radial.to_tuple()),
+            Location=pt3(ifc_file, *cpo.to_tuple()),
+            Axis=dir3(ifc_file, *cpn.to_tuple()),
+            RefDirection=dir3(ifc_file, *cpx.to_tuple()),
         )
+        print(f"DEBUG: cpo ={cpo}, cpx={cpx}")
 
-        # Revolution axis: passes through arc center, along arc normal
+        # Axis of revolution - at arc center, direction = arc normal
+        # IfcAxis1Placement only has Location and Axis (no RefDirection)
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
-            Location=pt3(ifc_file, *local_arc_center.to_tuple()),
-            Axis=dir3(ifc_file, *arc.normal.to_tuple()),
+            Location=pt3(ifc_file, 0, 0, 0),
+            Axis=dir3(ifc_file, 0.0, 1.0, 0.0),
         )
 
+        # Create revolved solid - negative angle for CW sweep
         solid = ifc_file.create_entity(
             "IfcRevolvedAreaSolid",
             SweptArea=profile,
             Position=rev_pos,
             Axis=rev_axis,
-            Angle=abs(arc.angle),  # IFC expects positive angle
+            Angle=-arc.angle,
         )
 
         body_ctx = context
-        shape_rep = shape_representation(ifc_file, body_ctx, solid, rep_type="SweptSolid")
+        shape_rep = shape_representation(
+            ifc_file, body_ctx, solid, rep_type="SweptSolid"
+        )
         prod_rep = product_definition_shape(ifc_file, shape_rep)
+
+        # Beam placement - at origin, solid already correctly positioned
+        beam_placement = ifc_file.create_entity(
+            "IfcAxis2Placement3D",
+            Location=pt3(ifc_file, 0.0, 0.0, 0.0),
+            Axis=dir3(ifc_file, 0.0, 0.0, 1.0),
+            RefDirection=dir3(ifc_file, 1.0, 0.0, 0.0),
+        )
+        beam_plac = ifc_file.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=container.ObjectPlacement,
+            RelativePlacement=beam_placement,
+        )
 
         beam = ifcopenshell.api.run(
             "root.create_entity", ifc_file, ifc_class="IfcBeam", name=pending.name
         )
         beam.Representation = prod_rep
-        beam.ObjectPlacement = local_placement(
-            ifc_file, frame, relative_to=container.ObjectPlacement
-        )
+        beam.ObjectPlacement = beam_plac
 
         ifcopenshell.api.run(
             "spatial.assign_container",

@@ -314,6 +314,14 @@ class Line:
     def direction(self) -> "Vec":
         return (self.end - self.start).normalized()
 
+    def tangent_at_start(self) -> "Vec":
+        """For compatibility with Arc - returns the direction of the line."""
+        return self.direction
+
+    def tangent_at_end(self) -> "Vec":
+        """For compatibility with Arc - returns the direction of the line."""
+        return self.direction
+
     @property
     def length(self) -> float:
         return self.start.distance_to(self.end)
@@ -554,6 +562,10 @@ class Path:
             return seg.direction
         return seg.tangent_at_start()
 
+    def tangent_at_start(self) -> Optional["Vec"]:
+        """Alias for start_tangent() for compatibility with Arc interface."""
+        return self.start_tangent()
+
     def end_tangent(self) -> Optional["Vec"]:
         if not self._segments:
             return None
@@ -561,6 +573,64 @@ class Path:
         if isinstance(seg, Line):
             return seg.direction
         return seg.tangent_at_end()
+
+    @property
+    def is_planar(self) -> bool:
+        """Check if all segments lie in the same plane."""
+        if len(self._segments) <= 1:
+            return True
+        
+        # For arcs, check if all have the same normal
+        # Use type name check for reload compatibility
+        arc_normals = []
+        for seg in self._segments:
+            if type(seg).__name__ == 'Arc':
+                arc_normals.append(seg.normal)
+        
+        if arc_normals:
+            # Check if all arc normals are the same (or opposite)
+            first_n = arc_normals[0].normalized()
+            for n in arc_normals[1:]:
+                n_normalized = n.normalized()
+                if abs(first_n @ n_normalized) < 0.999:
+                    return False
+            return True
+        
+        # For Lines only - check if all collinear
+        all_lines = all(type(seg).__name__ == 'Line' for seg in self._segments)
+        if len(self._segments) >= 2 and all_lines:
+            # Check if all lines are collinear (same direction or opposite)
+            first_dir = self._segments[0].direction.normalized()
+            for seg in self._segments[1:]:
+                dir_normalized = seg.direction.normalized()
+                if abs(first_dir @ dir_normalized) < 0.999 and abs(first_dir @ dir_normalized + 1) > 0.001:
+                    return False
+            return True
+        
+        return True  # Single segment or mixed that we can't easily verify
+    
+    @property
+    def normal(self) -> Optional["Vec"]:
+        """Return the normal of the plane if the path is planar."""
+        if not self.is_planar:
+            return None
+        
+        # Find the first Arc to get its normal
+        for seg in self._segments:
+            if type(seg).__name__ == 'Arc':
+                return seg.normal
+        
+        # For Lines only: use first segment direction and derive a perpendicular
+        if len(self._segments) > 0 and type(self._segments[0]).__name__ == 'Line':
+            first_dir = self._segments[0].direction.normalized()
+            # Return an arbitrary perpendicular to the line direction
+            from ifckit.geometry import Vec
+            if abs(first_dir.z) < 0.9:
+                return (Vec(0, 0, 1) ** first_dir).normalized()
+            else:
+                return (Vec(0, 1, 0) ** first_dir).normalized()
+        
+        return None
 
     def __repr__(self) -> str:
         return f"Path({len(self._segments)} segments, length={self.length:.3f})"

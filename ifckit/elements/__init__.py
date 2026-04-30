@@ -22,7 +22,6 @@ from ifckit.elements.structural import (
     PendingRevolvedBeam,
 )
 from ifckit.elements.style import RenderStyle
-from ifckit.elements.swept import PendingSweptBeam
 
 __all__ = [
     "PendingElement",
@@ -35,7 +34,6 @@ __all__ = [
     "PendingColumn",
     "PendingExtrudedElement",
     "PendingRevolvedBeam",
-    "PendingSweptBeam",
     "AlignmentSegment",
     "BridgePartType",
     "PendingAlignment",

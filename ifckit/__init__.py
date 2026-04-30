@@ -28,7 +28,6 @@ from ifckit.elements import (
     PendingExtrudedElement,
     PendingRevolvedBeam,
     PendingSlab,
-    PendingSweptBeam,
     PendingWall,
 )
 from ifckit.elements.registry import ElementRegistry
@@ -91,7 +90,6 @@ __all__ = [
     "PendingColumn",
     "PendingExtrudedElement",
     "PendingRevolvedBeam",
-    "PendingSweptBeam",
     "PendingBridge",
     "PendingBridgePart",
     "PendingAlignment",

@@ -50,18 +50,18 @@ if pkg_path not in sys.path:
 import ifckit
 import ifckit.json_build
 import ifckit.builders
-import ifckit.builders.swept  # <-- MUST import explicitly
+import ifckit.builders.beam_factory
 import ifckit.elements
-import ifckit.elements.swept
 import ifckit.geometry
 import ifckit.validator
+import ifckit.rhinokit
 
-# Reload in dependency order (leaves before roots)
+# Reload in dependency order (parents before children!)
 importlib.reload(ifckit.geometry)
 importlib.reload(ifckit.elements)
-importlib.reload(ifckit.elements.swept)
-importlib.reload(ifckit.builders.swept)  # <-- MUST reload explicitly
 importlib.reload(ifckit.builders)
+importlib.reload(ifckit.builders.beam_factory)
+importlib.reload(ifckit.rhinokit)
 importlib.reload(ifckit.validator)
 importlib.reload(ifckit.json_build)
 importlib.reload(ifckit)

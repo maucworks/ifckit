@@ -16,7 +16,6 @@ from ifckit.model import (
 )
 from ifckit.geometry import Vec, Line, Arc, Path, Plane
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
-from ifckit.elements.swept import PendingSweptBeam
 from ifckit.elements.building import PendingWall, PendingSlab
 
 
@@ -344,28 +343,6 @@ class TestModelAdd:
         m, storey = model_with_storey
         arc = Arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
         pending = PendingRevolvedBeam(arc, _SQUARE_PROFILE, name="RB1")
-        handle = m.add(pending, storey)
-        assert handle.entity.is_a("IfcBeam")
-
-    def test_add_swept_beam_line(self, model_with_storey):
-        m, storey = model_with_storey
-        pending = PendingSweptBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="SW1")
-        handle = m.add(pending, storey)
-        assert handle.entity.is_a("IfcBeam")
-
-    def test_add_swept_beam_arc(self, model_with_storey):
-        m, storey = model_with_storey
-        arc = Arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
-        pending = PendingSweptBeam(arc, _SQUARE_PROFILE, name="SW2")
-        handle = m.add(pending, storey)
-        assert handle.entity.is_a("IfcBeam")
-
-    def test_add_swept_beam_path(self, model_with_storey):
-        m, storey = model_with_storey
-        p = Path()
-        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
-        p.add_arc(Vec(3, 1, 0), Vec(0, 0, 1), Vec(3, 0, 0), math.pi / 2)
-        pending = PendingSweptBeam(p, _SQUARE_PROFILE, name="SW3")
         handle = m.add(pending, storey)
         assert handle.entity.is_a("IfcBeam")
 

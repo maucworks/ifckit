@@ -37,7 +37,6 @@ from ifckit.elements.bridge import (
 )
 from ifckit.elements.building import PendingSlab, PendingWall
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
-from ifckit.elements.swept import PendingSweptBeam
 from ifckit.geometry import Vec
 
 
@@ -369,34 +368,6 @@ def _validate_bridge(b: PendingBridge) -> ValidationResult:
             errors.append(f"PendingBridge '{b.name}' alignment: {e}")
         for w in child.warnings:
             warnings.append(f"PendingBridge '{b.name}' alignment: {w}")
-
-    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
-
-
-@register_validator(PendingSweptBeam)
-def _validate_swept_beam(sb: PendingSweptBeam) -> ValidationResult:
-    errors: List[str] = []
-    warnings: List[str] = []
-
-    # Path length — Line, Arc, and Path all expose .length as a property
-    path = sb.path
-    path_len = path.length
-
-    if path_len < _MIN_LENGTH:
-        errors.append(f"PendingSweptBeam '{sb.name}': path length must be > 0, got {path_len:.6f}")
-    elif path_len < _WARN_SHORT:
-        warnings.append(f"PendingSweptBeam '{sb.name}': path is very short ({path_len:.4f} m)")
-
-    # Profile
-    if len(sb.profile) < 3:
-        errors.append(
-            f"PendingSweptBeam '{sb.name}': profile must have at least 3 points, "
-            f"got {len(sb.profile)}"
-        )
-    else:
-        area = abs(_profile_area_2d(sb.profile))
-        if area < _MIN_LENGTH**2:
-            errors.append(f"PendingSweptBeam '{sb.name}': profile area is effectively zero")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 

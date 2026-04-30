@@ -11,7 +11,6 @@ from ifckit.validator import validate, ValidationResult
 from ifckit.geometry import Vec, Plane, Line, Arc, Path
 from ifckit.elements.building import PendingWall, PendingSlab
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
-from ifckit.elements.swept import PendingSweptBeam
 from ifckit.elements.bridge import (
     AlignmentSegment,
     BridgePartType,
@@ -499,64 +498,3 @@ class TestUnknownType:
 
         with pytest.raises(TypeError, match="No validator"):
             validate(Alien())
-
-
-# ---------------------------------------------------------------------------
-# PendingSweptBeam
-# ---------------------------------------------------------------------------
-
-
-def _swept(**kw):
-    defaults = dict(
-        path=Line(Vec(0, 0, 0), Vec(5, 0, 0)),
-        profile=BOX_PROFILE,
-        name="SB",
-    )
-    defaults.update(kw)
-    return PendingSweptBeam(**defaults)
-
-
-class TestValidateSweptBeam:
-    def test_valid_line_path(self):
-        assert validate(_swept()).ok
-
-    def test_valid_arc_path(self):
-        arc = Arc(Vec(0, 5, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
-        assert validate(_swept(path=arc)).ok
-
-    def test_valid_mixed_path(self):
-        p = Path()
-        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
-        p.add_arc(Vec(3, 1, 0), Vec(0, 0, 1), Vec(3, 0, 0), math.pi / 2)
-        assert validate(_swept(path=p)).ok
-
-    def test_zero_length_line_path_errors(self):
-        bad = _swept(path=Line(Vec(0, 0, 0), Vec(0, 0, 0)))
-        result = validate(bad)
-        assert not result.ok
-        assert any("path length" in e for e in result.errors)
-
-    def test_too_few_profile_points_errors(self):
-        result = validate(_swept(profile=[Vec(0, 0), Vec(1, 0)]))
-        assert not result.ok
-        assert any("at least 3" in e for e in result.errors)
-
-    def test_zero_area_profile_errors(self):
-        collinear = [Vec(0, 0), Vec(1, 0), Vec(2, 0)]
-        result = validate(_swept(profile=collinear))
-        assert not result.ok
-        assert any("area" in e for e in result.errors)
-
-    def test_short_path_warns(self):
-        short = _swept(path=Line(Vec(0, 0, 0), Vec(0.005, 0, 0)))
-        result = validate(short)
-        assert result.ok  # warning, not error
-        assert any("very short" in w for w in result.warnings)
-
-    def test_empty_path_errors(self):
-        """TC2: Empty Path (no segments) must produce a validation error."""
-        empty_path = Path()
-        sb = PendingSweptBeam(empty_path, [Vec(0, 0), Vec(1, 0), Vec(1, 1), Vec(0, 1)])
-        result = validate(sb)
-        assert not result.ok
-        assert any("path length" in e for e in result.errors)

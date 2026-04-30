@@ -54,20 +54,37 @@ def local_placement(
     return f.create_entity("IfcLocalPlacement", PlacementRelTo=relative_to, RelativePlacement=ax)
 
 
+def _signed_area_2d(points: Sequence[tuple[float, float]]) -> float:
+    """Compute signed area of a polygon (shoelace formula). Positive = CCW."""
+    n = len(points)
+    area = 0.0
+    for i in range(n):
+        j = (i + 1) % n
+        area += points[i][0] * points[j][1]
+        area -= points[j][0] * points[i][1]
+    return area / 2.0
+
+
 def profile_from_points(
     f: ifcopenshell.file,
     points_2d: Sequence[tuple[float, float]],
     profile_name: str | None = None,
+    ensure_ccw: bool = True,
 ) -> ifcopenshell.entity_instance:
     """
     Create IfcArbitraryClosedProfileDef from a list of (x, y) tuples.
     The list is automatically closed (first == last) if not already.
+    If ensure_ccw=True, reverses orientation for positive signed area (CCW).
     """
     pts = list(points_2d)
     # Close the profile if not already closed (epsilon comparison for float safety).
     _EPS = 1e-9
     if not (abs(pts[0][0] - pts[-1][0]) < _EPS and abs(pts[0][1] - pts[-1][1]) < _EPS):
         pts.append(pts[0])
+    # CCW normalization (C# approach for viewer compatibility)
+    if ensure_ccw and _signed_area_2d(pts) < 0:
+        pts = list(reversed(pts[:-1]))  # reverse, drop duplicate end point
+        pts.append(pts[0])  # re-close
     ifc_pts = [pt2(f, x, y) for x, y in pts]
     polyline = f.create_entity("IfcPolyline", Points=ifc_pts)
     return f.create_entity(
