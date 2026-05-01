@@ -23,6 +23,7 @@ from ifckit import (
 )
 from ifckit.builders import default_registry
 from ifckit.builders._geom import get_body_context
+from ifckit.builders.bridge import AlignmentBuilder
 
 
 # ---------------------------------------------------------------------------
@@ -233,14 +234,13 @@ class TestIfc4x3Bridge:
         align_handle = model.add_alignment(site, "MainAlignment")
 
         # Populate alignment geometry
-        reg = default_registry()
         seg1 = AlignmentSegment(geometry=Line(Vec(0, 0, 0), Vec(50, 0, 0)))
         seg2 = AlignmentSegment(
             geometry=Arc(center=Vec(50, 20, 0), normal=Vec(0, 0, 1),
                          start=Vec(50, 0, 0), angle=math.pi / 4)
         )
         alignment = PendingAlignment(segments=[seg1, seg2], name="MainAlignment")
-        reg.get("alignment").build(
+        AlignmentBuilder().build(
             model.ifc_file, alignment, align_handle.entity, None
         )
 

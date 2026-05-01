@@ -287,3 +287,80 @@ def test_polygon_normal_xy_square():
     n = _polygon_normal(pts)
     # Newell's method for flat XY polygon → should align with +Z or -Z
     assert abs(n.z) == pytest.approx(1.0, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Path.is_planar + Path.normal
+# ---------------------------------------------------------------------------
+
+
+class TestPathPlanar:
+    def test_empty_path_is_planar(self):
+        assert Path().is_planar is True
+
+    def test_single_line_is_planar(self):
+        p = Path().add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        assert p.is_planar is True
+
+    def test_single_arc_is_planar(self):
+        p = Path().add_arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+        assert p.is_planar is True
+
+    def test_two_collinear_lines_planar(self):
+        p = Path().add_line(Vec(0, 0, 0), Vec(5, 0, 0)).add_line(Vec(5, 0, 0), Vec(10, 0, 0))
+        assert p.is_planar is True
+
+    def test_two_anti_parallel_lines_planar(self):
+        """Lines pointing in exactly opposite directions must still be planar (fixed precedence bug)."""
+        p = Path().add_line(Vec(0, 0, 0), Vec(5, 0, 0)).add_line(Vec(5, 0, 0), Vec(0, 0, 0))
+        assert p.is_planar is True
+
+    def test_two_diverging_lines_not_planar(self):
+        p = Path().add_line(Vec(0, 0, 0), Vec(1, 0, 0)).add_line(Vec(1, 0, 0), Vec(1, 1, 0))
+        # Not collinear, but still True (single-plane check can't detect 2D turns in lines-only)
+        # The expected result is True — the planar check for lines only detects non-collinear case
+        # if direction differs AND is not anti-parallel. A 90° turn is not collinear → not planar.
+        assert p.is_planar is False
+
+    def test_two_arcs_same_normal_planar(self):
+        p = (
+            Path()
+            .add_arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+            .add_arc(Vec(2, 1, 0), Vec(0, 0, 1), Vec(2, 0, 0), math.pi / 2)
+        )
+        assert p.is_planar is True
+
+    def test_two_arcs_different_normal_not_planar(self):
+        p = (
+            Path()
+            .add_arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+            .add_arc(Vec(1, 0, 1), Vec(1, 0, 0), Vec(1, 0, 0), math.pi / 2)
+        )
+        assert p.is_planar is False
+
+    def test_normal_arc_path_returns_arc_normal(self):
+        normal = Vec(0, 0, 1)
+        p = Path().add_arc(Vec(0, 1, 0), normal, Vec(0, 0, 0), math.pi / 2)
+        n = p.normal
+        assert n is not None
+        assert abs(n.normalized() @ normal.normalized()) == pytest.approx(1.0, abs=1e-6)
+
+    def test_normal_line_only_path_perpendicular_to_direction(self):
+        p = Path().add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        n = p.normal
+        assert n is not None
+        # Normal must be perpendicular to the line direction
+        direction = Vec(1, 0, 0)
+        assert abs(n @ direction) == pytest.approx(0.0, abs=1e-6)
+
+    def test_normal_empty_path_is_none(self):
+        # Empty path: is_planar=True but no segments → normal returns None
+        assert Path().normal is None
+
+    def test_normal_non_planar_path_is_none(self):
+        p = (
+            Path()
+            .add_arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+            .add_arc(Vec(1, 0, 1), Vec(1, 0, 0), Vec(1, 0, 0), math.pi / 2)
+        )
+        assert p.normal is None

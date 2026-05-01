@@ -113,5 +113,5 @@ __all__ = [
     "AlignmentHandle",
     "EntityHandle",
     "IfcMeshImporter",
-    "rhinnokit",
+    "rk",
 ]

@@ -52,10 +52,6 @@ class RevolvedBeamBuilder:
 
         arc = pending.arc
         elev = storey_elevation(container)
-        from ifckit.geometry import Vec
-
-        def _local_pt(v):
-            return Vec(v.x, v.y, v.z - elev)
 
         # Calculate radial direction and radius for CP
         # radius = (arc.start - arc.center).length()
@@ -82,7 +78,8 @@ class RevolvedBeamBuilder:
         )
 
         # Axis of revolution - at arc center, direction = arc normal
-        # IfcAxis1Placement only has Location and Axis (no RefDirection)
+        # IfcAxis1Placement is in the local frame of rev_pos, where local Y = arc normal (cpy).
+        # So (0,1,0) in that local frame correctly resolves to arc.normal in world space.
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
             Location=pt3(ifc_file, 0, 0, 0),

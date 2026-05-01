@@ -460,6 +460,8 @@ class Polyline:
     def close(self) -> "Polyline":
         """Return a closed copy (appends first point if not already closed)."""
         pts = list(self.points)
+        if not pts:
+            return self
         if not pts[0].equals(pts[-1]):
             pts.append(pts[0])
         return Polyline(pts, closed=True)
@@ -501,6 +503,21 @@ class Path:
     """
     A G1-continuous path made of Line3 and Arc3 segments.
     Used for bridge alignment, extrusion paths, etc.
+
+    NOTE ON isinstance() VS type-name CHECKS
+    -----------------------------------------
+    This class uses ``isinstance(seg, Arc)`` / ``isinstance(seg, Line)`` throughout.
+    This is intentional and correct. ``Arc`` and ``Line`` are defined in this same
+    module (``ifckit.geometry``). They are *not* user-defined subclasses and are
+    *not* subject to Rhino/Grasshopper module-reload identity splits.
+
+    The ``type(x).__name__ == "..."`` pattern is only needed for ``PendingElement``
+    subclasses (``ifckit.elements.*``) because those live in user-facing modules
+    that Grasshopper scripts may reload, creating a new class object for the same
+    logical type. Geometry primitives (Arc, Line, Vec, Plane, …) are internal
+    infrastructure and are never reloaded independently.
+
+    Do NOT replace ``isinstance`` here with string-name checks.
     """
 
     def __init__(self) -> None:
@@ -580,11 +597,11 @@ class Path:
         if len(self._segments) <= 1:
             return True
         
-        # For arcs, check if all have the same normal
-        # Use type name check for reload compatibility
+        # For arcs, check if all have the same normal.
+        # isinstance is safe here — Arc is a module-internal primitive, not a reloadable user class.
         arc_normals = []
         for seg in self._segments:
-            if type(seg).__name__ == 'Arc':
+            if isinstance(seg, Arc):  # safe: Arc never reloaded independently
                 arc_normals.append(seg.normal)
         
         if arc_normals:
@@ -596,14 +613,15 @@ class Path:
                     return False
             return True
         
-        # For Lines only - check if all collinear
-        all_lines = all(type(seg).__name__ == 'Line' for seg in self._segments)
+        # For Lines only — check if all collinear.
+        # isinstance is safe here — Line is a module-internal primitive, not a reloadable user class.
+        all_lines = all(isinstance(seg, Line) for seg in self._segments)  # safe: Line never reloaded
         if len(self._segments) >= 2 and all_lines:
             # Check if all lines are collinear (same direction or opposite)
             first_dir = self._segments[0].direction.normalized()
             for seg in self._segments[1:]:
                 dir_normalized = seg.direction.normalized()
-                if abs(first_dir @ dir_normalized) < 0.999 and abs(first_dir @ dir_normalized + 1) > 0.001:
+                if abs(first_dir @ dir_normalized) < 0.999 and abs((first_dir @ dir_normalized) + 1.0) > 0.001:
                     return False
             return True
         
@@ -615,16 +633,17 @@ class Path:
         if not self.is_planar:
             return None
         
-        # Find the first Arc to get its normal
+        # Find the first Arc to get its normal.
+        # isinstance is safe here — Arc is a module-internal primitive, not a reloadable user class.
         for seg in self._segments:
-            if type(seg).__name__ == 'Arc':
+            if isinstance(seg, Arc):  # safe: Arc never reloaded independently
                 return seg.normal
         
-        # For Lines only: use first segment direction and derive a perpendicular
-        if len(self._segments) > 0 and type(self._segments[0]).__name__ == 'Line':
+        # For Lines only: use first segment direction and derive a perpendicular.
+        # isinstance is safe here — Line is a module-internal primitive, not a reloadable user class.
+        if len(self._segments) > 0 and isinstance(self._segments[0], Line):  # safe: Line never reloaded
             first_dir = self._segments[0].direction.normalized()
             # Return an arbitrary perpendicular to the line direction
-            from ifckit.geometry import Vec
             if abs(first_dir.z) < 0.9:
                 return (Vec(0, 0, 1) ** first_dir).normalized()
             else:

@@ -324,3 +324,89 @@ class TestExampleJsonFile:
             assert os.path.exists(output_path)
         else:
             pytest.skip("Example file not found")
+
+
+class TestFlatJsonFormat:
+    """Test the flat element format: {"type": "...", <fields>} without a "data" key."""
+
+    def test_flat_wall_format_builds(self, tmp_path):
+        """Elements described without a nested 'data' dict must build successfully."""
+        data = {
+            "ifc_version": "IFC4",
+            "project": {"name": "FlatTest"},
+            "unit": "METRE",
+            "site": {"name": "Site"},
+            "buildings": [
+                {
+                    "name": "Building",
+                    "storeys": [
+                        {
+                            "name": "GF",
+                            "elevation": 0.0,
+                            "elements": [
+                                {
+                                    "type": "basic_wall",
+                                    "footprint": [
+                                        [0.0, 0.0, 0.0],
+                                        [5.0, 0.0, 0.0],
+                                        [5.0, 0.2, 0.0],
+                                        [0.0, 0.2, 0.0],
+                                    ],
+                                    "height": 3.0,
+                                    "plane": {
+                                        "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                                        "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                                        "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+                                    },
+                                    "name": "W1",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        output_path = str(tmp_path / "flat.ifc")
+        build(data, output_path)
+        import os
+        assert os.path.exists(output_path)
+
+    def test_nested_data_format_builds(self, tmp_path):
+        """Nested {'type': ..., 'data': {...}} format must also build successfully."""
+        wall_fields = {
+            "footprint": [
+                [0.0, 0.0, 0.0],
+                [5.0, 0.0, 0.0],
+                [5.0, 0.2, 0.0],
+                [0.0, 0.2, 0.0],
+            ],
+            "height": 3.0,
+            "plane": {
+                "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+            },
+            "name": "W1",
+        }
+        data = {
+            "ifc_version": "IFC4",
+            "project": {"name": "NestedTest"},
+            "unit": "METRE",
+            "site": {"name": "Site"},
+            "buildings": [
+                {
+                    "name": "Building",
+                    "storeys": [
+                        {
+                            "name": "GF",
+                            "elevation": 0.0,
+                            "elements": [{"type": "basic_wall", "data": wall_fields}],
+                        }
+                    ],
+                }
+            ],
+        }
+        output_path = str(tmp_path / "nested.ifc")
+        build(data, output_path)
+        import os
+        assert os.path.exists(output_path)

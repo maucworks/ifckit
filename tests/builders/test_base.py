@@ -39,9 +39,14 @@ class TestBuildRegistry:
 
     def test_default_registry_has_all(self):
         r = default_registry()
-        for t in ["basic_wall", "basic_slab", "basic_beam", "basic_column",
-                  "revolved_beam", "alignment"]:
+        for t in ["basic_wall", "basic_slab", "basic_beam", "basic_column", "revolved_beam"]:
             assert t in r.registered_types()
+
+    def test_default_registry_excludes_alignment(self):
+        """AlignmentBuilder is intentionally excluded — it is called directly by
+        IfcModel.add_alignment(), not via model.add()."""
+        r = default_registry()
+        assert "alignment" not in r.registered_types()
 
     def test_entity_type_on_builders(self):
         assert WallBuilder().entity_type == "basic_wall"

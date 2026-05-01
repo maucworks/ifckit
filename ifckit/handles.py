@@ -86,7 +86,10 @@ class BuildingHandle(Handle):
 
     def clear(self) -> int:
         """
-        Remove all elements contained in this building and its storeys.
+        Remove all elements directly contained in this building.
+
+        Does not recurse into child storeys. To clear a specific storey,
+        call ``storey_handle.clear()`` instead.
 
         Returns:
             The number of elements removed.

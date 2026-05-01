@@ -192,3 +192,42 @@ class TestRevolvedBeamBuilder:
         reopened = ifcopenshell.open(path)
         assert len(reopened.by_type("IfcBeam")) == 1
         assert len(reopened.by_type("IfcRevolvedAreaSolid")) == 1
+
+    def test_revolution_axis_is_local_y_of_rev_pos(self, ifc4_model, ifc4_storey, body_context):
+        """The IfcAxis1Placement for the revolution axis must point along local Y of rev_pos.
+
+        rev_pos is constructed with Axis=tangent_at_start, RefDirection=radial.
+        The implicit Y of that frame is arc.normal, so (0,1,0) in that local frame
+        resolves to arc.normal in world space — i.e. the correct revolution axis.
+        This test verifies the IFC entity is literally (0,1,0).
+        """
+        pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE)
+        RevolvedBeamBuilder().build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        solid = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")[0]
+        axis1 = solid.Axis  # IfcAxis1Placement
+        ratios = list(axis1.Axis.DirectionRatios)
+        assert ratios == pytest.approx([0.0, 1.0, 0.0], abs=1e-6)
+
+    def test_rev_pos_ref_direction_is_radial(self, ifc4_model, ifc4_storey, body_context):
+        """rev_pos RefDirection must be the radial direction (center → start, negated)."""
+        arc = QUARTER_ARC
+        # cpx = (arc.center - arc.start).normalized() = (0,1,0)-(0,0,0) normalized = (0,1,0)
+        cpx = (arc.center - arc.start).normalized()
+        pending = PendingRevolvedBeam(arc, SQUARE_PROFILE)
+        RevolvedBeamBuilder().build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        solid = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")[0]
+        rev_pos = solid.Position  # IfcAxis2Placement3D
+        ref_dir = list(rev_pos.RefDirection.DirectionRatios)
+        assert ref_dir == pytest.approx([cpx.x, cpx.y, cpx.z], abs=1e-6)
+
+    def test_non_horizontal_arc_produces_valid_solid(self, ifc4_model, ifc4_storey, body_context):
+        """An arc in a non-horizontal plane (normal != world Y) must still build correctly."""
+        # Arc in the XZ plane (normal = world -Y)
+        arc_xz = Arc(Vec(0, 0, 1), Vec(0, -1, 0), Vec(0, 0, 0), math.pi / 2)
+        pending = PendingRevolvedBeam(arc_xz, SQUARE_PROFILE)
+        entity = RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        assert entity.is_a("IfcBeam")
+        solids = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")
+        assert len(solids) == 1

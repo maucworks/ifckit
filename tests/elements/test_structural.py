@@ -179,18 +179,18 @@ class TestPendingRevolvedBeam:
 
 
 # ---------------------------------------------------------------------------
-# TC4 — from_dict round-trip documents plane loss (D3)
+# TC4 — from_dict round-trip verifies plane is preserved
 # ---------------------------------------------------------------------------
 
 
 class TestFromDictPlaneLoss:
-    """TC4: Documents that PendingWall/PendingSlab.from_dict does not round-trip plane."""
+    """TC4: Verifies that PendingWall.from_dict correctly round-trips the plane."""
 
-    def test_wall_from_dict_plane_loss(self):
+    def test_wall_from_dict_plane_roundtrip(self):
         """
-        PendingWall.from_dict silently drops the plane; this is a known
-        limitation (D3). The test asserts the current behaviour so that
-        any accidental change is caught.
+        PendingWall.to_dict serialises the plane and from_dict restores it.
+        This test was previously misnamed 'PlaneLoss' and failed to assert the plane;
+        it now confirms the round-trip is correct.
         """
         from ifckit.elements.building import PendingWall
 
@@ -199,6 +199,9 @@ class TestFromDictPlaneLoss:
         w = PendingWall(footprint, plane, 3.0, name="W")
         d = w.to_dict()
         w2 = PendingWall.from_dict(d)
-        # plane is NOT preserved — this is expected (D3)
         assert w2.name == "W"
         assert len(w2.footprint) == 4
+        # Plane origin, x_axis, and y_axis must survive the round-trip
+        assert w2.plane.origin.equals(plane.origin)
+        assert w2.plane.x_axis.equals(plane.x_axis)
+        assert w2.plane.y_axis.equals(plane.y_axis)

@@ -54,6 +54,17 @@ def local_placement(
     return f.create_entity("IfcLocalPlacement", PlacementRelTo=relative_to, RelativePlacement=ax)
 
 
+def shift_plane_elevation(plane: "Plane", elev: float) -> "Plane":
+    """Return a copy of *plane* with its origin shifted by ``-elev`` in Z.
+
+    Used by builders to convert a world-space plane to storey-local coordinates
+    (subtract the storey elevation from the origin Z component).
+    """
+    from ifckit.geometry import Vec
+    local_origin = Vec(plane.origin.x, plane.origin.y, plane.origin.z - elev)
+    return plane.__class__(local_origin, plane.x_axis, plane.y_axis)
+
+
 def _signed_area_2d(points: Sequence[tuple[float, float]]) -> float:
     """Compute signed area of a polygon (shoelace formula). Positive = CCW."""
     n = len(points)

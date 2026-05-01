@@ -91,3 +91,19 @@ class TestParallelTransportFrames:
         frames = parallel_transport_frames(path, Vec(0.5, 0, 0.5))
         for f in frames:
             assert f.x_axis.dot(f.y_axis) == pytest.approx(0.0, abs=1e-6)
+
+    def test_single_line_segment_two_frames(self):
+        """A single-segment path must return exactly 2 frames (start + end)."""
+        path = _straight_path(5.0)
+        frames = parallel_transport_frames(path, Vec(0, 0, 1), angle_step_deg=45.0)
+        assert len(frames) == 2
+
+    def test_single_arc_segment_frames_orthonormal(self):
+        """All frames along a single-arc path must be orthonormal."""
+        path = _quarter_arc_path()
+        frames = parallel_transport_frames(path, Vec(0, 0, 1), angle_step_deg=15.0)
+        assert len(frames) >= 2
+        for f in frames:
+            assert f.x_axis.dot(f.y_axis) == pytest.approx(0.0, abs=1e-6)
+            assert abs(f.x_axis) == pytest.approx(1.0, abs=1e-6)
+            assert abs(f.y_axis) == pytest.approx(1.0, abs=1e-6)

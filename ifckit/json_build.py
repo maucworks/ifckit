@@ -68,7 +68,8 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     unit = LengthUnit.MILLIMETRE if unit_str == "MILLIMETRE" else LengthUnit.METRE
 
     model = IfcModel(name=project_name, schema=schema, author=author, unit=unit)
-    site = model.add_site(data.get("site", {}).get("name", "Site"))
+    site_data = data.get("site") or {}
+    site = model.add_site(site_data.get("name", "Site"))
 
     for bldg_data in data.get("buildings", []):
         building = site.add_building(bldg_data.get("name", "Building"))

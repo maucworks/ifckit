@@ -649,7 +649,7 @@ class IfcModel:
         """
         removed = 0
         for rel in container.ContainsElements or []:
-            for product in rel.RelatedElements:
+            for product in list(rel.RelatedElements):
                 self._file.remove(product)
                 removed += 1
         return removed

@@ -19,6 +19,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     project_profile_to_plane,
     shape_representation,
+    shift_plane_elevation,
     storey_elevation,
 )
 from ifckit.elements.base import PendingElement
@@ -55,15 +56,7 @@ class WallBuilder:
 
         # Translate plane origin to storey-local coordinates (subtract elevation Z).
         elev = storey_elevation(container)
-        from ifckit.geometry import Vec
-        local_origin = Vec(
-            pending.plane.origin.x,
-            pending.plane.origin.y,
-            pending.plane.origin.z - elev,
-        )
-        local_plane = pending.plane.__class__(
-            local_origin, pending.plane.x_axis, pending.plane.y_axis
-        )
+        local_plane = shift_plane_elevation(pending.plane, elev)
 
         # Solid: extrude in local Z
         placement = axis2placement3d(

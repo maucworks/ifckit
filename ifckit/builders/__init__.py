@@ -15,14 +15,18 @@ from ifckit.builders.wall import WallBuilder
 
 
 def default_registry() -> BuilderRegistry:
-    """Return a BuilderRegistry pre-loaded with all built-in builders."""
+    """Return a BuilderRegistry pre-loaded with all built-in builders.
+
+    Note: AlignmentBuilder is intentionally excluded — it is called directly
+    by IfcModel.add_alignment() and cannot be reached via model.add() because
+    it requires an IfcAlignment entity as container, not a spatial structure.
+    """
     registry = BuilderRegistry()
     registry.register(WallBuilder())
     registry.register(SlabBuilder())
     registry.register(ExtrudedElementBuilder("basic_beam", "IfcBeam"))
     registry.register(ExtrudedElementBuilder("basic_column", "IfcColumn"))
     registry.register(RevolvedBeamBuilder())
-    registry.register(AlignmentBuilder())
     return registry
 
 

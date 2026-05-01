@@ -78,10 +78,10 @@ class ExtrudedElementBuilder:
     ) -> ifcopenshell.entity_instance:
         # Use element_type string comparison instead of isinstance() to handle
         # class identity mismatches from module reloading in Rhino/Grasshopper.
-        if not hasattr(pending, 'element_type') or pending.element_type not in ('basic_beam', 'basic_column'):
+        if not hasattr(pending, 'element_type') or pending.element_type != self.entity_type:
             raise TypeError(
-                f"ExtrudedElementBuilder expects PendingBeam or PendingColumn, "
-                f"got {type(pending).__name__}"
+                f"ExtrudedElementBuilder({self.entity_type!r}) expects a matching element, "
+                f"got element_type={getattr(pending, 'element_type', None)!r}"
             )
 
         axis = pending.axis

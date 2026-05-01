@@ -173,7 +173,8 @@ class TestAlignmentBuilder:
     def test_entity_type(self):
         assert AlignmentBuilder.entity_type == "alignment"
 
-    def test_in_default_registry(self):
+    def test_not_in_default_registry(self):
+        """AlignmentBuilder is excluded from default_registry — it is used directly
+        by IfcModel.add_alignment(), not routed through model.add()."""
         reg = default_registry()
-        builder = reg.get("alignment")
-        assert isinstance(builder, AlignmentBuilder)
+        assert "alignment" not in reg.registered_types()

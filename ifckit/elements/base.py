@@ -44,7 +44,7 @@ class PendingElement(metaclass=RegisterElementType):
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict (useful for JSON transport / debugging)."""
         d: Dict[str, Any] = {"type": self.element_type, "name": self.name}
-        if self.clip_data:
+        if self.clip_data is not None:
             d["clip_data"] = self.clip_data
         if self.style is not None:
             d["style"] = self.style.to_dict()

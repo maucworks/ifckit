@@ -32,10 +32,6 @@ _ELEMENT_ALIASES: Dict[str, str] = {
     "beam": "basic_beam",
     "column": "basic_column",
     "slab": "basic_slab",
-    "revolved_beam": "revolved_beam",
-    "bridge": "bridge",
-    "bridge_part": "bridge_part",
-    "alignment": "alignment",
 }
 
 
