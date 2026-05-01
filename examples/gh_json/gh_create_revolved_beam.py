@@ -2,23 +2,25 @@
 gh_create_revolved_beam.py  —  GH Script component: "Create IFC Revolved Beam"
 ================================================================================
 
-Stateless component: serializes arc-based beam paths to JSON strings.
-Handles single arc paths → IfcRevolvedAreaSolid via PendingRevolvedBeam.
+Stateless component: serializes arc/line-based beam paths to JSON strings.
+Handles list of arcs (from biarc reduction) → multiple IfcRevolvedAreaSolid via PendingRevolvedBeam.
 
 Component inputs
 ----------------
-arc_curve    : Rhino ArcCurve — The arc sweep path (center, start, angle).
+arcs         : list — Rhino ArcCurve objects (from biarc reduction).
+                  May have mixed normals (concave vs convex).
 profile_pts  : list — Rhino Point3d objects defining the cross-section
                     polygon in the local XY plane (X = width, Y = up).
                     Minimum 3 points; no closing duplicate needed.
 profile_json: str  — JSON string from gh_profile.py (alternative to profile_pts).
                     Takes precedence if both are provided.
-name         : str  — Optional element name prefix.
+name          : str  — Optional element name prefix.
+plane_normal : list — [x, y, z] canonical plane normal (default: [1, 0, 0]).
 
 Component outputs
 -----------------
 out      : str  — Status message.
-json_out : list — List of JSON strings (one per beam).
+json_out : list — List of JSON strings (one per beam segment).
 """
 
 import math
@@ -34,23 +36,24 @@ if pkg_path not in sys.path:
 
 import ifckit
 import ifckit.geometry
+import ifckit.elements
 import ifckit.builders
 import ifckit.builders.beam_factory
 import ifckit.builders.revolved_beam
-import ifckit.elements
 import ifckit.rhinokit
 
+# Reload in dependency order: geometry first, then elements, builders, then root
 importlib.reload(ifckit.geometry)
 importlib.reload(ifckit.elements)
-importlib.reload(ifckit.builders)
+importlib.reload(ifckit.rhinokit)
 importlib.reload(ifckit.builders.beam_factory)
 importlib.reload(ifckit.builders.revolved_beam)
-importlib.reload(ifckit.rhinokit)
+importlib.reload(ifckit.builders)
 importlib.reload(ifckit)
 
 from ifckit import PendingRevolvedBeam, Vec
+from ifckit.geometry import assemble_path_planar
 import ifckit.rhinokit as rk
-from ifckit.builders.beam_factory import PathType, classify_path
 
 
 def _get_profile():
@@ -69,35 +72,53 @@ def _get_profile():
     return None
 
 
+def _to_ifckit_arc(rhino_arc):
+    """Convert Rhino ArcCurve to ifckit Arc."""
+    return rk.arc_to_arc(rhino_arc)
+
+
 messages = []
 json_outputs = []
 
-if arc_curve:
-    arc = rk.arc_to_arc(arc_curve)
-    if not arc:
-        messages.append("ERR: invalid arc curve")
+if arcs:
+    prof = _get_profile()
+    if not prof:
+        messages.append("ERR: no profile (provide profile_pts or profile_json)")
     else:
-        prof = _get_profile()
-        if not prof:
-            messages.append("ERR: no profile (provide profile_pts or profile_json)")
-        else:
-            path_type = classify_path(arc)
-            if path_type != PathType.SINGLE_ARC:
-                messages.append(f"ERR: expected single arc path, got {path_type}")
-            else:
-                try:
-                    el_name = name or "RevolvedBeam"
-                    # DEBUG: show the arc being used
-                    print(f"DEBUG: start={arc.start}, center={arc.center}, angle={arc.angle}, tangent={arc.tangent_at_start()}, normal={arc.normal}")
-                    beam = PendingRevolvedBeam(arc=arc, profile=prof, name=el_name)
-                    json_outputs.append(beam.to_json())
-                    angle_deg = math.degrees(abs(arc.angle))
-                    messages.append(f"OK  {el_name} ({angle_deg:.0f}° arc)")
-                except Exception as exc:
-                    messages.append(f"ERR {el_name}: {exc}")
+        normal = Vec(*plane_normal) if plane_normal else Vec(1, 0, 0)
 
-elif not arc_curve:
-    messages.append("No arc curve")
+        ifckit_arcs = []
+        for rh_arc in arcs:
+            ifckit_arc = _to_ifckit_arc(rh_arc)
+            if not ifckit_arc:
+                messages.append(f"ERR: invalid arc curve")
+                continue
+            ifckit_arcs.append(ifckit_arc)
+
+        if not ifckit_arcs:
+            messages.append("ERR: no valid arcs")
+        else:
+            paths = assemble_path_planar(ifckit_arcs, normal)
+
+            for path_idx, path in enumerate(paths):
+                for seg_idx, seg in enumerate(path.segments):
+                    from ifckit.geometry import Arc, Line
+                    if isinstance(seg, Line):
+                        messages.append(f"WRN: Line segment {seg_idx} in path {path_idx} — skipped (revolved beam requires arc)")
+                        continue
+
+                    try:
+                        el_name = f"{name or 'RevolvedBeam'}_{path_idx}_{seg_idx}"
+                        # Pass cp_normal to ensure profile continuity when arc normals differ
+                        beam = PendingRevolvedBeam(arc=seg, profile=prof, name=el_name, cp_normal=normal)
+                        json_outputs.append(beam.to_json())
+                        angle_deg = math.degrees(abs(seg.angle))
+                        messages.append(f"OK  {el_name} ({angle_deg:.0f}° arc)")
+                    except Exception as exc:
+                        messages.append(f"ERR {el_name}: {exc}")
+
+elif not arcs:
+    messages.append("No arcs")
 
 out = "\n".join(messages) if messages else "No beams processed."
 print(out)

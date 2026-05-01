@@ -26,11 +26,17 @@ import math
 from typing import Any, List
 
 from ifckit.geometry import Arc, Line, Vec, Path
+import Rhino.Geometry
 
 
 def pt_to_vec(pt: Any) -> Vec:
     """Rhino Point3d → Vec."""
     return Vec(pt.X, pt.Y, pt.Z)
+
+
+def vec_to_pt3d(vec: Vec) -> Any:
+    """Vec → Rhino Point3d."""
+    return Rhino.Geometry.Point3d(vec.x, vec.y, vec.z)
 
 
 def pts_to_vecs(pts: Any) -> List[Vec]:
@@ -83,29 +89,26 @@ def arc_to_arc(rhino_arc: Any) -> Arc:
 
     Handles both Rhino Arc (primitive) and ArcCurve (geometry with curve methods).
     Uses .Arc property if available (ArcCurve), otherwise assumes it's already an Arc.
-    
-    Rhino Arc has a Plane property which contains the plane of the arc.
-    Arc.Plane.Normal gives the normal vector to the arc's plane.
+
     """
     try:
         arc = rhino_arc.Arc
     except AttributeError:
         arc = rhino_arc
 
-    center = arc.Center
-    start = arc.StartPoint
+    rh_center = arc.Center
+    rh_start = arc.StartPoint
+    rh_end = arc.EndPoint
+    rh_plane = arc.Plane
+    rh_normal = rh_plane.Normal
     angle_rad = arc.Angle  # Rhino Arc.Angle is already in radians
 
-    # Rhino Arc.Plane.Normal gives the normal to the arc's plane
-    # This works for 3D arcs (arcs not in World XY)
-    plane = arc.Plane
-    normal_vec = plane.Normal
-    normal = Vec(normal_vec.X, normal_vec.Y, normal_vec.Z)
+    normal = Vec(rh_normal.X, rh_normal.Y, rh_normal.Z)
 
     return Arc(
-        center=pt_to_vec(center),
+        center=pt_to_vec(rh_center),
         normal=normal,
-        start=pt_to_vec(start),
+        start=pt_to_vec(rh_start),
         angle=angle_rad,
     )
 

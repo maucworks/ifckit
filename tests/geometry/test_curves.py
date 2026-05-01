@@ -364,3 +364,116 @@ class TestPathPlanar:
             .add_arc(Vec(1, 0, 1), Vec(1, 0, 0), Vec(1, 0, 0), math.pi / 2)
         )
         assert p.normal is None
+
+
+class TestPathPlane:
+    def test_plane_single_arc(self):
+        p = Path().add_arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(5, 0, 0), 0.5)
+        plane = p.plane
+        assert plane.origin.equals(Vec(5, 0, 0))
+        assert plane.y_axis.equals(Vec(0, 0, 1))
+
+    def test_plane_lines(self):
+        p = Path().add_line(Vec(0, 0, 0), Vec(10, 0, 0))
+        plane = p.plane
+        assert plane.origin.equals(Vec(0, 0, 0))
+
+    def test_plane_not_planar_raises(self):
+        p = Path().add_arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(5, 0, 0), 0.5)
+        p.add_arc(Vec(0, 0, 0), Vec(0, 1, 0), Vec(5, 0, 0), 0.5)
+        with pytest.raises(ValueError, match="not planar"):
+            _ = p.plane
+
+    def test_plane_empty_path_raises(self):
+        p = Path()
+        with pytest.raises(ValueError, match="no segments"):
+            _ = p.plane
+
+
+class TestAssemblePath:
+    def test_assemble_single_segment(self):
+        from ifckit.geometry import assemble_path, assemble_path_planar
+        line = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        paths = assemble_path([line])
+        assert len(paths) == 1
+        assert paths[0].start_point().equals(Vec(0, 0, 0))
+        assert paths[0].end_point().equals(Vec(10, 0, 0))
+
+    def test_assemble_ordered(self):
+        from ifckit.geometry import assemble_path
+        l1 = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        l2 = Line(Vec(10, 0, 0), Vec(10, 10, 0))
+        paths = assemble_path([l1, l2])
+        assert len(paths) == 1
+        assert paths[0].end_point().equals(Vec(10, 10, 0))
+
+    def test_assemble_unordered(self):
+        from ifckit.geometry import assemble_path
+        l1 = Line(Vec(10, 0, 0), Vec(10, 10, 0))
+        l2 = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        paths = assemble_path([l1, l2])
+        assert len(paths) == 2  # not connected - no shared endpoints
+
+    def test_assemble_ordered_connected(self):
+        from ifckit.geometry import assemble_path
+        l1 = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        l2 = Line(Vec(10, 0, 0), Vec(10, 10, 0))
+        l3 = Line(Vec(10, 10, 0), Vec(10, 10, 10))
+        paths = assemble_path([l1, l2, l3])  # ordered forward chain
+        assert len(paths) == 1
+        assert paths[0].end_point().equals(Vec(10, 10, 10))
+
+    def test_assemble_chain_partial_order(self):
+        from ifckit.geometry import assemble_path
+        l1 = Line(Vec(10, 0, 0), Vec(10, 10, 0))
+        l2 = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        l3 = Line(Vec(10, 10, 0), Vec(10, 10, 10))
+        paths = assemble_path([l3, l2, l1])  # ends chain together
+        assert len(paths) >= 1
+        p = paths[0] if paths[0].end_point().equals(Vec(10, 10, 10)) else paths[-1]
+        assert p.end_point().equals(Vec(10, 10, 10))
+
+    def test_assemble_disconnected_returns_multiple(self):
+        from ifckit.geometry import assemble_path
+        l1 = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        l2 = Line(Vec(100, 0, 0), Vec(110, 0, 0))
+        paths = assemble_path([l1, l2])
+        assert len(paths) == 2
+
+    def test_assemble_flipped_line(self):
+        from ifckit.geometry import assemble_path
+        l1 = Line(Vec(0, 0, 0), Vec(10, 0, 0))
+        l2 = Line(Vec(20, 0, 0), Vec(10, 0, 0))  # reversed: end at (10,0,0) matches l1.start
+        paths = assemble_path([l1, l2])
+        assert len(paths) == 1
+        assert paths[0].start_point().equals(Vec(0, 0, 0))
+        assert paths[0].end_point().equals(Vec(20, 0, 0))
+
+    def test_assemble_empty_raises(self):
+        from ifckit.geometry import assemble_path
+        with pytest.raises(ValueError, match="must not be empty"):
+            assemble_path([])
+
+    def test_assemble_planar_mixed_normals(self):
+        from ifckit.geometry import assemble_path_planar
+        c = Vec(0, 0, 0)
+        n1 = Vec(0, 0, 1)
+        n2 = Vec(0, 0, -1)
+        a1 = Arc(c, n1, Vec(5, 0, 0), 0.5)
+        a2 = Arc(c, n2, a1.end, 0.3)
+        paths = assemble_path_planar([a1, a2], Vec(0, 0, 1))
+        assert len(paths) == 1
+        p = paths[0]
+        assert len(p.segments) == 2
+        assert p.is_planar
+        plane = p.plane
+        assert plane.y_axis.dot(Vec(0, 0, 1)) > 0
+
+    def test_assemble_planar_flipped_start(self):
+        from ifckit.geometry import assemble_path_planar
+        c = Vec(0, 0, 0)
+        n1 = Vec(0, 0, 1)
+        a1 = Arc(c, n1, Vec(5, 0, 0), 0.5)
+        a2 = Arc(c, n1, Vec(0, 5, 0), 0.3)  # not connected
+        paths = assemble_path_planar([a2, a1], Vec(0, 0, 1))
+        assert len(paths) == 2  # not connected

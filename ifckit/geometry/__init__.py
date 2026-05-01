@@ -261,7 +261,12 @@ class Plane:
 
     def transform_point(self, local: "Vec") -> "Vec":
         """Transform a point from local frame coordinates to world coordinates."""
-        return self.origin + self.x_axis * local.x + self.y_axis * local.y + self.z_axis * local.z
+        return (
+            self.origin
+            + self.x_axis * local.x
+            + self.y_axis * local.y
+            + self.z_axis * local.z
+        )
 
     def transform_vector(self, local: "Vec") -> "Vec":
         """Transform a vector (no translation) from local to world."""
@@ -321,6 +326,9 @@ class Line:
     def tangent_at_end(self) -> "Vec":
         """For compatibility with Arc - returns the direction of the line."""
         return self.direction
+
+    def reverse(self) -> "Line":
+        return Line(self.end, self.start)
 
     @property
     def length(self) -> float:
@@ -388,6 +396,9 @@ class Arc:
         radial = self.start - self.center
         return self.center + radial.rotate_around(self.normal, self.angle / 2)
 
+    def reverse(self) -> "Arc":
+        return Arc(self.center, -self.normal, self.end, self.angle)
+
     def point_at(self, t: float) -> "Vec":
         """t=0 → start, t=1 → end."""
         radial = self.start - self.center
@@ -417,9 +428,7 @@ class Arc:
         return (self.normal**radial) * sign
 
     def __repr__(self) -> str:
-        return (
-            f"Arc(center={self.center}, r={self.radius:.3f}, angle={math.degrees(self.angle):.1f}°)"
-        )
+        return f"Arc(center={self.center}, r={self.radius:.3f}, angle={math.degrees(self.angle):.1f}°)"
 
 
 # ---------------------------------------------------------------------------
@@ -596,14 +605,14 @@ class Path:
         """Check if all segments lie in the same plane."""
         if len(self._segments) <= 1:
             return True
-        
+
         # For arcs, check if all have the same normal.
         # isinstance is safe here — Arc is a module-internal primitive, not a reloadable user class.
         arc_normals = []
         for seg in self._segments:
             if isinstance(seg, Arc):  # safe: Arc never reloaded independently
                 arc_normals.append(seg.normal)
-        
+
         if arc_normals:
             # Check if all arc normals are the same (or opposite)
             first_n = arc_normals[0].normalized()
@@ -612,44 +621,66 @@ class Path:
                 if abs(first_n @ n_normalized) < 0.999:
                     return False
             return True
-        
+
         # For Lines only — check if all collinear.
         # isinstance is safe here — Line is a module-internal primitive, not a reloadable user class.
-        all_lines = all(isinstance(seg, Line) for seg in self._segments)  # safe: Line never reloaded
+        all_lines = all(
+            isinstance(seg, Line) for seg in self._segments
+        )  # safe: Line never reloaded
         if len(self._segments) >= 2 and all_lines:
             # Check if all lines are collinear (same direction or opposite)
             first_dir = self._segments[0].direction.normalized()
             for seg in self._segments[1:]:
                 dir_normalized = seg.direction.normalized()
-                if abs(first_dir @ dir_normalized) < 0.999 and abs((first_dir @ dir_normalized) + 1.0) > 0.001:
+                if (
+                    abs(first_dir @ dir_normalized) < 0.999
+                    and abs((first_dir @ dir_normalized) + 1.0) > 0.001
+                ):
                     return False
             return True
-        
+
         return True  # Single segment or mixed that we can't easily verify
-    
+
     @property
     def normal(self) -> Optional["Vec"]:
         """Return the normal of the plane if the path is planar."""
         if not self.is_planar:
             return None
-        
+
         # Find the first Arc to get its normal.
         # isinstance is safe here — Arc is a module-internal primitive, not a reloadable user class.
         for seg in self._segments:
             if isinstance(seg, Arc):  # safe: Arc never reloaded independently
                 return seg.normal
-        
+
         # For Lines only: use first segment direction and derive a perpendicular.
         # isinstance is safe here — Line is a module-internal primitive, not a reloadable user class.
-        if len(self._segments) > 0 and isinstance(self._segments[0], Line):  # safe: Line never reloaded
+        if len(self._segments) > 0 and isinstance(
+            self._segments[0], Line
+        ):  # safe: Line never reloaded
             first_dir = self._segments[0].direction.normalized()
             # Return an arbitrary perpendicular to the line direction
             if abs(first_dir.z) < 0.9:
                 return (Vec(0, 0, 1) ** first_dir).normalized()
             else:
                 return (Vec(0, 1, 0) ** first_dir).normalized()
-        
+
         return None
+
+    @property
+    def plane(self) -> "Plane":
+        """Return the plane if the path is planar, otherwise raise ValueError."""
+        if not self._segments:
+            raise ValueError("Path has no segments")
+        if not self.is_planar:
+            raise ValueError("Path is not planar")
+        normal = self.normal
+        if normal is None:
+            raise ValueError("Cannot determine plane normal")
+        origin = self.start_point()
+        if origin is None:
+            raise ValueError("Path has no segments")
+        return Plane(origin, Vec(1, 0, 0), normal)
 
     def __repr__(self) -> str:
         return f"Path({len(self._segments)} segments, length={self.length:.3f})"
@@ -689,7 +720,9 @@ def parallel_transport_frames(
     prev_tangent = (pts[1] - pts[0]).normalized()
     prev_normal = seed_normal.normalized()
     # ensure normal is orthogonal to first tangent
-    prev_normal = (prev_normal - prev_tangent * (prev_normal @ prev_tangent)).normalized()
+    prev_normal = (
+        prev_normal - prev_tangent * (prev_normal @ prev_tangent)
+    ).normalized()
 
     for i, pt in enumerate(pts):
         if i == 0:
@@ -712,6 +745,199 @@ def parallel_transport_frames(
         frames.append(Plane(pt, t, normal))
 
     return frames
+
+
+# ---------------------------------------------------------------------------
+# Assemble unordered segments into continuous paths
+# ---------------------------------------------------------------------------
+
+
+def _segments_connected(
+    a: Line | Arc,
+    b: Line | Arc,
+    tol: float = 1e-9,
+) -> bool:
+    """Check if b's start matches a's end within tolerance."""
+    return a.end.equals(b.start, tol)
+
+
+# def _flip_line(line: Line) -> Line:
+#     """Return a Line with flipped direction."""
+#     return Line(line.end, line.start)
+
+
+def _segments_fit(
+    a: Line | Arc,
+    b: Line | Arc,
+    tol: float = 1e-9,
+) -> tuple[bool, bool]:
+    """
+    Check if two segments can connect.
+
+    Returns (forward, reversed) where:
+      - forward: b.start matches a.end (b connects as-is)
+      - reversed: b.end matches a.end (b needs to be flipped)
+    """
+    forward = a.end.equals(b.start, tol)
+    reversed = a.end.equals(b.end, tol)
+    return forward, reversed
+
+
+def assemble_path(
+    segments: Sequence[Line | Arc],
+    tol: float = 1e-9,
+) -> List["Path"]:
+    """
+    Assemble unordered Line/Arc segments into one or more continuous Paths.
+
+    Segments may be:
+      - Unordered (any start order)
+      - Flipped (line direction or arc sweep may be reversed)
+      - Mixed Line and Arc
+
+    The function:
+      1. Chains segments by matching endpoints (within tol)
+      2. Flips segment direction to maintain continuity
+      3. Normalizes all arc normals to the path's plane normal
+      4. Returns List[Path] — one per connected subpath
+
+    Raises ValueError if no segments provided.
+    """
+    if not segments:
+        raise ValueError("segments must not be empty")
+
+    segs = list(segments)
+    unused = set(range(len(segs)))
+    paths: List[Path] = []
+
+    while unused:
+        start_idx = min(unused)
+        unused.remove(start_idx)
+        path = Path()
+        seg = segs[start_idx]
+
+        if isinstance(seg, Line):
+            path.add_line(seg.start, seg.end)
+        elif isinstance(seg, Arc):
+            path.add_arc(seg.center, seg.normal, seg.start, seg.angle)
+
+        while True:
+            current_end = path.end_point()
+            current_start = path.start_point()
+            added = False
+
+            for i in sorted(unused):
+                nxt = segs[i]
+                forward, reversed = _segments_fit(path._segments[-1], nxt, tol)
+                if forward:
+                    added = True
+                    unused.remove(i)
+                    if isinstance(nxt, Line):
+                        path.add_line(nxt.start, nxt.end)
+                    elif isinstance(nxt, Arc):
+                        path.add_arc(nxt.center, nxt.normal, nxt.start, nxt.angle)
+                    break
+                elif reversed:
+                    added = True
+                    unused.remove(i)
+                    if isinstance(nxt, Line):
+                        flipped = nxt.reverse()
+                        path.add_line(flipped.start, flipped.end)
+                    elif isinstance(nxt, Arc):
+                        flipped = nxt.reverse()
+                        path.add_arc(
+                            flipped.center, flipped.normal, flipped.start, flipped.angle
+                        )
+                    break
+
+            if not added:
+                break
+
+            if path.start_tangent is None or path.end_tangent is None:
+                break
+
+        paths.append(path)
+
+    if not paths:
+        raise ValueError("Could not assemble any path")
+
+    return paths
+
+
+# def assemble_path_planar(
+#     segments: Sequence[Line | Arc],
+#     plane_normal: Vec,
+#     tol: float = 1e-9,
+# ) -> List["Path"]:
+#     """
+#     Assemble unordered Line/Arc segments, normalized to plane_normal.
+#
+#     Unlike assemble_path(), this version:
+#       - Takes an explicit plane_normal to use as the canonical normal
+#       - Normalizes all Arc segments to have normal parallel to plane_normal
+#       - Works even when segments don't form a single planar path on their own
+#     """
+#     if not segments:
+#         raise ValueError("segments must not be empty")
+#
+#     segs = list(segments)
+#     unused = set(range(len(segs)))
+#     paths: List[Path] = []
+#
+#     while unused:
+#         start_idx = min(unused)
+#         unused.remove(start_idx)
+#         path = Path()
+#         seg = segs[start_idx]
+#
+#         if isinstance(seg, Line):
+#             path.add_line(seg.start, seg.end)
+#         elif isinstance(seg, Arc):
+#             adj_arc = seg.reverse() if seg.normal.dot(plane_normal) < 0 else seg
+#             path.add_arc(adj_arc.center, adj_arc.normal, adj_arc.start, adj_arc.angle)
+#
+#         while True:
+#             current_end = path.end_point()
+#             if current_end is None:
+#                 break
+#             found = False
+#             for i in sorted(unused):
+#                 nxt = segs[i]
+#                 forward, reversed = _segments_fit(path._segments[-1], nxt, tol)
+#                 if forward:
+#                     found = True
+#                     unused.remove(i)
+#                     if isinstance(nxt, Line):
+#                         path.add_line(nxt.start, nxt.end)
+#                     elif isinstance(nxt, Arc):
+#                         adj_nxt = (
+#                             nxt.reverse() if nxt.normal.dot(plane_normal) < 0 else nxt
+#                         )
+#                         path.add_arc(
+#                             adj_nxt.center, adj_nxt.normal, adj_nxt.start, adj_nxt.angle
+#                         )
+#                     break
+#                 elif reversed:
+#                     found = True
+#                     unused.remove(i)
+#                     if isinstance(nxt, Line):
+#                         flipped = _flip_line(nxt)
+#                         path.add_line(flipped.start, flipped.end)
+#                     elif isinstance(nxt, Arc):
+#                         flipped = nxt.reverse()
+#                         path.add_arc(
+#                             flipped.center, flipped.normal, flipped.start, flipped.angle
+#                         )
+#                     break
+#             if not found:
+#                 break
+#
+#         paths.append(path)
+#
+#     if not paths:
+#         raise ValueError("Could not assemble any path")
+#
+#     return paths
 
 
 # ---------------------------------------------------------------------------

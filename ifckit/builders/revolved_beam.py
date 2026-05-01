@@ -53,11 +53,26 @@ class RevolvedBeamBuilder:
         arc = pending.arc
         elev = storey_elevation(container)
 
+        # Canonical plane normal for profile continuity
+        cp_normal = pending.cp_normal  # may be None
+        if cp_normal is None:
+            needs_flip = False
+        else:
+            # Normalize both for robust comparison
+            arc_n = arc.normal.normalized()
+            cp_n = cp_normal.normalized()
+            # Flip profile if arc normal opposes cp_normal
+            needs_flip = arc_n.dot(cp_n) < 0
+
         # Calculate radial direction and radius for CP
-        # radius = (arc.start - arc.center).length()
         radius = arc.radius
+
         # Profile points - offset by radius in local X to position at arc start in CP
-        pts_2d = [(p.x - radius, p.y) for p in pending.profile]
+        # If needs_flip, negate both X and Y to maintain continuity
+        if needs_flip:
+            pts_2d = [((-p.x - radius), -p.y) for p in pending.profile]
+        else:
+            pts_2d = [(p.x - radius, p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
 
         # Position = CP at arc center

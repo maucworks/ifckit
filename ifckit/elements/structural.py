@@ -261,6 +261,8 @@ class PendingRevolvedBeam(PendingElement):
         profile:    Closed list of Vec points (cross-section in local YZ plane).
         name:       Element name.
         ref_line:   Optional reference line for orientation.
+        cp_normal:  Canonical plane normal — if arc.normal opposes this,
+                   the profile is flipped 180° to maintain continuity.
         clip_data:  Optional clip plane data.
     """
 
@@ -272,12 +274,14 @@ class PendingRevolvedBeam(PendingElement):
         profile: Sequence[ProfilePoint],
         name: str = "",
         ref_line: Optional[Line] = None,
+        cp_normal: Optional[Vec] = None,
         style: Optional[RenderStyle] = None,
     ) -> None:
         super().__init__(name=name, style=style)
         self.arc = arc
         self.profile = _coerce_profile(profile)
         self.ref_line = ref_line
+        self.cp_normal = cp_normal
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -288,6 +292,8 @@ class PendingRevolvedBeam(PendingElement):
             "angle_deg": math.degrees(self.arc.angle),
         }
         d["profile"] = [p.to_tuple() for p in self.profile]
+        if self.cp_normal is not None:
+            d["cp_normal"] = self.cp_normal.to_tuple()
         return d
 
     @classmethod
@@ -300,4 +306,6 @@ class PendingRevolvedBeam(PendingElement):
             angle=math.radians(arc_d["angle_deg"]),
         )
         profile = [Vec(*pt) for pt in cls._require(d, "profile")]
-        return cls(arc=arc, profile=profile, name=d.get("name", ""), style=cls._style_from_dict(d))
+        cp_normal = Vec(*d["cp_normal"]) if "cp_normal" in d else None
+        return cls(arc=arc, profile=profile, name=d.get("name", ""), 
+                  cp_normal=cp_normal, style=cls._style_from_dict(d))
