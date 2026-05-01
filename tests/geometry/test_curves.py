@@ -392,7 +392,7 @@ class TestPathPlane:
 
 class TestAssemblePath:
     def test_assemble_single_segment(self):
-        from ifckit.geometry import assemble_path, assemble_path_planar
+        from ifckit.geometry import assemble_path
         line = Line(Vec(0, 0, 0), Vec(10, 0, 0))
         paths = assemble_path([line])
         assert len(paths) == 1
@@ -454,26 +454,6 @@ class TestAssemblePath:
         with pytest.raises(ValueError, match="must not be empty"):
             assemble_path([])
 
-    def test_assemble_planar_mixed_normals(self):
-        from ifckit.geometry import assemble_path_planar
-        c = Vec(0, 0, 0)
-        n1 = Vec(0, 0, 1)
-        n2 = Vec(0, 0, -1)
-        a1 = Arc(c, n1, Vec(5, 0, 0), 0.5)
-        a2 = Arc(c, n2, a1.end, 0.3)
-        paths = assemble_path_planar([a1, a2], Vec(0, 0, 1))
-        assert len(paths) == 1
-        p = paths[0]
-        assert len(p.segments) == 2
-        assert p.is_planar
-        plane = p.plane
-        assert plane.y_axis.dot(Vec(0, 0, 1)) > 0
 
-    def test_assemble_planar_flipped_start(self):
-        from ifckit.geometry import assemble_path_planar
-        c = Vec(0, 0, 0)
-        n1 = Vec(0, 0, 1)
-        a1 = Arc(c, n1, Vec(5, 0, 0), 0.5)
-        a2 = Arc(c, n1, Vec(0, 5, 0), 0.3)  # not connected
-        paths = assemble_path_planar([a2, a1], Vec(0, 0, 1))
-        assert len(paths) == 2  # not connected
+# Removed tests for assemble_path_planar (removed functionality)
+# The new assemble_path handles arc reversal via Arc.reverse() internally

@@ -42,7 +42,13 @@ from ifckit.geometry import (
 )
 from ifckit.json_build import build, build_from_json, validate_json
 from ifckit.model import IfcModel
-import ifckit.rhinokit as rk
+
+def __getattr__(name):
+    if name == "rk":
+        import ifckit.rhinokit as rk
+        return rk
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 from ifckit.handles import (
     SiteHandle,
     BuildingHandle,
