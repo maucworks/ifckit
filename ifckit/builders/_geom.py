@@ -1,9 +1,23 @@
 """
 ifckit.builders._geom
-=====================
+====================
 
 Low-level ifcopenshell geometry helpers shared across builders.
 Creates IfcCartesianPoint, IfcDirection, IfcAxis2Placement3D, etc.
+
+Coordinate Precision
+-------------------
+By default, coordinates are rounded to 4 decimal places (0.1mm precision).
+Since ifckit uses millimeters as its internal unit, 4 decimal places in
+the IFC output (meters) = 0.1mm precision.
+
+Adjust precision with set_precision()::
+
+    from ifckit.builders import set_precision
+
+    set_precision(3)  # 3 decimals = 1mm precision
+    set_precision(4)  # 4 decimals = 0.1mm precision (default)
+    set_precision(6)  # 6 decimals = 1μm precision
 """
 
 from __future__ import annotations
@@ -17,16 +31,50 @@ if TYPE_CHECKING:
     from ifckit.geometry import Arc, Line, Path, Plane, Vec
 
 
+# Coordinate precision: decimal places in IFC output (meters)
+# 4 = 0.1mm precision (default for mm-based projects)
+_PRECISION = 4
+
+
+def set_precision(decimals: int) -> None:
+    """
+    Set coordinate output precision.
+
+    Args:
+        decimals: Number of decimal places (0-10). Higher = more precision.
+                 3 = 1mm, 4 = 0.1mm, 6 = 1μm.
+
+    Raises:
+        ValueError: If decimals is not in range 0-10.
+    """
+    global _PRECISION
+    if not isinstance(decimals, int):
+        raise TypeError(f"decimals must be int, got {type(decimals).__name__}")
+    if decimals < 0 or decimals > 10:
+        raise ValueError(f"decimals must be 0-10, got {decimals}")
+    _PRECISION = decimals
+
+
+def get_precision() -> int:
+    """Return current coordinate precision (decimal places)."""
+    return _PRECISION
+
+
+def _round_coord(value: float) -> float:
+    """Round a coordinate value to current precision."""
+    return float(round(value, _PRECISION))
+
+
 def pt2(f: ifcopenshell.file, x: float, y: float) -> ifcopenshell.entity_instance:
-    return f.create_entity("IfcCartesianPoint", Coordinates=[float(x), float(y)])
+    return f.create_entity("IfcCartesianPoint", Coordinates=[_round_coord(x), _round_coord(y)])
 
 
 def pt3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
-    return f.create_entity("IfcCartesianPoint", Coordinates=[float(x), float(y), float(z)])
+    return f.create_entity("IfcCartesianPoint", Coordinates=[_round_coord(x), _round_coord(y), _round_coord(z)])
 
 
 def dir3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
-    return f.create_entity("IfcDirection", DirectionRatios=[float(x), float(y), float(z)])
+    return f.create_entity("IfcDirection", DirectionRatios=[_round_coord(x), _round_coord(y), _round_coord(z)])
 
 
 def axis2placement3d(

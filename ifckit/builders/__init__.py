@@ -12,6 +12,7 @@ from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
 from ifckit.builders.slab import SlabBuilder
 from ifckit.builders.wall import WallBuilder
+from ifckit.builders._geom import set_precision, get_precision
 
 
 def default_registry() -> BuilderRegistry:
@@ -42,4 +43,6 @@ __all__ = [
     "classify_path",
     "build_beam",
     "default_registry",
+    "set_precision",
+    "get_precision",
 ]
