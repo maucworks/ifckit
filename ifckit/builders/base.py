@@ -1,17 +1,22 @@
 """
 ifckit.builders.base
-====================
+===================
 
-IIfcBuilder protocol and BuilderRegistry.
+IIfcBuilder protocol, BaseBuilder abstract class, and BuilderRegistry.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Protocol, runtime_checkable
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, Dict, Protocol, runtime_checkable
 
 import ifcopenshell
 
 from ifckit.elements.base import PendingElement
+from ifckit.elements.style import RenderStyle
+
+if TYPE_CHECKING:
+    from ifckit.geometry import Plane
 
 
 @runtime_checkable
@@ -48,6 +53,87 @@ class IIfcBuilder(Protocol):
             The created primary IFC entity.
         """
         ...
+
+
+    # Subclasses must implement geometry creation.
+    @abstractmethod
+    def _create_geometry(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        """Create the geometry and IFC entity. Subclass implements; BaseBuilder handles styling."""
+        ...
+
+
+class BaseBuilder(ABC, IIfcBuilder):
+    """
+    Abstract base for all element builders with central styling + clipping.
+
+    Provides common build() flow:
+        1. Create geometry entity (_create_geometry)
+        2. Apply clipping (if start_clip/end_clip present)
+        3. Apply styling (default gray fallback)
+
+    Subclasses must implement _create_geometry().
+    """
+
+    entity_type: str
+
+    def build(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        # 1. Subclass creates geometry + entity
+        entity = self._create_geometry(ifc_file, pending, container, context)
+
+        # 2. Apply clipping (if element has clip planes)
+        entity = self._apply_clips(ifc_file, entity, pending, container, context)
+
+        # 3. Apply styling (central with default gray)
+        self._apply_styling(ifc_file, entity, pending.style)
+
+        return entity
+
+    @abstractmethod
+    def _create_geometry(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        """Create entity. Override in subclass."""
+        ...
+
+    def _apply_clips(
+        self,
+        ifc_file: ifcopenshell.file,
+        entity: ifcopenshell.entity_instance,
+        pending: PendingElement,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        """Apply start_clip/end_clip if present. Override in subclass if needed."""
+        return entity
+
+    def _apply_styling(
+        self,
+        ifc_file: ifcopenshell.file,
+        entity: ifcopenshell.entity_instance,
+        style: Any,
+    ) -> None:
+        """Apply RenderStyle. Uses #808080 (gray) as default if style is None."""
+        from ifckit.builders._geom import apply_style
+
+        if style is None:
+            style = RenderStyle("#808080")
+        apply_style(ifc_file, entity, style)
 
 
 class BuilderRegistry:

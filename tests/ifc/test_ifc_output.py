@@ -353,3 +353,75 @@ class TestToString:
         s = model.to_string()
         assert "IFC4X3" in s.upper()
         assert "IFCBRIDGE" in s.upper()
+
+    def test_ifc2x3_to_string_parseable(self, tmp_path):
+        model = IfcModel(name="Str2x3", schema=IfcSchema.IFC2X3, author="pytest")
+        site = model.add_site("S")
+        bldg = model.add_building(site, "B")
+        _ = model.add_storey(bldg, "L0")
+        s = model.to_string()
+        assert "IFC2X3" in s.upper()
+        assert "IFCPROJECT" in s.upper()
+
+
+# ---------------------------------------------------------------------------
+# Scenario 7: Minimal IFC2X3 building — 1 wall, 1 slab, 1 storey
+# ---------------------------------------------------------------------------
+
+class TestMinimalIfc2x3Building:
+    @pytest.fixture
+    def saved_file(self, tmp_path):
+        model = IfcModel(name="MinBuilding2x3", schema=IfcSchema.IFC2X3, author="pytest")
+        site = model.add_site("Site")
+        bldg = model.add_building(site, "Bldg")
+        storey = model.add_storey(bldg, "L0", elevation=0.0)
+
+        reg = default_registry()
+        ctx = get_body_context(model.ifc_file)
+
+        wall = PendingWall(footprint=SQUARE, plane=Plane.world_xy(),
+                           height=3.0, name="W1")
+        reg.get("basic_wall").build(model.ifc_file, wall, storey.entity, ctx)
+
+        slab = PendingSlab(footprint=SQUARE, plane=Plane.world_xy(),
+                           thickness=0.3, name="S1")
+        reg.get("basic_slab").build(model.ifc_file, slab, storey.entity, ctx)
+
+        path = str(tmp_path / "minimal_ifc2x3.ifc")
+        model.save(path)
+        return ifcopenshell.open(path)
+
+    def test_schema_is_ifc2x3(self, saved_file):
+        assert "IFC2X3" in saved_file.schema.upper()
+
+    def test_project_present(self, saved_file):
+        assert _count(saved_file, "IfcProject") == 1
+
+    def test_site_present(self, saved_file):
+        assert _count(saved_file, "IfcSite") == 1
+
+    def test_building_present(self, saved_file):
+        assert _count(saved_file, "IfcBuilding") == 1
+
+    def test_storey_present(self, saved_file):
+        assert _count(saved_file, "IfcBuildingStorey") == 1
+
+    def test_wall_present(self, saved_file):
+        assert _count(saved_file, "IfcWall") == 1
+
+    def test_slab_present(self, saved_file):
+        assert _count(saved_file, "IfcSlab") == 1
+
+    def test_extruded_solids_present(self, saved_file):
+        assert _count(saved_file, "IfcExtrudedAreaSolid") == 2
+
+    def test_wall_has_representation(self, saved_file):
+        walls = saved_file.by_type("IfcWall")
+        assert walls[0].Representation is not None
+
+    def test_wall_contained_in_storey(self, saved_file):
+        assert _has_rel(saved_file, "IfcRelContainedInSpatialStructure",
+                        "IfcBuildingStorey", "IfcWall")
+
+    def test_owner_history_present(self, saved_file):
+        assert _count(saved_file, "IfcOwnerHistory") >= 1

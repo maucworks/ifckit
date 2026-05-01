@@ -14,6 +14,7 @@ from typing import Optional
 class IfcSchema(enum.Enum):
     """Supported IFC schema versions."""
 
+    IFC2X3 = "IFC2X3"
     IFC4 = "IFC4"
     IFC4X3 = "IFC4X3"
 

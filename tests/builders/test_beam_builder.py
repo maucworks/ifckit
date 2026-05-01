@@ -164,7 +164,7 @@ class TestRevolvedBeamBuilder:
         pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE)
         RevolvedBeamBuilder().build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
         solid = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")[0]
-        assert solid.Angle == pytest.approx(-math.pi / 2)  # negative = CW sweep (C# approach)
+        assert solid.Angle == pytest.approx(math.pi / 2)
 
     def test_has_representation(self, ifc4_model, ifc4_storey, body_context):
         pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE)
@@ -182,7 +182,7 @@ class TestRevolvedBeamBuilder:
         )
         assert entity.is_a("IfcBeam")
         solid = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")[0]
-        assert solid.Angle == pytest.approx(-math.pi)  # negative = CW sweep (C# approach)
+        assert solid.Angle == pytest.approx(math.pi)  # positive angle, direction via axis orientation
 
     def test_file_parses_after_save(self, ifc4_model, ifc4_storey, body_context, tmp_path):
         pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE)
@@ -209,10 +209,10 @@ class TestRevolvedBeamBuilder:
         assert ratios == pytest.approx([0.0, 1.0, 0.0], abs=1e-6)
 
     def test_rev_pos_ref_direction_is_radial(self, ifc4_model, ifc4_storey, body_context):
-        """rev_pos RefDirection must be the radial direction (center → start, negated)."""
+        """rev_pos RefDirection must be the radial direction (start → center, i.e. start - center normalized)."""
         arc = QUARTER_ARC
-        # cpx = (arc.center - arc.start).normalized() = (0,1,0)-(0,0,0) normalized = (0,1,0)
-        cpx = (arc.center - arc.start).normalized()
+        # cpx = (arc.start - arc.center).normalized() = (0,0,0)-(0,1,0) normalized = (0,-1,0)
+        cpx = (arc.start - arc.center).normalized()
         pending = PendingRevolvedBeam(arc, SQUARE_PROFILE)
         RevolvedBeamBuilder().build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
         solid = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")[0]

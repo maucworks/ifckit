@@ -1,6 +1,6 @@
 """
 ifckit.builders.wall
-====================
+===================
 
 WallBuilder: PendingWall → IfcWall with extruded solid geometry.
 """
@@ -11,7 +11,6 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
-    apply_style,
     axis2placement3d,
     extrude_profile,
     local_placement,
@@ -22,11 +21,12 @@ from ifckit.builders._geom import (
     shift_plane_elevation,
     storey_elevation,
 )
+from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
 from ifckit.elements.building import PendingWall
 
 
-class WallBuilder:
+class WallBuilder(BaseBuilder):
     """
     Builds an IfcWall from a PendingWall.
 
@@ -36,7 +36,7 @@ class WallBuilder:
 
     entity_type = "basic_wall"
 
-    def build(
+    def _create_geometry(
         self,
         ifc_file: ifcopenshell.file,
         pending: PendingElement,
@@ -88,5 +88,4 @@ class WallBuilder:
             relating_structure=container,
         )
 
-        apply_style(ifc_file, wall, pending.style)
         return wall

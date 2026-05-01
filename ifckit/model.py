@@ -4,7 +4,7 @@ ifckit.model
 
 IfcModel: builds and manages an IFC spatial hierarchy using ifcopenshell.
 
-Supports IFC4 (buildings) and IFC4X3 (bridges / infrastructure).
+Supports IFC2X3 (legacy buildings), IFC4 (buildings) and IFC4X3 (bridges / infrastructure).
 """
 
 from __future__ import annotations
@@ -38,8 +38,10 @@ class IfcModel:
 
     Args:
         name:   Project name (IfcProject.Name).
-        schema: IfcSchema.IFC4 or IfcSchema.IFC4X3.
+        schema: IfcSchema.IFC2X3, IfcSchema.IFC4 or IfcSchema.IFC4X3.
         author: Author name stored in IfcOwnerHistory (informational only).
+                For IFC2X3 this is required for a valid file; when omitted
+                ``"Unknown"`` is used.
         unit:   Length unit (default: METRE).
 
     Usage::
@@ -66,6 +68,12 @@ class IfcModel:
         schema_str = get_schema_name(schema)
         self._file = ifcopenshell.file(schema=schema_str)
 
+        # IFC2X3 requires OwnerHistory on every root entity.
+        # Set up person + org + application before the first root.create_entity call
+        # so that ifcopenshell's owner.settings can resolve them automatically.
+        if schema == IfcSchema.IFC2X3:
+            self._setup_owner_history(author)
+
         self._project = ifcopenshell.api.run(
             "root.create_entity",
             self._file,
@@ -84,9 +92,14 @@ class IfcModel:
             volume_unit = ifcopenshell.api.run(
                 "unit.add_si_unit", self._file, unit_type="VOLUMEUNIT"
             )
+            angle_unit = ifcopenshell.api.run(
+                "unit.add_si_unit", self._file, unit_type="PLANEANGLEUNIT"
+            )
 
             ifcopenshell.api.run(
-                "unit.assign_unit", self._file, units=[length_unit, area_unit, volume_unit]
+                "unit.assign_unit",
+                self._file,
+                units=[length_unit, area_unit, volume_unit, angle_unit],
             )
         else:
             raise NotImplementedError(
@@ -95,7 +108,7 @@ class IfcModel:
                 "Use LengthUnit.METRE or LengthUnit.MILLIMETRE."
             )
 
-        if author:
+        if author and schema != IfcSchema.IFC2X3:
             ifcopenshell.api.run(
                 "owner.add_person",
                 self._file,
@@ -107,6 +120,14 @@ class IfcModel:
             "context.add_context",
             self._file,
             context_type="Model",
+        )
+
+        self._body_context = self._file.create_entity(
+            "IfcGeometricRepresentationSubContext",
+            ContextIdentifier="Body",
+            ContextType="Model",
+            ParentContext=self._context,
+            TargetView="MODEL_VIEW",
         )
 
         from ifckit.builders import default_registry
@@ -601,6 +622,46 @@ class IfcModel:
                 f"IfcModel.{method}() requires schema {required.value}, "
                 f"but model uses {self.schema.value}"
             )
+
+    def _setup_owner_history(self, author: str) -> None:
+        """Set up the mandatory IFC2X3 OwnerHistory entities.
+
+        IFC2X3 requires ``IfcOwnerHistory`` on every root entity.
+        ifcopenshell resolves the active user and application via
+        ``owner.settings.get_user()`` / ``get_application()``, which look for
+        the first ``IfcPersonAndOrganization`` and ``IfcApplication`` in the
+        file.  We create them here — before the first ``root.create_entity``
+        call — so that all subsequent API calls succeed automatically.
+
+        Args:
+            author: Author name; ``"Unknown"`` is used when empty.
+        """
+        name = author or "Unknown"
+        person = ifcopenshell.api.run(
+            "owner.add_person",
+            self._file,
+            identification=name,
+            family_name=name,
+        )
+        org = ifcopenshell.api.run(
+            "owner.add_organisation",
+            self._file,
+            name="Unknown",
+        )
+        ifcopenshell.api.run(
+            "owner.add_person_and_organisation",
+            self._file,
+            person=person,
+            organisation=org,
+        )
+        ifcopenshell.api.run(
+            "owner.add_application",
+            self._file,
+            application_developer=org,
+            version="1",
+            application_full_name="ifckit",
+            application_identifier="ifckit",
+        )
 
     @property
     def ifc_file(self) -> ifcopenshell.file:

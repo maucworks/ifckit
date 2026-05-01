@@ -1,6 +1,6 @@
 """
 ifckit.builders.revolved_beam
-=============================
+============================
 
 RevolvedBeamBuilder: PendingRevolvedBeam → IfcBeam with IfcRevolvedAreaSolid.
 
@@ -18,7 +18,6 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
-    apply_style,
     dir3,
     local_placement,
     product_definition_shape,
@@ -27,15 +26,16 @@ from ifckit.builders._geom import (
     shape_representation,
     storey_elevation,
 )
+from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
 from ifckit.elements.structural import PendingRevolvedBeam
 from ifckit.geometry import Plane
 
 
-class RevolvedBeamBuilder:
+class RevolvedBeamBuilder(BaseBuilder):
     entity_type = "revolved_beam"
 
-    def build(
+    def _create_geometry(
         self,
         ifc_file: ifcopenshell.file,
         pending: PendingElement,
@@ -69,10 +69,12 @@ class RevolvedBeamBuilder:
 
         # Profile points - offset by radius in local X to position at arc start in CP
         # If needs_flip, negate both X and Y to maintain continuity
+        axis_dist = -radius
         if needs_flip:
-            pts_2d = [((-p.x - radius), -p.y) for p in pending.profile]
+            pts_2d = [((p.x), p.y) for p in pending.profile]
+            # axis_dist *= -1
         else:
-            pts_2d = [(p.x - radius, p.y) for p in pending.profile]
+            pts_2d = [(-p.x, -p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
 
         # Position = CP at arc center
@@ -81,10 +83,11 @@ class RevolvedBeamBuilder:
         # CP local Y = arc normal (perpendicular to arc plane)
         # Position's local XY = radial-normal plane = CP
 
-        cpo = arc.center
-        cpx = (arc.center - arc.start).normalized()
-        cpn = arc.tangent_at_start().normalized()
-        cpy = arc.normal.normalized()
+        cpo = arc.start
+        # cps = arc.start
+        cpx = (arc.start - arc.center).normalized()
+        cpn = -arc.tangent_at_start().normalized()
+        # cpy = arc.normal.normalized()
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
             Location=pt3(ifc_file, *cpo.to_tuple()),
@@ -97,7 +100,7 @@ class RevolvedBeamBuilder:
         # So (0,1,0) in that local frame correctly resolves to arc.normal in world space.
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
-            Location=pt3(ifc_file, 0, 0, 0),
+            Location=pt3(ifc_file, axis_dist, 0, 0),
             Axis=dir3(ifc_file, 0.0, 1.0, 0.0),
         )
 
@@ -107,7 +110,7 @@ class RevolvedBeamBuilder:
             SweptArea=profile,
             Position=rev_pos,
             Axis=rev_axis,
-            Angle=-arc.angle,
+            Angle=arc.angle,
         )
 
         body_ctx = context
@@ -142,5 +145,4 @@ class RevolvedBeamBuilder:
             relating_structure=container,
         )
 
-        apply_style(ifc_file, beam, pending.style)
         return beam

@@ -1,6 +1,6 @@
 """
 ifckit.builders.extruded
-========================
+=======================
 
 ExtrudedElementBuilder: builds any IFC element by extruding a profile along
 a straight axis (Line).  Used for both IfcBeam and IfcColumn — they are
@@ -40,7 +40,6 @@ import ifcopenshell.api
 
 from ifckit.builders._geom import (
     _arbitrary_perp,
-    apply_style,
     axis2placement3d,
     dir3,
     extrude_profile,
@@ -51,12 +50,13 @@ from ifckit.builders._geom import (
     shape_representation,
     storey_elevation,
 )
+from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
 from ifckit.elements.structural import PendingBeam, PendingColumn
 from ifckit.geometry import Plane, Vec
 
 
-class ExtrudedElementBuilder:
+class ExtrudedElementBuilder(BaseBuilder):
     """
     Builds an extruded IFC structural element from a PendingBeam or PendingColumn.
 
@@ -69,7 +69,7 @@ class ExtrudedElementBuilder:
         self.entity_type = entity_type
         self._ifc_class = ifc_class
 
-    def build(
+    def _create_geometry(
         self,
         ifc_file: ifcopenshell.file,
         pending: PendingElement,
@@ -151,12 +151,21 @@ class ExtrudedElementBuilder:
             relating_structure=container,
         )
 
-        apply_style(ifc_file, element, pending.style)
         return element
+
+    def _apply_clips(
+        self,
+        ifc_file: ifcopenshell.file,
+        entity: ifcopenshell.entity_instance,
+        pending: PendingElement,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        return entity  # Clipping handled in _create_geometry for now
 
 
 # ---------------------------------------------------------------------------
-# Clipping helpers
+# Clipping helpers (shared)
 # ---------------------------------------------------------------------------
 
 

@@ -1,6 +1,6 @@
 """
 ifckit.builders.slab
-====================
+===================
 
 SlabBuilder: PendingSlab → IfcSlab with extruded solid geometry.
 """
@@ -11,7 +11,6 @@ import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
-    apply_style,
     axis2placement3d,
     extrude_profile,
     local_placement,
@@ -22,11 +21,12 @@ from ifckit.builders._geom import (
     shift_plane_elevation,
     storey_elevation,
 )
+from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
 from ifckit.elements.building import PendingSlab
 
 
-class SlabBuilder:
+class SlabBuilder(BaseBuilder):
     """
     Builds an IfcSlab from a PendingSlab.
 
@@ -36,7 +36,7 @@ class SlabBuilder:
 
     entity_type = "basic_slab"
 
-    def build(
+    def _create_geometry(
         self,
         ifc_file: ifcopenshell.file,
         pending: PendingElement,
@@ -82,5 +82,4 @@ class SlabBuilder:
             relating_structure=container,
         )
 
-        apply_style(ifc_file, slab, pending.style)
         return slab

@@ -403,9 +403,20 @@ def apply_style(ifc_file: Any, product: Any, style: Any) -> None:
         Side="BOTH",
         Styles=[rendering],
     )
+
+    # IFC2X3: IfcStyledItem.Styles must be SET OF IfcPresentationStyleAssignment.
+    # IFC4+:  IfcStyledItem.Styles can contain IfcPresentationStyle directly.
+    if ifc_file.schema == "IFC2X3":
+        style_entry = ifc_file.create_entity(
+            "IfcPresentationStyleAssignment",
+            Styles=[surface_style],
+        )
+    else:
+        style_entry = surface_style
+
     ifc_file.create_entity(
         "IfcStyledItem",
         Item=items[0],
-        Styles=[surface_style],
+        Styles=[style_entry],
         Name=None,
     )

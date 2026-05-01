@@ -34,6 +34,11 @@ def ifc4x3():
     return IfcModel(name="BridgeProject", schema=IfcSchema.IFC4X3, author="pytest")
 
 
+@pytest.fixture
+def ifc2x3():
+    return IfcModel(name="LegacyProject", schema=IfcSchema.IFC2X3, author="pytest")
+
+
 # ---------------------------------------------------------------------------
 # IfcModel construction
 # ---------------------------------------------------------------------------
@@ -51,6 +56,9 @@ class TestIfcModelInit:
     def test_schema_ifc4x3(self, ifc4x3):
         assert ifc4x3.schema == IfcSchema.IFC4X3
 
+    def test_schema_ifc2x3(self, ifc2x3):
+        assert ifc2x3.schema == IfcSchema.IFC2X3
+
     def test_ifc4_file_schema_string(self, ifc4):
         s = ifc4.to_string()
         assert "IFC4" in s
@@ -59,11 +67,30 @@ class TestIfcModelInit:
         s = ifc4x3.to_string()
         assert "IFC4X3" in s
 
+    def test_ifc2x3_file_schema_string(self, ifc2x3):
+        s = ifc2x3.to_string()
+        assert "IFC2X3" in s
+
     def test_units_assigned(self, ifc4):
         assert len(ifc4.ifc_file.by_type("IfcUnitAssignment")) == 1
 
     def test_context_created(self, ifc4):
         assert len(ifc4.ifc_file.by_type("IfcGeometricRepresentationContext")) >= 1
+
+    def test_ifc2x3_owner_history_created(self, ifc2x3):
+        """IFC2X3 requires OwnerHistory — verify it was created automatically."""
+        assert len(ifc2x3.ifc_file.by_type("IfcOwnerHistory")) >= 1
+
+    def test_ifc2x3_person_and_org_created(self, ifc2x3):
+        assert len(ifc2x3.ifc_file.by_type("IfcPersonAndOrganization")) >= 1
+
+    def test_ifc2x3_application_created(self, ifc2x3):
+        assert len(ifc2x3.ifc_file.by_type("IfcApplication")) >= 1
+
+    def test_ifc2x3_no_author_still_creates_owner_history(self):
+        """Empty author should not prevent IFC2X3 model creation."""
+        model = IfcModel(name="NoAuthor", schema=IfcSchema.IFC2X3, author="")
+        assert len(model.ifc_file.by_type("IfcOwnerHistory")) >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +170,51 @@ class TestIfc4Hierarchy:
         ifc4.add_storey(b, "L1", elevation=3.5)
         ifc4.add_storey(b, "L2", elevation=7.0)
         assert len(ifc4.ifc_file.by_type("IfcBuildingStorey")) == 3
+
+
+# ---------------------------------------------------------------------------
+# IFC2X3 hierarchy
+# ---------------------------------------------------------------------------
+
+
+class TestIfc2x3Hierarchy:
+    def test_add_site(self, ifc2x3):
+        site = ifc2x3.add_site("Site A")
+        assert isinstance(site, SiteHandle)
+        assert len(ifc2x3.ifc_file.by_type("IfcSite")) == 1
+
+    def test_add_building(self, ifc2x3):
+        site = ifc2x3.add_site("S")
+        building = ifc2x3.add_building(site, "Bldg")
+        assert isinstance(building, BuildingHandle)
+        assert len(ifc2x3.ifc_file.by_type("IfcBuilding")) == 1
+
+    def test_add_storey(self, ifc2x3):
+        site = ifc2x3.add_site("S")
+        b = ifc2x3.add_building(site, "B")
+        storey = ifc2x3.add_storey(b, "Ground Floor", elevation=0.0)
+        assert isinstance(storey, StoreyHandle)
+        assert len(ifc2x3.ifc_file.by_type("IfcBuildingStorey")) == 1
+        assert storey.entity.Elevation == pytest.approx(0.0)
+
+    def test_add_element(self, ifc2x3):
+        site = ifc2x3.add_site("S")
+        b = ifc2x3.add_building(site, "B")
+        s = ifc2x3.add_storey(b, "L0")
+        wall = ifc2x3.add_element(s, "IfcWall", name="W1")
+        assert isinstance(wall, EntityHandle)
+        assert len(ifc2x3.ifc_file.by_type("IfcWall")) == 1
+
+    def test_site_aggregated_under_project(self, ifc2x3):
+        ifc2x3.add_site("S")
+        rels = ifc2x3.ifc_file.by_type("IfcRelAggregates")
+        relating = [r.RelatingObject for r in rels]
+        assert any(e.is_a("IfcProject") for e in relating)
+
+    def test_bridge_not_available_in_ifc2x3(self, ifc2x3):
+        site = ifc2x3.add_site("S")
+        with pytest.raises(ValueError, match="IFC4X3"):
+            ifc2x3.add_bridge(site, "Bridge")
 
 
 # ---------------------------------------------------------------------------

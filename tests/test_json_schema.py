@@ -41,6 +41,16 @@ class TestValidateJson:
         result = validate_json(data)
         assert result.ok is False
 
+    def test_valid_ifc2x3_version(self):
+        data = {
+            "ifc_version": "IFC2X3",
+            "project": {"name": "Test"},
+            "unit": "METRE",
+            "buildings": [],
+        }
+        result = validate_json(data)
+        assert result.ok is True
+
     def test_missing_project(self):
         data = {"ifc_version": "IFC4", "unit": "METRE", "buildings": []}
         result = validate_json(data)
@@ -248,6 +258,19 @@ class TestBuild:
         data = {"ifc_version": "INVALID", "project": {"name": "Test"}, "unit": "METRE", "buildings": []}
         with pytest.raises(ValueError, match="Invalid JSON"):
             build(data)
+
+    def test_build_ifc2x3(self, tmp_path):
+        data = {
+            "ifc_version": "IFC2X3",
+            "project": {"name": "Legacy", "author": "pytest"},
+            "unit": "METRE",
+            "site": {"name": "Site"},
+            "buildings": [{"name": "Bldg", "storeys": [{"name": "L0", "elements": []}]}],
+        }
+        model = build(data)
+        assert model is not None
+        assert model.schema.value == "IFC2X3"
+        assert "IFC2X3" in model.to_string().upper()
 
 
 class TestBuildFromJson:

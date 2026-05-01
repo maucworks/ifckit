@@ -23,8 +23,8 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
     warnings: List[str] = []
 
     if "ifc_version" in data:
-        if data["ifc_version"] not in ("IFC4", "IFC4X3"):
-            errors.append(f"ifc_version must be 'IFC4' or 'IFC4X3', got {data['ifc_version']}")
+        if data["ifc_version"] not in ("IFC2X3", "IFC4", "IFC4X3"):
+            errors.append(f"ifc_version must be 'IFC2X3', 'IFC4' or 'IFC4X3', got {data['ifc_version']}")
     else:
         errors.append("Missing required field: ifc_version")
 
@@ -60,7 +60,9 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
         raise ValueError(f"Invalid JSON: {'; '.join(json_result.errors)}")
 
     schema_str = data.get("ifc_version", "IFC4")
-    schema = IfcSchema.IFC4 if schema_str == "IFC4" else IfcSchema.IFC4X3
+    schema = {"IFC2X3": IfcSchema.IFC2X3, "IFC4": IfcSchema.IFC4, "IFC4X3": IfcSchema.IFC4X3}.get(
+        schema_str, IfcSchema.IFC4
+    )
 
     project_name = data.get("project", {}).get("name", "Unnamed Project")
     author = data.get("project", {}).get("author", "")
