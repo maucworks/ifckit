@@ -97,7 +97,9 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         f"Available: {list(ElementRegistry.types().keys())}"
                     )
                 pending = cls.from_dict(elem_dict)
-                
+                if "hatch_pattern" in elem_data:
+                    pending.hatch_pattern = elem_data["hatch_pattern"]
+
                 result = validate(pending)
                 if not result.ok:
                     raise ValueError(f"Validation failed: {result.errors}")
@@ -106,6 +108,31 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
 
     if output_path:
         model.save(output_path)
+
+    # Build drawings after all elements.
+    # drawings[] is optional at root level. Each entry defines a section plane
+    # as a Plane in 3-D space.
+    #
+    # Schema:
+    #   [{"name":        "Section A-A",
+    #     "target_view": "SECTION_VIEW",      # default PLAN_VIEW
+    #     "origin":      [x, y, z],           # default [0, 0, 0]
+    #     "x_axis":      [x, y, z],           # default [1, 0, 0]
+    #     "z_axis":      [x, y, z]}]          # default [0, 0, -1]
+    for drawing_data in data.get("drawings", []):
+        dname       = drawing_data.get("name", "Drawing")
+        target_view = drawing_data.get("target_view", "PLAN_VIEW")
+        raw_origin  = drawing_data.get("origin", [0.0, 0.0, 0.0])
+        raw_x_axis  = drawing_data.get("x_axis", [1.0, 0.0, 0.0])
+        raw_z_axis  = drawing_data.get("z_axis", [0.0, 0.0, -1.0])
+
+        model.add_drawing(
+            name=dname,
+            target_view=target_view,
+            position=(float(raw_origin[0]), float(raw_origin[1]), float(raw_origin[2])),
+            x_axis=(float(raw_x_axis[0]),  float(raw_x_axis[1]),  float(raw_x_axis[2])),
+            z_axis=(float(raw_z_axis[0]),  float(raw_z_axis[1]),  float(raw_z_axis[2])),
+        )
 
     return model
 

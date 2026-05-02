@@ -310,6 +310,184 @@ class IfcModel:
         )
         return StoreyHandle(storey, self)
 
+    def add_drawing(
+        self,
+        name: str,
+        target_view: str = "PLAN_VIEW",
+        position: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        x_axis: tuple[float, float, float] = (1.0, 0.0, 0.0),
+        z_axis: tuple[float, float, float] = (0.0, 0.0, -1.0),
+    ) -> "ifcopenshell.entity_instance":
+        """Create a Bonsai-compatible drawing annotation in the IFC file.
+
+        Creates an ``IfcAnnotation[ObjectType="DRAWING"]`` with an
+        ``EPset_Drawing`` property set and an associated ``IfcGroup``,
+        matching the structure Bonsai (BlenderBIM) uses for floor-plan and
+        section drawings.
+
+        The annotation can be consumed by ``ifcopenshell.draw`` via::
+
+            draw_settings(drawing_object_type="DRAWING")
+
+        Args:
+            name:        Drawing name (e.g. ``"Section A-A"``).
+            target_view: IFC drawing target view.  One of ``"PLAN_VIEW"``,
+                         ``"SECTION_VIEW"``, ``"ELEVATION_VIEW"``,
+                         ``"REFLECTED_PLAN_VIEW"``, ``"MODEL_VIEW"``.
+                         Defaults to ``"PLAN_VIEW"``.
+            position:    Origin of the section plane in IFC file units.
+            x_axis:      Local X axis of the section plane (right direction
+                         of the drawing).  Defaults to world X ``(1,0,0)``.
+            z_axis:      View direction / plane normal.  IfcOpenShell's
+                         SvgSerializer interprets this as the camera look-at
+                         direction.  For a plan view looking down use
+                         ``(0,0,-1)`` (default); for a section facing north
+                         use ``(0,-1,0)``.
+
+        Returns:
+            The created ``IfcAnnotation`` entity.
+        """
+        from ifckit.builders._geom import axis2placement3d
+        from ifckit.geometry import Vec
+
+        origin  = Vec(*[float(v) for v in position])
+        z_vec   = Vec(*[float(v) for v in z_axis])
+        x_vec   = Vec(*[float(v) for v in x_axis])
+
+        # Bonsai stores the placement Axis as the camera's outward normal
+        # (pointing away from the scene toward the viewer), which is the
+        # negation of the view/look-at direction the user supplies.
+        # e.g. user z_axis=(0,0,-1) "looking down" → IFC Axis=(0,0,1).
+        placement_z = Vec(-z_vec.x, -z_vec.y, -z_vec.z)
+
+        annotation = ifcopenshell.api.run(
+            "root.create_entity",
+            self._file,
+            ifc_class="IfcAnnotation",
+            name=name,
+        )
+        annotation.ObjectType = "DRAWING"
+        # Note: PredefinedType on IfcAnnotation only accepts schema-specific enums
+        # (infrastructure types in IFC4X3, none in IFC4/IFC2X3).
+        # Bonsai uses ObjectType="DRAWING" as the convention, not PredefinedType.
+
+        ax = axis2placement3d(self._file, origin, placement_z, x_vec)
+        annotation.ObjectPlacement = self._file.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=None,
+            RelativePlacement=ax,
+        )
+
+        # Camera box representation — matches Bonsai's IfcCsgSolid/IfcBlock
+        # convention exactly. The SvgSerializer matches the annotation GUID in
+        # the geometry iterator and extracts the section plane from the block.
+        #
+        # Bonsai convention (reverse-engineered from reference file):
+        #   - IfcCsgSolid wrapping an IfcBlock
+        #   - Block centred on the annotation origin: position (-half, -half, -depth)
+        #   - Annotation Z-axis = (0,0,1) — camera looks toward -Z in world space
+        #   - Block: 50 m × 50 m × 10 m (large enough for any model)
+        half   = 25000.0   # mm — half of 50 m box in XY
+        depth  = 10000.0   # mm — 10 m clip depth below the section plane
+
+        # Use the 'Body' subcontext — the geometry iterator only processes
+        # representations under subcontexts, not the root Model context.
+        model_ctx = next(
+            (c for c in self._file.by_type("IfcGeometricRepresentationContext")
+             if not c.is_a("IfcGeometricRepresentationSubContext")
+             and c.ContextType == "Model"),
+            self._file.by_type("IfcGeometricRepresentationContext")[0],
+        )
+        geom_ctx = next(
+            (c for c in self._file.by_type("IfcGeometricRepresentationSubContext")
+             if c.ContextIdentifier == "Body"
+             and c.ParentContext == model_ctx),
+            None,
+        )
+        if geom_ctx is None:
+            geom_ctx = self._file.create_entity(
+                "IfcGeometricRepresentationSubContext",
+                ContextIdentifier="Body",
+                ContextType="Model",
+                ParentContext=model_ctx,
+                TargetView="MODEL_VIEW",
+            )
+
+        # Block positioned so annotation origin is at the top face centre.
+        # Local coords: X and Y centred (±half), Z from -depth to 0.
+        block_pos = self._file.create_entity(
+            "IfcAxis2Placement3D",
+            Location=self._file.create_entity(
+                "IfcCartesianPoint", Coordinates=(-half, -half, -depth)
+            ),
+        )
+        block = self._file.create_entity(
+            "IfcBlock",
+            Position=block_pos,
+            XLength=half * 2,
+            YLength=half * 2,
+            ZLength=depth,
+        )
+        csg = self._file.create_entity("IfcCsgSolid", TreeRootExpression=block)
+        shape_rep = self._file.create_entity(
+            "IfcShapeRepresentation",
+            ContextOfItems=geom_ctx,
+            RepresentationIdentifier="Body",
+            RepresentationType="CSG",
+            Items=[csg],
+        )
+        annotation.Representation = self._file.create_entity(
+            "IfcProductDefinitionShape",
+            Representations=[shape_rep],
+        )
+
+        # EPset_Drawing — Bonsai's standard property set for drawings
+        pset = ifcopenshell.api.run(
+            "pset.add_pset",
+            self._file,
+            product=annotation,
+            name="EPset_Drawing",
+        )
+        scale_str = "1/100"
+        human_scale = "1:100"
+        ifcopenshell.api.run(
+            "pset.edit_pset",
+            self._file,
+            pset=pset,
+            properties={
+                "TargetView":        target_view,
+                "Scale":             scale_str,
+                "HumanScale":        human_scale,
+                "HasUnderlay":       False,
+                "HasLinework":       True,
+                "HasAnnotation":     False,
+                "GlobalReferencing": True,
+                "Stylesheet":        "",
+                "Markers":           "",
+                "Symbols":           "",
+                "Patterns":          "",
+                "ShadingStyles":     "",
+                "CurrentShadingStyle": "",
+            },
+        )
+
+        # IfcGroup — Bonsai groups each drawing's annotations under a named group
+        group = ifcopenshell.api.run("group.add_group", self._file)
+        ifcopenshell.api.run(
+            "group.edit_group",
+            self._file,
+            group=group,
+            attributes={"Name": name, "ObjectType": "DRAWING"},
+        )
+        ifcopenshell.api.run(
+            "group.assign_group",
+            self._file,
+            group=group,
+            products=[annotation],
+        )
+
+        return annotation
+
     def add_element(
         self,
         storey: StoreyHandle,
@@ -714,6 +892,47 @@ class IfcModel:
                 self._file.remove(product)
                 removed += 1
         return removed
+
+    def preview_rhino_curves(
+        self,
+        clear: bool = True,
+        hlr_poly: bool = True,
+        mesher_deflection: Optional[float] = None,
+    ) -> dict:
+        """Import the model into the active Rhino document as 2-D curves and
+        hatches derived from section-plane drawings.
+
+        Each IFC element's section-cut outline and projection are placed as
+        ``PolylineCurve`` / ``PolyCurve`` objects on a layered hierarchy::
+
+            IFC-SVG / <drawing name> / cut / IfcWall
+            IFC-SVG / <drawing name> / cut_hatch / IfcWall
+            IFC-SVG / <drawing name> / projection / IfcWall
+            IFC-SVG / <drawing name> / projection_hatch / IfcWall
+
+        Closed paths that carry an IFC material fill colour are also added as
+        ``Hatch`` objects on the corresponding ``_hatch`` layer.  The hatch
+        pattern is resolved per-element from ``EPset_IfcKit.HatchPattern``,
+        falling back to ``"Solid"``.
+
+        Requires Rhino 8+ with ``ifcopenshell.draw`` support.
+
+        Args:
+            clear:              If *True*, remove existing IFC-SVG objects before importing.
+            hlr_poly:           Use polygonal HLR (faster, Bonsai default).
+                                Set ``False`` for exact BREP HLR.
+            mesher_deflection:  OCC mesher linear deflection in metres.
+                                ``None`` = ifcopenshell default.
+
+        Returns:
+            ``{"curves": int, "hatches": int}``
+        """
+        from ifckit.rhino_import import IfcSvgImporter
+
+        importer = IfcSvgImporter()
+        if clear:
+            importer.clear()
+        return importer.import_model(self, hlr_poly=hlr_poly, mesher_deflection=mesher_deflection)
 
     def preview_rhino(self, mesh_quality: str = "default", clear: bool = True) -> int:
         """Import the model into the active Rhino document as meshes.

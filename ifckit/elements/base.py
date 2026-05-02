@@ -36,10 +36,12 @@ class PendingElement(metaclass=RegisterElementType):
         name: str = "",
         clip_data: Optional[ClipData] = None,
         style: Optional[RenderStyle] = None,
+        hatch_pattern: str = "",
     ) -> None:
         self.name = name
         self.clip_data = clip_data
         self.style = style
+        self.hatch_pattern = hatch_pattern
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict (useful for JSON transport / debugging)."""
