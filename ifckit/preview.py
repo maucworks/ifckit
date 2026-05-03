@@ -158,12 +158,15 @@ def _parse_input(json_str: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def build_preview_meshes(json_str: str) -> List[Any]:
+def build_preview_meshes(json_str: str, unit: str = "MILLIMETRE") -> List[Any]:
     """Build ephemeral Rhino meshes from a collector or element JSON string.
 
     Args:
         json_str: JSON string — either a ``gh_collector`` storey JSON or a
                   single element JSON (``json_out`` of a beam/wall/arc node).
+        unit:     Length unit used in the input JSON coordinates.
+                  ``"MILLIMETRE"`` (default) or ``"METRE"``.  Must match the
+                  unit setting in ``gh_build_json`` for this project.
 
     Returns:
         List of ``Rhino.Geometry.Mesh`` objects.  Empty list if no geometry
@@ -183,10 +186,12 @@ def build_preview_meshes(json_str: str) -> List[Any]:
 
     storey_data = _parse_input(json_str)
 
+    ifc_unit = LengthUnit.MILLIMETRE if unit.upper() == "MILLIMETRE" else LengthUnit.METRE
+
     # ------------------------------------------------------------------
     # Build a throw-away IfcModel in memory
     # ------------------------------------------------------------------
-    model = IfcModel(name="Preview", schema=IfcSchema.IFC4, unit=LengthUnit.METRE)
+    model = IfcModel(name="Preview", schema=IfcSchema.IFC4, unit=ifc_unit)
     site = model.add_site("PreviewSite")
     building = site.add_building("PreviewBuilding")
     storey = building.add_storey(

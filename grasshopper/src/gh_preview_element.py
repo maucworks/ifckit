@@ -5,6 +5,7 @@ gh_preview_element.py  —  GH Script component: "ifckit Preview Element"
 @component  nickname:"ifckit Preview Element"
 @group "Preview"
 @input  json_in  : str  list — Collector storey JSON(s) or single element JSON(s)
+@input  unit     : str  item — Length unit of coordinates: "MILLIMETRE" (default) or "METRE"
 @output out      : str  item — Status message
 @output preview  : geometry list — Ephemeral meshes (never added to Rhino doc)
 """
@@ -35,6 +36,7 @@ try:
 
     inputs = json_in if isinstance(json_in, list) else [json_in]
     inputs = [s for s in inputs if s]
+    _unit = str(unit).upper() if unit else "MILLIMETRE"
 
     if not inputs:
         out = "No input"
@@ -44,7 +46,7 @@ try:
 
         for s in inputs:
             try:
-                meshes = build_preview_meshes(s)
+                meshes = build_preview_meshes(s, unit=_unit)
                 preview.extend(meshes)
                 total_meshes += len(meshes)
             except Exception as exc:
