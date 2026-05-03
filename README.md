@@ -93,6 +93,32 @@ standalone Python file with `@component` / `@input` / `@output` annotations.
 To regenerate the `.gh` file from source, run `grasshopper/script/build_gh.py`
 inside the Rhino ScriptEditor with Grasshopper open.
 
+### Installing ifckit in Rhino 8
+
+Rhino 8 ships with its own CPython 3.9 environment. Install ifckit into it
+from the **Rhino ScriptEditor** (`EditPythonScript`) or a Script component:
+
+```python
+import subprocess, sys
+subprocess.run([sys.executable, "-m", "pip", "install", "ifckit[ifc]"], check=True)
+```
+
+`ifcopenshell` is bundled with Rhino 8, so the `[ifc]` extra will install it
+only if it is not already present.
+
+To install a local development checkout instead:
+
+```python
+import subprocess, sys
+subprocess.run(
+    [sys.executable, "-m", "pip", "install", "-e", r"C:\path\to\ifckit"],
+    check=True,
+)
+```
+
+After installing, restart Rhino once to make the package available in all
+Script components.
+
 ## Development
 
 ```bash
