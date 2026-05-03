@@ -71,6 +71,9 @@ class IBeamProfile(Profile):
         flange_thickness: float = 0.025,
         anchor: str = "s",
         name: str = "I-Profile",
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
     ) -> None:
         self.height = float(height)
         self.width = float(width)
@@ -79,6 +82,7 @@ class IBeamProfile(Profile):
         self.anchor = anchor.lower()
         self.name = name
         self._validate()
+        self._init_transform(rotation, offset_x, offset_y)
 
     def _validate(self) -> None:
         if self.height <= 0:
@@ -124,20 +128,8 @@ class IBeamProfile(Profile):
         """
         Return 12 (x, y) points defining the closed I-section in the local XY plane.
         The closing duplicate is NOT included; profile_from_points() adds it automatically.
-
-        Point order (counter-clockwise from bottom-left):
-
-             8---7
-             |   |     ← top flange
-            9|   |6
-             |   |     ← web
-           10|   |5
-             |   |     ← bottom flange
-             1---4
-             0   3  ← anchor-offset origin
         """
         ox, oy = self._origin_offset()
-        # negate so that anchor='s' places origin at mid-bottom
         ox = -ox
         oy = -oy
 
@@ -149,20 +141,21 @@ class IBeamProfile(Profile):
         hw = w / 2
         htw = tw / 2
 
-        return [
-            (ox - hw, oy),  # 0  bottom-left  outer flange
-            (ox + hw, oy),  # 1  bottom-right outer flange
-            (ox + hw, oy + tf),  # 2  bottom-right inner flange
-            (ox + htw, oy + tf),  # 3  web bottom-right
-            (ox + htw, oy + h - tf),  # 4  web top-right
-            (ox + hw, oy + h - tf),  # 5  top-right inner flange
-            (ox + hw, oy + h),  # 6  top-right outer flange
-            (ox - hw, oy + h),  # 7  top-left  outer flange
-            (ox - hw, oy + h - tf),  # 8  top-left  inner flange
-            (ox - htw, oy + h - tf),  # 9  web top-left
-            (ox - htw, oy + tf),  # 10 web bottom-left
-            (ox - hw, oy + tf),  # 11 bottom-left inner flange
+        pts = [
+            (ox - hw, oy),
+            (ox + hw, oy),
+            (ox + hw, oy + tf),
+            (ox + htw, oy + tf),
+            (ox + htw, oy + h - tf),
+            (ox + hw, oy + h - tf),
+            (ox + hw, oy + h),
+            (ox - hw, oy + h),
+            (ox - hw, oy + h - tf),
+            (ox - htw, oy + h - tf),
+            (ox - htw, oy + tf),
+            (ox - hw, oy + tf),
         ]
+        return self._apply_transform(pts)
 
     profile_type = "i_beam"
 
@@ -170,17 +163,15 @@ class IBeamProfile(Profile):
         """
         Emit ``IfcIShapeProfileDef`` (native IFC parametric I-section).
 
-        The 2D position is centred at the anchor origin.
+        The anchor offset and user rotation/offset are combined in the
+        IfcAxis2Placement2D via ``_ifc_placement_2d()``.
         """
         ox, oy = self._origin_offset()
-        # IfcIShapeProfileDef is symmetric: centre of bounding box = centroid
-        # We place the 2D position at the anchor offset so the origin is correct.
-        pos = ifc_file.create_entity(
-            "IfcAxis2Placement2D",
-            Location=ifc_file.create_entity(
-                "IfcCartesianPoint", Coordinates=[-ox, -oy + self.height / 2]
-            ),
-        )
+        # IfcIShapeProfileDef centroid is at bounding-box centre.
+        # Anchor offset moves the local origin relative to that centroid.
+        anchor_x = -ox
+        anchor_y = -oy + self.height / 2
+        pos = self._ifc_placement_2d(ifc_file, anchor_x=anchor_x, anchor_y=anchor_y)
         return ifc_file.create_entity(
             "IfcIShapeProfileDef",
             ProfileType="AREA",
@@ -204,10 +195,12 @@ class IBeamProfile(Profile):
             "anchor": self.anchor,
             "area": self.area,
             "centroid_z": self.centroid_z,
+            **self._transform_dict(),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "IBeamProfile":
+        r, ox, oy = cls._transform_from_dict(d)
         return cls(
             height=d["height"],
             width=d["width"],
@@ -215,4 +208,7 @@ class IBeamProfile(Profile):
             flange_thickness=d["flange_thickness"],
             anchor=d.get("anchor", "s"),
             name=d.get("name", "I-Profile"),
+            rotation=r,
+            offset_x=ox,
+            offset_y=oy,
         )

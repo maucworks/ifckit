@@ -15,6 +15,9 @@ gh_profile.py  —  GH Script component: "ifckit Profile"
 @input  anchor           : str   item — Anchor point: "c" centroid, "s" mid-bottom, "sw" bottom-left (default "c")
 @input  unit             : str   item — Unit for steel dims: "m" (default) or "mm"
 @input  name             : str   item — Optional profile label
+@input  rotation         : float item — CCW rotation of profile around its origin (radians, default 0)
+@input  offset_x         : float item — Additional X offset in profile plane (m, default 0)
+@input  offset_y         : float item — Additional Y offset in profile plane (m, default 0)
 @output out      : str item — Status message
 @output json_out : str  item — Profile JSON (Profile.to_dict() format)
 
@@ -33,6 +36,9 @@ from ifckit.schema import LengthUnit
 
 _pt = (profile_type or "").strip().lower()
 _anchor = (anchor or "c").strip().lower()
+_rotation = float(rotation or 0)
+_offset_x = float(offset_x or 0)
+_offset_y = float(offset_y or 0)
 messages = []
 json_out = ""
 
@@ -46,7 +52,11 @@ try:
         ft = float(flange_thickness or 0)
         if h <= 0 or w <= 0 or wt <= 0 or ft <= 0:
             raise ValueError("height, width, web_thickness, flange_thickness all required for I-beam")
-        profile = IBeamProfile(height=h, width=w, web_thickness=wt, flange_thickness=ft, anchor=_anchor, name=name or "I-Profile")
+        profile = IBeamProfile(
+            height=h, width=w, web_thickness=wt, flange_thickness=ft,
+            anchor=_anchor, name=name or "I-Profile",
+            rotation=_rotation, offset_x=_offset_x, offset_y=_offset_y,
+        )
 
     elif _pt == "l":
         h  = float(height or 0)
@@ -54,27 +64,40 @@ try:
         ft = float(flange_thickness or 0)
         if h <= 0 or w <= 0 or ft <= 0:
             raise ValueError("height, width, flange_thickness all required for L-beam")
-        profile = LBeamProfile(height=h, width=w, flange_thickness=ft, anchor=_anchor, name=name or "L-Profile")
+        profile = LBeamProfile(
+            height=h, width=w, thickness=ft,
+            anchor=_anchor, name=name or "L-Profile",
+            rotation=_rotation, offset_x=_offset_x, offset_y=_offset_y,
+        )
 
     elif _pt == "rect":
         w = float(width or 0)
         h = float(height or 0)
         if w <= 0 or h <= 0:
             raise ValueError("width and height required for rect")
-        profile = RectangleProfile(width=w, height=h, name=name or "Rect-Profile")
+        profile = RectangleProfile(
+            x_dim=w, y_dim=h, name=name or "Rect-Profile",
+            rotation=_rotation, offset_x=_offset_x, offset_y=_offset_y,
+        )
 
     elif _pt == "circle":
         r = float(radius or 0)
         if r <= 0:
             raise ValueError("radius required for circle")
-        profile = CircleProfile(radius=r, name=name or "Circle-Profile")
+        profile = CircleProfile(
+            radius=r, name=name or "Circle-Profile",
+            rotation=_rotation, offset_x=_offset_x, offset_y=_offset_y,
+        )
 
     elif _pt == "hollow_circle":
         r  = float(radius or 0)
         wt = float(wall_thickness or 0)
         if r <= 0 or wt <= 0:
             raise ValueError("radius and wall_thickness required for hollow_circle")
-        profile = HollowCircleProfile(radius=r, wall_thickness=wt, name=name or "HollowCircle-Profile")
+        profile = HollowCircleProfile(
+            radius=r, wall_thickness=wt, name=name or "HollowCircle-Profile",
+            rotation=_rotation, offset_x=_offset_x, offset_y=_offset_y,
+        )
 
     elif _pt == "steel":
         sname = (steel_name or "").strip()
@@ -82,7 +105,10 @@ try:
             raise ValueError("steel_name required for steel profile")
         u_str = (unit or "m").strip().lower()
         lu = LengthUnit.MILLIMETRE if u_str == "mm" else LengthUnit.METRE
-        profile = SteelProfile.from_name(sname, anchor=_anchor, unit=lu)
+        profile = SteelProfile.from_name(
+            sname, anchor=_anchor, unit=lu,
+            rotation=_rotation, offset_x=_offset_x, offset_y=_offset_y,
+        )
         if name:
             profile.name = name
 

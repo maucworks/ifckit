@@ -254,17 +254,27 @@ class SteelProfile:
     """
 
     @staticmethod
-    def from_name(name: str, anchor: str = "c", unit: LengthUnit = LengthUnit.METRE) -> "object":
+    def from_name(
+        name: str,
+        anchor: str = "c",
+        unit: LengthUnit = LengthUnit.METRE,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
+    ) -> "object":
         """
         Look up a steel section and return the appropriate ``Profile`` object.
 
         Args:
-            name:   Section designation (e.g. ``"HEA200"``, ``"IPE300"``,
-                    ``"CHS168.3x10"``).
-            anchor: Anchor point for I/H profiles (default ``"c"`` = centroid).
-            unit:   Target length unit for the returned profile dimensions.
-                    ``LengthUnit.METRE`` (default) divides table values (mm) by 1000.
-                    ``LengthUnit.MILLIMETRE`` returns dimensions in mm as-is.
+            name:     Section designation (e.g. ``"HEA200"``, ``"IPE300"``,
+                      ``"CHS168.3x10"``).
+            anchor:   Anchor point for I/H profiles (default ``"c"`` = centroid).
+            unit:     Target length unit for the returned profile dimensions.
+                      ``LengthUnit.METRE`` (default) divides table values (mm) by 1000.
+                      ``LengthUnit.MILLIMETRE`` returns dimensions in mm as-is.
+            rotation: CCW rotation of the cross-section (radians, default 0).
+            offset_x: Additional X translation in profile plane (m, default 0).
+            offset_y: Additional Y translation in profile plane (m, default 0).
 
         Returns:
             ``IBeamProfile``, ``HollowCircleProfile``, or another ``Profile`` subclass.
@@ -285,6 +295,9 @@ class SteelProfile:
                 flange_thickness=tf * scale,
                 anchor=anchor,
                 name=name,
+                rotation=rotation,
+                offset_x=offset_x,
+                offset_y=offset_y,
             )
 
         # --- CHS sections ---
@@ -294,6 +307,9 @@ class SteelProfile:
                 radius=d_mm / 2 * scale,
                 wall_thickness=t_mm * scale,
                 name=name,
+                rotation=rotation,
+                offset_x=offset_x,
+                offset_y=offset_y,
             )
 
         # --- Parse CHS on-the-fly: CHSddd.dxtt.t ---
@@ -305,6 +321,9 @@ class SteelProfile:
                 radius=d_mm / 2 * scale,
                 wall_thickness=t_mm * scale,
                 name=name,
+                rotation=rotation,
+                offset_x=offset_x,
+                offset_y=offset_y,
             )
 
         # --- UNP sections (approximate) ---
@@ -317,6 +336,9 @@ class SteelProfile:
                 flange_thickness=tf * scale,
                 anchor=anchor,
                 name=name,
+                rotation=rotation,
+                offset_x=offset_x,
+                offset_y=offset_y,
             )
 
         raise KeyError(

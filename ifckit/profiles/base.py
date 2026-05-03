@@ -9,10 +9,35 @@ Every concrete profile must implement:
   - ``to_dict()``           → JSON-serializable dict (must include ``"profile_type"``)
   - ``from_dict(d)``        → classmethod reconstructing from that dict
 
+Profile transform
+-----------------
+All profiles support three optional transform parameters that are applied
+**on top of** any internal anchor offset:
+
+  rotation  (float, radians, default 0.0)
+      CCW rotation of the cross-section around its local origin.
+
+  offset_x  (float, metres, default 0.0)
+      Additional translation along the local profile X-axis (horizontal
+      in the cross-section plane, i.e. perpendicular to the beam axis in
+      the strong-axis direction).
+
+  offset_y  (float, metres, default 0.0)
+      Additional translation along the local profile Y-axis (vertical in
+      the cross-section plane, i.e. the weak-axis direction).
+
+These map to the two degrees of freedom in ``IfcAxis2Placement2D``:
+  - ``Location``     ← anchor_offset + (offset_x, offset_y)
+  - ``RefDirection`` ← (cos rotation, sin rotation)
+
+For polyline-based profiles the transform is applied directly to the
+(x, y) point coordinates via ``_apply_transform(points)``.
+
 Registration
 ------------
-Subclasses are auto-registered in ``ProfileRegistry`` via the ``RegisterProfileType``
-metaclass, using the class-level ``profile_type`` string as the key.
+Subclasses are auto-registered in ``ProfileRegistry`` via the
+``RegisterProfileType`` metaclass, using the class-level ``profile_type``
+string as the key.
 
 Usage::
 
@@ -28,6 +53,7 @@ Usage::
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -54,9 +80,104 @@ class Profile(ABC, metaclass=RegisterProfileType):
 
     Subclasses must set a class-level ``profile_type`` string (used for
     serialization dispatch) and implement the three abstract methods below.
+
+    The optional *rotation*, *offset_x*, *offset_y* transform is applied
+    centrally — subclasses do not need to handle it themselves.
     """
 
     profile_type: Optional[str] = None  # overridden in each concrete subclass
+
+    # Transform defaults — subclasses may set these in __init__ by calling
+    # _init_transform(rotation, offset_x, offset_y) or by setting the attrs.
+    rotation: float = 0.0
+    offset_x: float = 0.0
+    offset_y: float = 0.0
+
+    # ------------------------------------------------------------------
+    # Transform helpers (called by subclass __init__ and builders)
+    # ------------------------------------------------------------------
+
+    def _init_transform(
+        self,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
+    ) -> None:
+        """Store the three transform parameters.  Call from subclass __init__."""
+        self.rotation = float(rotation)
+        self.offset_x = float(offset_x)
+        self.offset_y = float(offset_y)
+
+    def _apply_transform(self, points: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+        """
+        Apply (rotation, offset_x, offset_y) to a list of (x, y) tuples.
+
+        Used by ``get_profile_points()`` implementations in polyline-based
+        profiles so the transform is reflected in the raw point coordinates.
+
+        The order is: rotate first (around origin), then translate.
+        """
+        if self.rotation == 0.0 and self.offset_x == 0.0 and self.offset_y == 0.0:
+            return points
+        c = math.cos(self.rotation)
+        s = math.sin(self.rotation)
+        dx, dy = self.offset_x, self.offset_y
+        return [(c * x - s * y + dx, s * x + c * y + dy) for x, y in points]
+
+    def _ifc_placement_2d(
+        self,
+        ifc_file: "ifcopenshell.file",
+        anchor_x: float = 0.0,
+        anchor_y: float = 0.0,
+    ) -> "ifcopenshell.entity_instance":
+        """
+        Build an ``IfcAxis2Placement2D`` that combines the subclass anchor
+        offset with the user-supplied rotation and offset_x/offset_y.
+
+        Args:
+            ifc_file:  The IFC file to create entities in.
+            anchor_x:  X offset already required by the subclass anchor system
+                       (e.g. ``IBeamProfile._origin_offset()``).
+            anchor_y:  Y offset already required by the subclass anchor system.
+
+        Returns:
+            An ``IfcAxis2Placement2D`` entity.
+        """
+        loc_x = anchor_x + self.offset_x
+        loc_y = anchor_y + self.offset_y
+
+        location = ifc_file.create_entity("IfcCartesianPoint", Coordinates=[loc_x, loc_y])
+
+        if self.rotation != 0.0:
+            c = math.cos(self.rotation)
+            s = math.sin(self.rotation)
+            ref_dir = ifc_file.create_entity("IfcDirection", DirectionRatios=[c, s])
+            return ifc_file.create_entity(
+                "IfcAxis2Placement2D", Location=location, RefDirection=ref_dir
+            )
+
+        return ifc_file.create_entity("IfcAxis2Placement2D", Location=location)
+
+    # ------------------------------------------------------------------
+    # Transform serialization helpers (use in to_dict / from_dict)
+    # ------------------------------------------------------------------
+
+    def _transform_dict(self) -> Dict[str, float]:
+        """Return {rotation, offset_x, offset_y} — include in to_dict()."""
+        return {
+            "rotation": self.rotation,
+            "offset_x": self.offset_x,
+            "offset_y": self.offset_y,
+        }
+
+    @staticmethod
+    def _transform_from_dict(d: Dict[str, Any]) -> Tuple[float, float, float]:
+        """Extract (rotation, offset_x, offset_y) from a dict, with defaults."""
+        return (
+            float(d.get("rotation", 0.0)),
+            float(d.get("offset_x", 0.0)),
+            float(d.get("offset_y", 0.0)),
+        )
 
     # ------------------------------------------------------------------
     # Abstract interface

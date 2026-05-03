@@ -105,9 +105,12 @@ class PolygonProfile(Profile):
     ``builders/_geom.py`` (which now delegates here).
 
     Args:
-        points: Sequence of (x, y) or (x, y, z) tuples, or Vec objects.
-                Z is ignored.
-        name:   Optional profile name.
+        points:   Sequence of (x, y) or (x, y, z) tuples, or Vec objects.
+                  Z is ignored.
+        name:     Optional profile name.
+        rotation: CCW rotation around local origin (radians, default 0).
+        offset_x: Additional X translation (m, default 0).
+        offset_y: Additional Y translation (m, default 0).
     """
 
     profile_type = "polygon"
@@ -116,6 +119,9 @@ class PolygonProfile(Profile):
         self,
         points: Sequence[Union[Tuple[float, float], Tuple[float, float, float], Any]],
         name: Optional[str] = None,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
     ) -> None:
         self.name = name
         self.points: List[Tuple[float, float]] = []
@@ -128,22 +134,28 @@ class PolygonProfile(Profile):
                 raise ValueError(f"Cannot interpret point {p!r} as (x, y)")
         if len(self.points) < 3:
             raise ValueError("PolygonProfile requires at least 3 points")
+        self._init_transform(rotation, offset_x, offset_y)
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
-        return list(self.points)
+        return self._apply_transform(list(self.points))
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        return _build_polyline_profile(ifc_file, self.points, self.name)
+        return _build_polyline_profile(ifc_file, self.get_profile_points(), self.name)
 
     def to_dict(self) -> Dict[str, Any]:
-        d: Dict[str, Any] = {"profile_type": self.profile_type, "points": list(self.points)}
+        d: Dict[str, Any] = {
+            "profile_type": self.profile_type,
+            "points": list(self.points),
+            **self._transform_dict(),
+        }
         if self.name is not None:
             d["name"] = self.name
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PolygonProfile":
-        return cls(points=d["points"], name=d.get("name"))
+        r, ox, oy = cls._transform_from_dict(d)
+        return cls(points=d["points"], name=d.get("name"), rotation=r, offset_x=ox, offset_y=oy)
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +187,9 @@ class RoundedPolygonProfile(Profile):
         radius: Union[float, Sequence[float]] = 0.0,
         name: Optional[str] = None,
         arc_segments: int = 8,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
     ) -> None:
         raw: List[Tuple[float, float]] = []
         for p in points:
@@ -197,6 +212,7 @@ class RoundedPolygonProfile(Profile):
         self.radii = radii
         self.name = name
         self.arc_segments = int(arc_segments)
+        self._init_transform(rotation, offset_x, offset_y)
 
     def _build_outline(self) -> List[Tuple[float, float]]:
         """Build the tessellated outline including fillet arcs."""
@@ -295,10 +311,10 @@ class RoundedPolygonProfile(Profile):
         return outline
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
-        return self._build_outline()
+        return self._apply_transform(self._build_outline())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        return _build_polyline_profile(ifc_file, self._build_outline(), self.name)
+        return _build_polyline_profile(ifc_file, self.get_profile_points(), self.name)
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
@@ -306,6 +322,7 @@ class RoundedPolygonProfile(Profile):
             "points": list(self.points),
             "radius": self.radii,
             "arc_segments": self.arc_segments,
+            **self._transform_dict(),
         }
         if self.name is not None:
             d["name"] = self.name
@@ -313,11 +330,15 @@ class RoundedPolygonProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "RoundedPolygonProfile":
+        r, ox, oy = cls._transform_from_dict(d)
         return cls(
             points=d["points"],
             radius=d.get("radius", 0.0),
             name=d.get("name"),
             arc_segments=d.get("arc_segments", 8),
+            rotation=r,
+            offset_x=ox,
+            offset_y=oy,
         )
 
 
@@ -333,9 +354,12 @@ class RectangleProfile(Profile):
     Emits ``IfcRectangleProfileDef`` (native IFC parametric type).
 
     Args:
-        x_dim: Width (m).
-        y_dim: Height (m).
-        name:  Optional profile name.
+        x_dim:    Width (m).
+        y_dim:    Height (m).
+        name:     Optional profile name.
+        rotation: CCW rotation around local origin (radians, default 0).
+        offset_x: Additional X translation (m, default 0).
+        offset_y: Additional Y translation (m, default 0).
     """
 
     profile_type = "rectangle"
@@ -345,6 +369,9 @@ class RectangleProfile(Profile):
         x_dim: float,
         y_dim: float,
         name: Optional[str] = None,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
     ) -> None:
         if x_dim <= 0:
             raise ValueError("x_dim must be positive")
@@ -353,6 +380,7 @@ class RectangleProfile(Profile):
         self.x_dim = float(x_dim)
         self.y_dim = float(y_dim)
         self.name = name
+        self._init_transform(rotation, offset_x, offset_y)
 
     @property
     def area(self) -> float:
@@ -361,13 +389,11 @@ class RectangleProfile(Profile):
     def get_profile_points(self) -> List[Tuple[float, float]]:
         hx = self.x_dim / 2
         hy = self.y_dim / 2
-        return [(-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)]
+        pts = [(-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)]
+        return self._apply_transform(pts)
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = ifc_file.create_entity(
-            "IfcAxis2Placement2D",
-            Location=ifc_file.create_entity("IfcCartesianPoint", Coordinates=[0.0, 0.0]),
-        )
+        pos = self._ifc_placement_2d(ifc_file)
         return ifc_file.create_entity(
             "IfcRectangleProfileDef",
             ProfileType="AREA",
@@ -382,6 +408,7 @@ class RectangleProfile(Profile):
             "profile_type": self.profile_type,
             "x_dim": self.x_dim,
             "y_dim": self.y_dim,
+            **self._transform_dict(),
         }
         if self.name is not None:
             d["name"] = self.name
@@ -389,7 +416,15 @@ class RectangleProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "RectangleProfile":
-        return cls(x_dim=d["x_dim"], y_dim=d["y_dim"], name=d.get("name"))
+        r, ox, oy = cls._transform_from_dict(d)
+        return cls(
+            x_dim=d["x_dim"],
+            y_dim=d["y_dim"],
+            name=d.get("name"),
+            rotation=r,
+            offset_x=ox,
+            offset_y=oy,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -404,17 +439,30 @@ class CircleProfile(Profile):
     Emits ``IfcCircleProfileDef`` (native IFC parametric type).
 
     Args:
-        radius: Circle radius (m).
-        name:   Optional profile name.
+        radius:   Circle radius (m).
+        name:     Optional profile name.
+        offset_x: Additional X translation (m, default 0).
+        offset_y: Additional Y translation (m, default 0).
+
+    Note: ``rotation`` has no effect on a circle but is accepted for API
+    consistency and is round-tripped through to_dict/from_dict.
     """
 
     profile_type = "circle"
 
-    def __init__(self, radius: float, name: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        radius: float,
+        name: Optional[str] = None,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
+    ) -> None:
         if radius <= 0:
             raise ValueError("radius must be positive")
         self.radius = float(radius)
         self.name = name
+        self._init_transform(rotation, offset_x, offset_y)
 
     @property
     def area(self) -> float:
@@ -423,19 +471,17 @@ class CircleProfile(Profile):
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """Approximate circle as 32-segment polygon."""
         n = 32
-        return [
+        pts = [
             (
                 self.radius * math.cos(2 * math.pi * i / n),
                 self.radius * math.sin(2 * math.pi * i / n),
             )
             for i in range(n)
         ]
+        return self._apply_transform(pts)
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = ifc_file.create_entity(
-            "IfcAxis2Placement2D",
-            Location=ifc_file.create_entity("IfcCartesianPoint", Coordinates=[0.0, 0.0]),
-        )
+        pos = self._ifc_placement_2d(ifc_file)
         return ifc_file.create_entity(
             "IfcCircleProfileDef",
             ProfileType="AREA",
@@ -445,14 +491,19 @@ class CircleProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        d: Dict[str, Any] = {"profile_type": self.profile_type, "radius": self.radius}
+        d: Dict[str, Any] = {
+            "profile_type": self.profile_type,
+            "radius": self.radius,
+            **self._transform_dict(),
+        }
         if self.name is not None:
             d["name"] = self.name
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CircleProfile":
-        return cls(radius=d["radius"], name=d.get("name"))
+        r, ox, oy = cls._transform_from_dict(d)
+        return cls(radius=d["radius"], name=d.get("name"), rotation=r, offset_x=ox, offset_y=oy)
 
 
 # ---------------------------------------------------------------------------
@@ -470,6 +521,11 @@ class HollowCircleProfile(Profile):
         radius:         Outer radius (m).
         wall_thickness: Wall thickness (m).
         name:           Optional profile name.
+        offset_x:       Additional X translation (m, default 0).
+        offset_y:       Additional Y translation (m, default 0).
+
+    Note: ``rotation`` has no effect on a circular section but is accepted
+    for API consistency.
     """
 
     profile_type = "hollow_circle"
@@ -479,6 +535,9 @@ class HollowCircleProfile(Profile):
         radius: float,
         wall_thickness: float,
         name: Optional[str] = None,
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
     ) -> None:
         if radius <= 0:
             raise ValueError("radius must be positive")
@@ -487,6 +546,7 @@ class HollowCircleProfile(Profile):
         self.radius = float(radius)
         self.wall_thickness = float(wall_thickness)
         self.name = name
+        self._init_transform(rotation, offset_x, offset_y)
 
     @property
     def inner_radius(self) -> float:
@@ -499,19 +559,17 @@ class HollowCircleProfile(Profile):
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """Outer circle approximated as 32-segment polygon (inner ring ignored)."""
         n = 32
-        return [
+        pts = [
             (
                 self.radius * math.cos(2 * math.pi * i / n),
                 self.radius * math.sin(2 * math.pi * i / n),
             )
             for i in range(n)
         ]
+        return self._apply_transform(pts)
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = ifc_file.create_entity(
-            "IfcAxis2Placement2D",
-            Location=ifc_file.create_entity("IfcCartesianPoint", Coordinates=[0.0, 0.0]),
-        )
+        pos = self._ifc_placement_2d(ifc_file)
         return ifc_file.create_entity(
             "IfcCircleHollowProfileDef",
             ProfileType="AREA",
@@ -526,6 +584,7 @@ class HollowCircleProfile(Profile):
             "profile_type": self.profile_type,
             "radius": self.radius,
             "wall_thickness": self.wall_thickness,
+            **self._transform_dict(),
         }
         if self.name is not None:
             d["name"] = self.name
@@ -533,8 +592,12 @@ class HollowCircleProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "HollowCircleProfile":
+        r, ox, oy = cls._transform_from_dict(d)
         return cls(
             radius=d["radius"],
             wall_thickness=d["wall_thickness"],
             name=d.get("name"),
+            rotation=r,
+            offset_x=ox,
+            offset_y=oy,
         )

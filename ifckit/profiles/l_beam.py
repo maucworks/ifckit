@@ -39,15 +39,15 @@ if TYPE_CHECKING:
 
 # Anchor → (x_fraction_of_width, y_fraction_of_height)
 _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
-    'sw': ( 0.0,  0.0),
-    's':  (-0.5,  0.0),
-    'se': (-1.0,  0.0),
-    'w':  ( 0.0, -0.5),
-    'c':  (-0.5, -0.5),
-    'e':  (-1.0, -0.5),
-    'nw': ( 0.0, -1.0),
-    'n':  (-0.5, -1.0),
-    'ne': (-1.0, -1.0),
+    "sw": (0.0, 0.0),
+    "s": (-0.5, 0.0),
+    "se": (-1.0, 0.0),
+    "w": (0.0, -0.5),
+    "c": (-0.5, -0.5),
+    "e": (-1.0, -0.5),
+    "nw": (0.0, -1.0),
+    "n": (-0.5, -1.0),
+    "ne": (-1.0, -1.0),
 }
 
 
@@ -68,8 +68,11 @@ class LBeamProfile(Profile):
         height: float = 0.3,
         width: float = 0.3,
         thickness: float = 0.02,
-        anchor: str = 'sw',
+        anchor: str = "sw",
         name: str = "L-Profile",
+        rotation: float = 0.0,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
     ) -> None:
         self.height = float(height)
         self.width = float(width)
@@ -77,6 +80,7 @@ class LBeamProfile(Profile):
         self.anchor = anchor.lower()
         self.name = name
         self._validate()
+        self._init_transform(rotation, offset_x, offset_y)
 
     def _validate(self) -> None:
         if self.height <= 0:
@@ -100,10 +104,7 @@ class LBeamProfile(Profile):
 
     @property
     def area(self) -> float:
-        return (
-            self.width * self.thickness
-            + (self.height - self.thickness) * self.thickness
-        )
+        return self.width * self.thickness + (self.height - self.thickness) * self.thickness
 
     @property
     def centroid_y(self) -> float:
@@ -132,17 +133,6 @@ class LBeamProfile(Profile):
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """
         Return 6 (x, y) points defining the closed L-section in the local XY plane.
-        X = horizontal, Y = vertical — consistent with IBeamProfile and ifckit builders.
-        The closing duplicate is NOT included; profile_from_points() adds it automatically.
-
-        Profile shape (anchor='sw', origin at bottom-left):
-
-            5
-            |\\
-            | \\
-            4  3---2
-            |      |
-            0------1
         """
         oy, oz = self._origin_offset()
 
@@ -150,14 +140,15 @@ class LBeamProfile(Profile):
         w = self.width
         t = self.thickness
 
-        return [
-            (oy,     oz    ),   # 0  bottom-left
-            (oy + w, oz    ),   # 1  bottom-right
-            (oy + w, oz + t),   # 2  top of horizontal leg, right
-            (oy + t, oz + t),   # 3  inner corner
-            (oy + t, oz + h),   # 4  top of vertical leg, inner
-            (oy,     oz + h),   # 5  top-left
+        pts = [
+            (oy, oz),
+            (oy + w, oz),
+            (oy + w, oz + t),
+            (oy + t, oz + t),
+            (oy + t, oz + h),
+            (oy, oz + h),
         ]
+        return self._apply_transform(pts)
 
     profile_type = "l_beam"
 
@@ -165,17 +156,10 @@ class LBeamProfile(Profile):
         """
         Emit ``IfcLShapeProfileDef`` (native IFC parametric L-section).
 
-        The position is set at the anchor origin.
+        Anchor offset and user rotation/offset combined via ``_ifc_placement_2d()``.
         """
         ox, oy = self._origin_offset()
-        # IfcLShapeProfileDef origin is at bottom-left corner of the bounding box.
-        # We shift the 2D placement so the anchor origin is at (0, 0) in profile space.
-        pos = ifc_file.create_entity(
-            "IfcAxis2Placement2D",
-            Location=ifc_file.create_entity(
-                "IfcCartesianPoint", Coordinates=[ox, oy]
-            ),
-        )
+        pos = self._ifc_placement_2d(ifc_file, anchor_x=ox, anchor_y=oy)
         return ifc_file.create_entity(
             "IfcLShapeProfileDef",
             ProfileType="AREA",
@@ -200,14 +184,19 @@ class LBeamProfile(Profile):
             "area": self.area,
             "centroid_y": self.centroid_y,
             "centroid_z": self.centroid_z,
+            **self._transform_dict(),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "LBeamProfile":
+        r, ox, oy = cls._transform_from_dict(d)
         return cls(
             height=d["height"],
             width=d["width"],
             thickness=d["thickness"],
             anchor=d.get("anchor", "sw"),
             name=d.get("name", "L-Profile"),
+            rotation=r,
+            offset_x=ox,
+            offset_y=oy,
         )
