@@ -36,6 +36,7 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.building import PendingSlab, PendingWall
+from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
 from ifckit.geometry import Vec
 
@@ -215,6 +216,29 @@ def _validate_slab(s: PendingSlab) -> ValidationResult:
         errors.append(f"PendingSlab '{s.name}': thickness must be > 0, got {s.thickness}")
     elif s.thickness < _WARN_SHORT:
         warnings.append(f"PendingSlab '{s.name}': thickness is very small ({s.thickness:.4f} m)")
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingSpace)
+def _validate_space(s: PendingSpace) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if len(s.footprint) < 3:
+        errors.append(
+            f"PendingSpace '{s.name}': footprint must have at least 3 points, "
+            f"got {len(s.footprint)}"
+        )
+    else:
+        area = abs(_profile_area_2d(s.footprint))
+        if area < _MIN_LENGTH**2:
+            errors.append(f"PendingSpace '{s.name}': footprint area is effectively zero")
+
+    if s.height <= 0.0:
+        errors.append(f"PendingSpace '{s.name}': height must be > 0, got {s.height}")
+    elif s.height < _WARN_SHORT:
+        warnings.append(f"PendingSpace '{s.name}': height is very small ({s.height:.4f} m)")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 

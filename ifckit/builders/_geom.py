@@ -23,7 +23,7 @@ Adjust precision with set_precision()::
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, List, Sequence
+from typing import TYPE_CHECKING, Any, List, Sequence
 
 import ifcopenshell
 
@@ -152,6 +152,33 @@ def profile_from_points(
         ProfileName=profile_name,
         OuterCurve=polyline,
     )
+
+
+def profile_to_ifc(
+    f: ifcopenshell.file,
+    profile_source: Any,
+    profile_name: str | None = None,
+    ensure_ccw: bool = True,
+) -> ifcopenshell.entity_instance:
+    """
+    Convert a profile source to an IfcProfileDef entity.
+
+    Accepts:
+      - A ``Profile`` subclass instance (calls ``profile.to_ifc(f)``).
+      - Any object with ``get_profile_points()`` (legacy duck-typing).
+      - A sequence of (x, y) tuples (calls ``profile_from_points()``).
+
+    This is the unified entry-point for all builders.
+    """
+    # Profile ABC or duck-typed object with to_ifc()
+    if hasattr(profile_source, "to_ifc"):
+        return profile_source.to_ifc(f)
+    # Legacy duck-typed objects without to_ifc but with get_profile_points()
+    if hasattr(profile_source, "get_profile_points"):
+        pts = profile_source.get_profile_points()
+        return profile_from_points(f, pts, profile_name=profile_name, ensure_ccw=ensure_ccw)
+    # Plain sequence of (x, y) tuples
+    return profile_from_points(f, profile_source, profile_name=profile_name, ensure_ccw=ensure_ccw)
 
 
 def extrude_profile(

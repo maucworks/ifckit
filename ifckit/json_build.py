@@ -106,8 +106,24 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                 
                 storey.add(pending)
 
-    if output_path:
-        model.save(output_path)
+            # spaces[] — optional; each entry is a PendingSpace dict.
+            #
+            # Schema per space:
+            #   {"name":          "1.01",         # space number (optional)
+            #    "long_name":     "Vergaderzaal", # descriptive name (optional)
+            #    "height":        3.0,            # clear room height (required)
+            #    "footprint":     [[x,y,z], ...], # closed polygon (required)
+            #    "predefined_type": "SPACE",      # default "SPACE" (optional)
+            #    "hatch_pattern": "ANSI31",       # optional
+            #    "style":         {"r":…}}        # optional RenderStyle
+            from ifckit.elements.space import PendingSpace
+
+            for space_data in storey_data.get("spaces", []):
+                pending_space = PendingSpace.from_dict(space_data)
+                result = validate(pending_space)
+                if not result.ok:
+                    raise ValueError(f"Space validation failed: {result.errors}")
+                storey.add(pending_space)
 
     # Build drawings after all elements.
     # drawings[] is optional at root level. Each entry defines a section plane
@@ -126,6 +142,12 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
         raw_x_axis  = drawing_data.get("x_axis", [1.0, 0.0, 0.0])
         raw_z_axis  = drawing_data.get("z_axis", [0.0, 0.0, -1.0])
 
+        for field_name, val in (("origin", raw_origin), ("x_axis", raw_x_axis), ("z_axis", raw_z_axis)):
+            if not isinstance(val, (list, tuple)) or len(val) != 3:
+                raise ValueError(
+                    f"Drawing {dname!r}: '{field_name}' must be a list of 3 numbers, got {val!r}"
+                )
+
         model.add_drawing(
             name=dname,
             target_view=target_view,
@@ -133,6 +155,9 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             x_axis=(float(raw_x_axis[0]),  float(raw_x_axis[1]),  float(raw_x_axis[2])),
             z_axis=(float(raw_z_axis[0]),  float(raw_z_axis[1]),  float(raw_z_axis[2])),
         )
+
+    if output_path:
+        model.save(output_path)
 
     return model
 

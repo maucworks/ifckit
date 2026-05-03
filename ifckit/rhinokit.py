@@ -23,10 +23,26 @@ Usage::
 from __future__ import annotations
 
 import math
-from typing import Any, List
+from typing import Any, List, Optional
 
 from ifckit.geometry import Arc, Line, Vec, Path
-import Rhino.Geometry
+from ifckit.paper import iso_a_size_mm
+
+try:
+    import Rhino.Geometry
+    import Rhino.DocObjects
+    import Rhino
+    _RHINO_AVAILABLE = True
+except ImportError:
+    _RHINO_AVAILABLE = False
+
+
+def _require_rhino(fn_name: str) -> None:
+    if not _RHINO_AVAILABLE:
+        raise ImportError(
+            f"ifckit.rhinokit.{fn_name}() requires Rhino — "
+            "run inside Rhino 8 / Grasshopper."
+        )
 
 
 def pt_to_vec(pt: Any) -> Vec:
@@ -36,6 +52,7 @@ def pt_to_vec(pt: Any) -> Vec:
 
 def vec_to_pt3d(vec: Vec) -> Any:
     """Vec → Rhino Point3d."""
+    _require_rhino("vec_to_pt3d")
     return Rhino.Geometry.Point3d(vec.x, vec.y, vec.z)
 
 
@@ -154,3 +171,216 @@ def curves_to_path(curves: Any) -> Path:
                 p.add_line(line.start, line.end)
 
     return p
+
+
+def ensure_layer(
+    doc: Any,
+    path: str,
+    color: Optional[Any] = None,
+    plot_weight: Optional[float] = None,
+) -> int:
+    """Ensure a layer exists in *doc*, creating it if necessary.
+
+    Applies *color* and *plot_weight* on both create and update.
+
+    Args:
+        doc:         Rhino document (``RhinoDoc``).
+        path:        Layer name or ``::``-separated hierarchy,
+                     e.g. ``"Annotations::NoPlot"``.
+        color:       ``System.Drawing.Color`` to set on the layer.
+                     ``None`` leaves the colour unchanged on existing layers
+                     and uses the Rhino default on new ones.
+        plot_weight: Line width in mm for printing.  ``0.0`` = "No Print".
+                     ``None`` leaves the value unchanged.
+
+    Returns:
+        Integer layer index of the (leaf) layer.
+
+    Example::
+
+        import System.Drawing
+        from ifckit import rhinokit as rk
+        import scriptcontext as sc
+
+        idx = rk.ensure_layer(
+            sc.doc,
+            "Annotations::NoPlot",
+            color=System.Drawing.Color.Magenta,
+            plot_weight=0.0,
+        )
+    """
+    import Rhino
+
+    parts = path.split("::")
+    for i, part in enumerate(parts):
+        current_path = "::".join(parts[: i + 1])
+        index = doc.Layers.FindByFullPath(current_path, -1)
+
+        if index < 0:
+            layer = Rhino.DocObjects.Layer()
+            layer.Name = part
+            if i > 0:
+                parent_path = "::".join(parts[:i])
+                parent_index = doc.Layers.FindByFullPath(parent_path, -1)
+                if parent_index >= 0:
+                    layer.ParentLayerId = doc.Layers[parent_index].Id
+            if color is not None:
+                layer.Color = color
+            if plot_weight is not None:
+                layer.PlotWeight = plot_weight
+            index = doc.Layers.Add(layer)
+            if index < 0:
+                raise RuntimeError(f"Failed to create Rhino layer: {current_path!r}")
+        else:
+            layer = doc.Layers[index]
+            changed = False
+            if color is not None:
+                layer.Color = color
+                changed = True
+            if plot_weight is not None:
+                layer.PlotWeight = plot_weight
+                changed = True
+            if changed:
+                layer.CommitChanges()
+
+    return doc.Layers.FindByFullPath(path, -1)
+
+
+def draw_paper_rectangle(
+    doc: Any,
+    plane: Any,
+    layer: str,
+    iso_a: int = 1,
+    scale: float = 1.0,
+    landscape: bool = False,
+) -> Any:
+    """Draw an ISO A-series paper rectangle on *plane* and add it to *doc*.
+
+    The rectangle is centred on ``plane.Origin``.
+
+    Args:
+        doc:       Rhino document (``RhinoDoc``).
+        plane:     Rhino ``Plane`` — defines position and orientation.
+        layer:     Full layer path (``::``-separated).  Created if it does
+                   not exist.
+        iso_a:     ISO A paper size number (0–10).  Default ``1`` = A1.
+        scale:     Scale factor applied to the paper size.  E.g. ``50`` for
+                   a 1:50 drawing frame.  Default ``1.0``.
+        landscape: If ``True``, swap width and height.  Default ``False``
+                   (portrait).
+
+    Returns:
+        ``System.Guid`` of the added curve object.
+
+    Example::
+
+        import Rhino.Geometry as rg
+        from ifckit import rhinokit as rk
+        import scriptcontext as sc
+
+        guid = rk.draw_paper_rectangle(
+            sc.doc,
+            plane=rg.Plane.WorldXY,
+            layer="Annotations::NoPlot",
+            iso_a=1,
+            scale=50,
+            landscape=True,
+        )
+    """
+    import Rhino
+    import Rhino.Geometry as rg
+
+    if iso_a not in range(0, 11):
+        raise ValueError(f"iso_a must be 0–10, got {iso_a!r}")
+
+    w_mm, h_mm = iso_a_size_mm(iso_a, landscape=landscape)
+
+    # Convert mm → Rhino document units then apply scale factor.
+    uf = Rhino.RhinoMath.UnitScale(
+        Rhino.UnitSystem.Millimeters, doc.ModelUnitSystem
+    )
+    w = w_mm * uf * scale
+    h = h_mm * uf * scale
+
+    # Build rectangle centred on plane.Origin.
+    interval_x = rg.Interval(-w / 2.0, w / 2.0)
+    interval_y = rg.Interval(-h / 2.0, h / 2.0)
+    rect = rg.Rectangle3d(plane, interval_x, interval_y)
+    curve = rect.ToNurbsCurve()
+
+    layer_index = ensure_layer(doc, layer)
+
+    attr = Rhino.DocObjects.ObjectAttributes()
+    attr.LayerIndex = layer_index
+
+    return doc.Objects.AddCurve(curve, attr)
+
+
+# ---------------------------------------------------------------------------
+# Dev reload helper
+# ---------------------------------------------------------------------------
+
+def reload_all(project_root: str | None = None) -> None:
+    """
+    Ensure *project_root* is on ``sys.path`` and reload all ifckit submodules
+    in dependency order (leaves first, root last).
+
+    Call this at the top of every Grasshopper Script node to pick up
+    live code changes without restarting Rhino::
+
+        import ifckit.rhinokit as rk
+        rk.reload_all()          # or rk.reload_all(r'/path/to/ifckit')
+
+    Parameters
+    ----------
+    project_root : str, optional
+        Absolute path to the project root (the directory that contains the
+        ``ifckit`` package).  Reads the ``IFCKIT_PATH`` environment variable
+        first; falls back to ``/Users/Mauc/L140-py-ifckit`` if neither is set.
+    """
+    import importlib
+    import os
+    import sys
+
+    _default = r'/Users/Mauc/L140-py-ifckit'
+    root = project_root or os.environ.get('IFCKIT_PATH', _default)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+
+    _RELOAD_ORDER = [
+        "ifckit.schema",
+        "ifckit.geometry",
+        "ifckit.elements",
+        "ifckit.profiles.base",
+        "ifckit.profiles.shapes",
+        "ifckit.profiles.i_beam",
+        "ifckit.profiles.l_beam",
+        "ifckit.profiles.steel",
+        "ifckit.profiles",
+        "ifckit.builders._geom",
+        "ifckit.builders.base",
+        "ifckit.builders.extruded",
+        "ifckit.builders.wall",
+        "ifckit.builders.slab",
+        "ifckit.builders.space",
+        "ifckit.builders.beam_factory",
+        "ifckit.builders.revolved_beam",
+        "ifckit.builders.bridge",
+        "ifckit.builders",
+        "ifckit.rhinokit",
+        "ifckit.rhino_import",
+        "ifckit.model",
+        "ifckit.validator",
+        "ifckit.json_build",
+        "ifckit",
+    ]
+
+    for mod_name in _RELOAD_ORDER:
+        mod = sys.modules.get(mod_name)
+        if mod is not None:
+            importlib.reload(mod)
+        else:
+            try:
+                importlib.import_module(mod_name)
+            except ImportError:
+                pass  # optional submodule not installed

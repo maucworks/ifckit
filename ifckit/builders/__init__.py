@@ -11,6 +11,7 @@ from ifckit.builders.bridge import AlignmentBuilder
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
 from ifckit.builders.slab import SlabBuilder
+from ifckit.builders.space import SpaceBuilder
 from ifckit.builders.wall import WallBuilder
 from ifckit.builders._geom import set_precision, get_precision
 
@@ -25,6 +26,7 @@ def default_registry() -> BuilderRegistry:
     registry = BuilderRegistry()
     registry.register(WallBuilder())
     registry.register(SlabBuilder())
+    registry.register(SpaceBuilder())
     registry.register(ExtrudedElementBuilder("basic_beam", "IfcBeam"))
     registry.register(ExtrudedElementBuilder("basic_column", "IfcColumn"))
     registry.register(RevolvedBeamBuilder())
@@ -36,6 +38,7 @@ __all__ = [
     "IIfcBuilder",
     "WallBuilder",
     "SlabBuilder",
+    "SpaceBuilder",
     "ExtrudedElementBuilder",
     "RevolvedBeamBuilder",
     "AlignmentBuilder",

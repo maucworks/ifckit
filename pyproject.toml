@@ -6,16 +6,32 @@ build-backend = "setuptools.build_meta"
 name = "ifckit"
 version = "0.1.0"
 description = "Framework-agnostic IFC builder library for architecture and infrastructure"
+authors = [{ name = "Sander Boer", email = "sanderboer@mauc.nl" }]
+readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-dependencies = [
-    "ifcopenshell>=0.7.0",
+keywords = ["ifc", "bim", "architecture", "ifcopenshell", "grasshopper", "rhino"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
 ]
+dependencies = []
 
 [project.optional-dependencies]
+ifc = ["ifcopenshell>=0.7.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
+    "ifcopenshell>=0.7.0",
     "httpx>=0.27",
     "ruff",
     "mypy",
@@ -24,13 +40,26 @@ api = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
 ]
+all = [
+    "ifcopenshell>=0.7.0",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.urls]
+Homepage   = "https://github.com/maucworks/ifckit"
+Repository = "https://github.com/maucworks/ifckit"
+Issues     = "https://github.com/maucworks/ifckit/issues"
+
+[project.scripts]
+ifckit = "ifckit.__main__:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["ifckit*"]
 
 [tool.ruff]
-line-length = 100
+line-length    = 100
 target-version = "py310"
 
 [tool.ruff.lint]
@@ -39,6 +68,3 @@ select = ["E", "F", "I"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-
-[project.scripts]
-ifckit = "ifckit.__main__:main"

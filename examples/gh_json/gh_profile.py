@@ -1,71 +1,122 @@
 """
-gh_profile.py  —  GH Script component: "Create Standard Profile"
-================================================================
+gh_profile.py  —  GH Script component: "Create Profile"
+========================================================
 
-Stateless component: generates standard steel section profiles.
+Stateless component: creates any supported ifckit profile type and outputs
+a JSON dict (Profile.to_dict() format) consumable by beam/wall/column nodes.
 
 Component inputs
 ----------------
-profile_type : str  — "I" for I-beam, "L" for L-beam.
-height       : float — Total height (I-beam) or leg length A (L-beam), in meters.
-width        : float — Flange width (I-beam) or leg length B (L-beam), in meters.
-web_thickness: float — Web thickness (I-beam only), in meters.
-flange_thickness: float — Flange thickness (both), in meters.
-name         : str  — Optional profile name.
+profile_type     : str  — One of: "I", "L", "rect", "circle", "hollow_circle", "steel"
+                         (case-insensitive).
+
+  For "I" (IBeamProfile):
+    height           : float — Total height, in model units.
+    width            : float — Flange width, in model units.
+    web_thickness    : float — Web thickness, in model units.
+    flange_thickness : float — Flange thickness, in model units.
+
+  For "L" (LBeamProfile):
+    height           : float — Leg length A (vertical), in model units.
+    width            : float — Leg length B (horizontal), in model units.
+    flange_thickness : float — Leg thickness, in model units.
+
+  For "rect" (RectangleProfile):
+    width            : float — Width, in model units.
+    height           : float — Height, in model units.
+
+  For "circle" (CircleProfile):
+    radius           : float — Radius, in model units.
+
+  For "hollow_circle" (HollowCircleProfile):
+    radius           : float — Outer radius, in model units.
+    wall_thickness   : float — Wall thickness, in model units.
+
+  For "steel" (SteelProfile lookup):
+    steel_name       : str   — Section name, e.g. "HEA200", "IPE300", "CHS168.3x10".
+    unit             : str   — "m" (default) or "mm" — model unit for returned dims.
+
+name             : str  — Optional profile name / label.
 
 Component outputs
 -----------------
 out      : str — Status message.
-json_out : str — JSON string representing the profile as a list of Vec tuples.
-                 Can be used as profile input for beams, columns, etc.
-
-Example — I-beam 200 mm height, 100 mm width, 6 mm web, 10 mm flange (in meters):
-    profile_type = "I"
-    height = 0.2
-    width = 0.1
-    web_thickness = 0.006
-    flange_thickness = 0.01
+json_out : str — JSON string (Profile.to_dict()) for use in beam/column nodes.
 """
 
 import json
-from ifckit import IBeamProfile, LBeamProfile, Vec
+import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
-profile_type = (profile_type or "").strip().upper()
+from ifckit.profiles import (
+    IBeamProfile, LBeamProfile,
+    RectangleProfile, CircleProfile, HollowCircleProfile,
+    SteelProfile,
+)
+from ifckit.schema import LengthUnit
+
+_pt = (profile_type or "").strip().lower()
 messages = []
 json_out = ""
 
-if profile_type in ("I", "L"):
-    try:
-        h = float(height or 0)
-        w = float(width or 0)
+try:
+    profile = None
+
+    if _pt == "i":
+        h  = float(height or 0)
+        w  = float(width or 0)
         wt = float(web_thickness or 0)
         ft = float(flange_thickness or 0)
+        if h <= 0 or w <= 0 or wt <= 0 or ft <= 0:
+            raise ValueError("height, width, web_thickness, flange_thickness all required for I-beam")
+        profile = IBeamProfile(height=h, width=w, web_thickness=wt, flange_thickness=ft, name=name or "I-Profile")
 
-        if h <= 0 or w <= 0:
-            messages.append("ERR: height and width required")
-        elif profile_type == "I" and (wt <= 0 or ft <= 0):
-            messages.append("ERR: web_thickness and flange_thickness required for I-beam")
-        elif profile_type == "L" and ft <= 0:
-            messages.append("ERR: flange_thickness required for L-beam")
-        else:
-            if profile_type == "I":
-                profile = IBeamProfile(
-                    height=h, width=w, web_thickness=wt, flange_thickness=ft, name=name
-                )
-            else:
-                profile = LBeamProfile(
-                    height=h, width=w, flange_thickness=ft, name=name
-                )
+    elif _pt == "l":
+        h  = float(height or 0)
+        w  = float(width or 0)
+        ft = float(flange_thickness or 0)
+        if h <= 0 or w <= 0 or ft <= 0:
+            raise ValueError("height, width, flange_thickness all required for L-beam")
+        profile = LBeamProfile(height=h, width=w, flange_thickness=ft, name=name or "L-Profile")
 
-            pts = profile.get_profile_points()
-            vecs = [Vec(x, y, 0) for x, y in pts]
-            profile_data = [v.to_tuple() for v in vecs]
+    elif _pt == "rect":
+        w = float(width or 0)
+        h = float(height or 0)
+        if w <= 0 or h <= 0:
+            raise ValueError("width and height required for rect")
+        profile = RectangleProfile(width=w, height=h, name=name or "Rect-Profile")
 
-            json_out = json.dumps({"profile": profile_data, "name": name or f"{profile_type}-Profile"})
-            messages.append(f"OK  {profile_type}-beam ({h*1000:.0f}×{w*1000:.0f}mm)")
-    except Exception as exc:
-        messages.append(f"ERR: {exc}")
-else:
-    messages.append("ERR: profile_type must be 'I' or 'L'")
+    elif _pt == "circle":
+        r = float(radius or 0)
+        if r <= 0:
+            raise ValueError("radius required for circle")
+        profile = CircleProfile(radius=r, name=name or "Circle-Profile")
+
+    elif _pt == "hollow_circle":
+        r  = float(radius or 0)
+        wt = float(wall_thickness or 0)
+        if r <= 0 or wt <= 0:
+            raise ValueError("radius and wall_thickness required for hollow_circle")
+        profile = HollowCircleProfile(radius=r, wall_thickness=wt, name=name or "HollowCircle-Profile")
+
+    elif _pt == "steel":
+        sname = (steel_name or "").strip()
+        if not sname:
+            raise ValueError("steel_name required for steel profile")
+        u_str = (unit or "m").strip().lower()
+        lu = LengthUnit.MILLIMETRE if u_str == "mm" else LengthUnit.METRE
+        profile = SteelProfile.from_name(sname, unit=lu)
+        if name:
+            profile.name = name
+
+    else:
+        raise ValueError(
+            "profile_type must be one of: 'I', 'L', 'rect', 'circle', 'hollow_circle', 'steel'"
+        )
+
+    json_out = json.dumps(profile.to_dict())
+    messages.append(f"OK  {profile.name or _pt}")
+
+except Exception as exc:
+    messages.append(f"ERR: {exc}")
 
 out = "\n".join(messages) if messages else "No profile processed."

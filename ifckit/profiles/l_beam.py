@@ -30,7 +30,12 @@ to X, the second to Y).
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+from ifckit.profiles.base import Profile
+
+if TYPE_CHECKING:
+    import ifcopenshell
 
 # Anchor → (x_fraction_of_width, y_fraction_of_height)
 _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
@@ -46,7 +51,7 @@ _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
 }
 
 
-class LBeamProfile:
+class LBeamProfile(Profile):
     """
     L-section (angle) profile.
 
@@ -154,8 +159,39 @@ class LBeamProfile:
             (oy,     oz + h),   # 5  top-left
         ]
 
-    def to_dict(self) -> dict:
+    profile_type = "l_beam"
+
+    def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """
+        Emit ``IfcLShapeProfileDef`` (native IFC parametric L-section).
+
+        The position is set at the anchor origin.
+        """
+        ox, oy = self._origin_offset()
+        # IfcLShapeProfileDef origin is at bottom-left corner of the bounding box.
+        # We shift the 2D placement so the anchor origin is at (0, 0) in profile space.
+        pos = ifc_file.create_entity(
+            "IfcAxis2Placement2D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint", Coordinates=[ox, oy]
+            ),
+        )
+        return ifc_file.create_entity(
+            "IfcLShapeProfileDef",
+            ProfileType="AREA",
+            ProfileName=self.name,
+            Position=pos,
+            Depth=self.height,
+            Width=self.width,
+            Thickness=self.thickness,
+            FilletRadius=None,
+            EdgeRadius=None,
+            LegSlope=None,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
+            "profile_type": self.profile_type,
             "name": self.name,
             "height": self.height,
             "width": self.width,
@@ -165,3 +201,13 @@ class LBeamProfile:
             "centroid_y": self.centroid_y,
             "centroid_z": self.centroid_z,
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "LBeamProfile":
+        return cls(
+            height=d["height"],
+            width=d["width"],
+            thickness=d["thickness"],
+            anchor=d.get("anchor", "sw"),
+            name=d.get("name", "L-Profile"),
+        )

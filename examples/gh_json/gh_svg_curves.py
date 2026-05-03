@@ -48,52 +48,7 @@ Workflow
 4.  Each run replaces the previous IFC-SVG objects (clear=True).
 """
 
-import os
-import sys
-import importlib
-
-# ---------------------------------------------------------------------------
-# Path setup — identical to gh_export_json.py
-# ---------------------------------------------------------------------------
-_fallback_path = r'/Users/Mauc/L140-py-ifckit'
-pkg_path = os.environ.get('IFCKIT_PATH', _fallback_path)
-if pkg_path not in sys.path:
-    sys.path.insert(0, pkg_path)
-
-# Force reload so Rhino picks up code changes without restarting.
-import ifckit
-import ifckit.geometry
-import ifckit.elements
-import ifckit.builders
-import ifckit.builders._geom
-import ifckit.builders.base
-import ifckit.builders.extruded
-import ifckit.builders.wall
-import ifckit.builders.slab
-import ifckit.builders.beam_factory
-import ifckit.builders.revolved_beam
-import ifckit.builders.bridge
-import ifckit.rhinokit
-import ifckit.rhino_import
-import ifckit.validator
-import ifckit.json_build
-
-importlib.reload(ifckit.geometry)
-importlib.reload(ifckit.elements)
-importlib.reload(ifckit.builders._geom)
-importlib.reload(ifckit.builders.base)
-importlib.reload(ifckit.builders.extruded)
-importlib.reload(ifckit.builders.wall)
-importlib.reload(ifckit.builders.slab)
-importlib.reload(ifckit.builders.beam_factory)
-importlib.reload(ifckit.builders.revolved_beam)
-importlib.reload(ifckit.builders.bridge)
-importlib.reload(ifckit.builders)
-importlib.reload(ifckit.rhinokit)
-importlib.reload(ifckit.rhino_import)
-importlib.reload(ifckit.validator)
-importlib.reload(ifckit.json_build)
-importlib.reload(ifckit)
+import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 # ---------------------------------------------------------------------------
 # Resolve inputs with sensible defaults

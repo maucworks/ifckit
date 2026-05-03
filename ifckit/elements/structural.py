@@ -15,7 +15,7 @@ from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Arc, Line, Plane, Vec
 
 # A profile point can be a Vec or a plain (x, y) or (x, y, z) tuple.
-# A profile source can also be any object with get_profile_points().
+# A profile source can also be any object with get_profile_points(), or a Profile.
 ProfilePoint = Union[Vec, Tuple[float, float], Tuple[float, float, float]]
 ProfileInput = Union[Sequence[ProfilePoint], Any]  # Any = duck-typed profile object
 
@@ -25,9 +25,11 @@ def _coerce_profile(profile: ProfileInput) -> List[Vec]:
     Coerce a profile to List[Vec].
 
     Accepts:
-      - Any object with a ``get_profile_points()`` method (e.g. IBeamProfile)
-      - A sequence of Vec
-      - A sequence of (x, y) or (x, y, z) tuples
+      - A ``Profile`` subclass instance (``ifckit.profiles.base.Profile``) — calls
+        ``get_profile_points()`` to obtain the outline.
+      - Any object with a ``get_profile_points()`` method (legacy duck-typing).
+      - A sequence of Vec.
+      - A sequence of (x, y) or (x, y, z) tuples.
     """
     if hasattr(profile, "get_profile_points"):
         profile = profile.get_profile_points()
@@ -87,6 +89,7 @@ class PendingExtrudedElement(PendingElement):
     ) -> None:
         super().__init__(name=name, style=style)
         self.axis = axis
+        self._profile_source = profile  # preserve original Profile object if given
         self.profile = _coerce_profile(profile)
         self.start_clip = start_clip
         self.end_clip = end_clip
@@ -121,7 +124,12 @@ class PendingExtrudedElement(PendingElement):
             "start": self.axis.start.to_tuple(),
             "end": self.axis.end.to_tuple(),
         }
-        d["profile"] = [p.to_tuple() for p in self.profile]
+        # Prefer to serialize the original profile object (preserves type + metadata).
+        from ifckit.profiles.base import Profile as _Profile
+        if isinstance(self._profile_source, _Profile):
+            d["profile"] = self._profile_source.to_dict()
+        else:
+            d["profile"] = [p.to_tuple() for p in self.profile]
         if self.up is not None:
             d["up"] = self.up.to_tuple()
         if self.start_clip is not None:
@@ -135,7 +143,13 @@ class PendingExtrudedElement(PendingElement):
         """Shared from_dict logic; subclasses call this."""
         axis_d = cls._require(d, "axis")
         axis = Line(Vec(*axis_d["start"]), Vec(*axis_d["end"]))
-        profile = [Vec(*pt) for pt in cls._require(d, "profile")]
+        profile_raw = cls._require(d, "profile")
+        # Profile can be a dict (Profile subclass) or a list of point tuples.
+        if isinstance(profile_raw, dict) and "profile_type" in profile_raw:
+            from ifckit.profiles.base import Profile as _Profile
+            profile: Any = _Profile.dispatch_from_dict(profile_raw)
+        else:
+            profile = [Vec(*pt) for pt in profile_raw]
         up_raw = d.get("up")
         up = Vec(*up_raw) if up_raw is not None else None
         return cls(
@@ -279,6 +293,7 @@ class PendingRevolvedBeam(PendingElement):
     ) -> None:
         super().__init__(name=name, style=style)
         self.arc = arc
+        self._profile_source = profile
         self.profile = _coerce_profile(profile)
         self.ref_line = ref_line
         self.cp_normal = cp_normal

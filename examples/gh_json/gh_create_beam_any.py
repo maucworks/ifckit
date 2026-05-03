@@ -25,41 +25,21 @@ json_out : list — List of JSON strings (one per beam).
 
 import math
 import json
-import os
-import sys
-import importlib
-
-_fallback_path = r'/Users/Mauc/L140-py-ifckit'
-pkg_path = os.environ.get('IFCKIT_PATH', _fallback_path)
-if pkg_path not in sys.path:
-    sys.path.insert(0, pkg_path)
-
-import ifckit
-import ifckit.geometry
-import ifckit.builders
-import ifckit.builders.beam_factory
-import ifckit.elements
-import ifckit.rhinokit
-
-importlib.reload(ifckit.geometry)
-importlib.reload(ifckit.elements)
-importlib.reload(ifckit.builders)
-importlib.reload(ifckit.builders.beam_factory)
-importlib.reload(ifckit.rhinokit)
-importlib.reload(ifckit)
+import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit import PendingBeam, PendingRevolvedBeam, Vec
+from ifckit.profiles import Profile
 import ifckit.rhinokit as rk
 from ifckit.builders.beam_factory import PathType, classify_path
 
 
 def _get_profile():
-    """Get profile from profile_json or profile_pts."""
+    """Get profile from profile_json (Profile.to_dict() format) or profile_pts."""
     if profile_json:
         try:
             data = json.loads(profile_json)
-            pts = data.get("profile", [])
-            return [Vec(*pt) for pt in pts]
+            if "profile_type" in data:
+                return Profile.dispatch_from_dict(data)
         except Exception:
             pass
 

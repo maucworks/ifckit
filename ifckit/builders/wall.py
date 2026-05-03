@@ -16,6 +16,7 @@ from ifckit.builders._geom import (
     local_placement,
     product_definition_shape,
     profile_from_points,
+    profile_to_ifc,
     project_profile_to_plane,
     shape_representation,
     shift_plane_elevation,

@@ -28,7 +28,12 @@ suitable for use as a PendingBeam / PendingColumn profile in ifckit.
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+from ifckit.profiles.base import Profile
+
+if TYPE_CHECKING:
+    import ifcopenshell
 
 # Anchor → (x_fraction_of_width, y_fraction_of_height)
 # Applied as: offset = (-fraction * width, -fraction * height)
@@ -45,7 +50,7 @@ _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
 }
 
 
-class IBeamProfile:
+class IBeamProfile(Profile):
     """
     Symmetric I-section profile.
 
@@ -159,8 +164,38 @@ class IBeamProfile:
             (ox - hw, oy + tf),  # 11 bottom-left inner flange
         ]
 
-    def to_dict(self) -> dict:
+    profile_type = "i_beam"
+
+    def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """
+        Emit ``IfcIShapeProfileDef`` (native IFC parametric I-section).
+
+        The 2D position is centred at the anchor origin.
+        """
+        ox, oy = self._origin_offset()
+        # IfcIShapeProfileDef is symmetric: centre of bounding box = centroid
+        # We place the 2D position at the anchor offset so the origin is correct.
+        pos = ifc_file.create_entity(
+            "IfcAxis2Placement2D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint", Coordinates=[-ox, -oy + self.height / 2]
+            ),
+        )
+        return ifc_file.create_entity(
+            "IfcIShapeProfileDef",
+            ProfileType="AREA",
+            ProfileName=self.name,
+            Position=pos,
+            OverallWidth=self.width,
+            OverallDepth=self.height,
+            WebThickness=self.web_thickness,
+            FlangeThickness=self.flange_thickness,
+            FilletRadius=None,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
+            "profile_type": self.profile_type,
             "name": self.name,
             "height": self.height,
             "width": self.width,
@@ -170,3 +205,14 @@ class IBeamProfile:
             "area": self.area,
             "centroid_z": self.centroid_z,
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "IBeamProfile":
+        return cls(
+            height=d["height"],
+            width=d["width"],
+            web_thickness=d["web_thickness"],
+            flange_thickness=d["flange_thickness"],
+            anchor=d.get("anchor", "s"),
+            name=d.get("name", "I-Profile"),
+        )

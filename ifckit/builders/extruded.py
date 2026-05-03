@@ -46,6 +46,7 @@ from ifckit.builders._geom import (
     local_placement,
     product_definition_shape,
     profile_from_points,
+    profile_to_ifc,
     pt3,
     shape_representation,
     storey_elevation,
@@ -115,7 +116,15 @@ class ExtrudedElementBuilder(BaseBuilder):
         )
 
         pts_2d = [(p.x, p.y) for p in pending.profile]
-        profile = profile_from_points(ifc_file, pts_2d)
+        # Use the original profile source (Profile object) when available so we
+        # emit the correct native IFC type (e.g. IfcIShapeProfileDef).
+        # Fall back to the already-projected 2D point list for plain Vec lists.
+        profile_source = getattr(pending, "_profile_source", None)
+        from ifckit.profiles.base import Profile as _Profile
+        if isinstance(profile_source, _Profile):
+            profile = profile_to_ifc(ifc_file, profile_source)
+        else:
+            profile = profile_from_points(ifc_file, pts_2d)
         solid = extrude_profile(
             ifc_file,
             profile,

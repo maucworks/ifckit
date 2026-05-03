@@ -18,6 +18,7 @@ json_out : list — List of JSON strings (one per wall).
 """
 
 import json
+import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 from ifckit import PendingWall, Plane, rhinokit as rk
 
 messages = []

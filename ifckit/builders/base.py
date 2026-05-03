@@ -100,17 +100,11 @@ class BaseBuilder(ABC, IIfcBuilder):
 
         # 4. Write EPset_IfcKit.HatchPattern pset if set
         if getattr(pending, "hatch_pattern", ""):
-            ifcopenshell.api.run(
+            pset = ifcopenshell.api.run(
                 "pset.add_pset",
                 ifc_file,
                 product=entity,
                 name="EPset_IfcKit",
-            )
-            pset = next(
-                r.RelatingPropertyDefinition
-                for r in entity.IsDefinedBy
-                if r.is_a("IfcRelDefinesByProperties")
-                and r.RelatingPropertyDefinition.Name == "EPset_IfcKit"
             )
             ifcopenshell.api.run(
                 "pset.edit_pset",

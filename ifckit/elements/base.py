@@ -50,6 +50,8 @@ class PendingElement(metaclass=RegisterElementType):
             d["clip_data"] = self.clip_data
         if self.style is not None:
             d["style"] = self.style.to_dict()
+        if self.hatch_pattern:
+            d["hatch_pattern"] = self.hatch_pattern
         return d
 
     def to_json(self, **kwargs) -> str:
@@ -104,6 +106,11 @@ class PendingElement(metaclass=RegisterElementType):
         """Helper: deserialise optional style from dict."""
         raw = d.get("style")
         return RenderStyle.from_dict(raw) if raw is not None else None
+
+    @classmethod
+    def _hatch_pattern_from_dict(cls, d: Dict[str, Any]) -> str:
+        """Helper: deserialise optional hatch_pattern from dict."""
+        return d.get("hatch_pattern", "")
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"

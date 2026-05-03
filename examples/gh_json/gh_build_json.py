@@ -25,6 +25,7 @@ json_out : str — Full IFC project JSON ready for Export/Preview node.
 """
 
 import json
+import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 out = ""
 json_out = ""

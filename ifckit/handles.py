@@ -104,6 +104,45 @@ class StoreyHandle(Handle):
         """Validate and build *pending*, placing it in this storey."""
         return self._model_ref.add(pending, self)
 
+    def add_space(
+        self,
+        footprint: list,
+        height: float,
+        name: str = "",
+        long_name: str = "",
+        predefined_type: str = "SPACE",
+        style=None,
+        hatch_pattern: str = "",
+    ) -> "EntityHandle":
+        """Create and build a ``PendingSpace`` in this storey.
+
+        Convenience wrapper around ``storey.add(PendingSpace(...))``.
+
+        Args:
+            footprint:       List of ``Vec`` points (closed or implicitly closed).
+            height:          Clear room height in document units.
+            name:            Space number / identifier (``IfcSpace.Name``).
+            long_name:       Descriptive room name (``IfcSpace.LongName``).
+            predefined_type: IFC predefined type string (default ``"SPACE"``).
+            style:           Optional ``RenderStyle``.
+            hatch_pattern:   Rhino hatch pattern name.
+
+        Returns:
+            ``EntityHandle`` wrapping the created ``IfcSpace``.
+        """
+        from ifckit.elements.space import PendingSpace
+
+        pending = PendingSpace(
+            footprint=footprint,
+            height=height,
+            name=name,
+            long_name=long_name,
+            predefined_type=predefined_type,
+            style=style,
+            hatch_pattern=hatch_pattern,
+        )
+        return self.add(pending)
+
     def clear(self) -> int:
         """
         Remove all elements contained in this storey.

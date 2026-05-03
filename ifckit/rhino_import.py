@@ -2,8 +2,9 @@
 ifckit.rhino_import
 ===================
 
-Import IFC geometry into Rhino as meshes (``IfcMeshImporter``) or as 2-D
-curves and hatches derived from an SVG floor-plan view (``IfcSvgImporter``).
+Import IFC geometry into Rhino as meshes (``IfcMeshImporter``), as 2-D
+curves and hatches derived from an SVG floor-plan view (``IfcSvgImporter``),
+or as space fills and annotations (``IfcSpaceImporter``).
 
 Requires: Rhino 8+ with ifcopenshell installed.
 
@@ -125,13 +126,33 @@ def _ensure_layer(doc: Any, path: str, cache: dict) -> int:
                     parent_layer = doc.Layers[parent_layer_index]
                     layer.ParentLayerId = parent_layer.Id
 
-        index = doc.Layers.Add(layer)
+        # Layer may already exist (e.g. from a previous run); find it first.
+        existing = doc.Layers.FindByFullPath(current_path, -1)
+        if existing >= 0:
+            index = existing
+        else:
+            index = doc.Layers.Add(layer)
         if index < 0:
             raise RuntimeError(f"Failed to create Rhino layer: {current_path!r}")
         cache[current_path] = index
 
     result = cache[path]
     return result if result >= 0 else 0
+
+
+def _delete_layer_recursive(doc: Any, layer_index: int) -> None:
+    """Recursively delete a Rhino layer and all its children.
+
+    Args:
+        doc:         Rhino document (``RhinoDoc``).
+        layer_index: Index of the layer to delete.  No-op when negative.
+    """
+    if layer_index < 0:
+        return
+    children = doc.Layers[layer_index].GetChildren()
+    for child in children or []:
+        _delete_layer_recursive(doc, child.Index)
+    doc.Layers.Delete(layer_index, False)
 
 
 def _colour_from_item(item: Any) -> Optional[tuple]:
@@ -375,14 +396,7 @@ class IfcMeshImporter:
 
     def _delete_layer_recursive(self, layer_index: int) -> None:
         """Recursively delete layer and all its children."""
-        if layer_index < 0:
-            return
-
-        children = self.doc.Layers[layer_index].GetChildren()
-        for child in children or []:
-            self._delete_layer_recursive(child.Index)
-
-        self.doc.Layers.Delete(layer_index, False)
+        _delete_layer_recursive(self.doc, layer_index)
 
     def _get_element_spatial_hierarchy(
         self, element: Any, ifc_file: Any
@@ -990,7 +1004,7 @@ def _segments_to_rhino(
 
     Returns:
         ``(open_curves, closed_curves)`` — Rhino ``Curve`` objects.
-        Closed curves appear in *both* lists.
+        A curve appears in exactly one list.
     """
     import Rhino
 
@@ -1127,9 +1141,10 @@ def _segments_to_rhino(
         if not crv.IsValid:
             continue
 
-        open_curves.append(crv)
         if is_closed:
             closed_curves.append(crv)
+        else:
+            open_curves.append(crv)
 
     return open_curves, closed_curves
 
@@ -1204,11 +1219,13 @@ class IfcSvgImporter:
         self,
         doc: Any = None,
         layer_root: str = "IFC-SVG",
+        hatch_pattern: str = "Solid",
         hatch_map: Optional[dict] = None,
     ) -> None:
         import Rhino
         self.doc = doc if doc is not None else Rhino.RhinoDoc.ActiveDoc
         self.layer_root = layer_root
+        self._default_hatch_pattern = hatch_pattern
         self.hatch_map: dict[str, str] = dict(BONSAI_HATCH_MAP)
         if hatch_map:
             self.hatch_map.update(hatch_map)
@@ -1249,6 +1266,8 @@ class IfcSvgImporter:
         ifc_model: Any,
         hlr_poly: bool = True,
         mesher_deflection: Optional[float] = None,
+        drawing_filter: Optional[str] = None,
+        destination_plane: Any = None,
     ) -> dict[str, int]:
         """Import curves and hatches from an ifcopenshell model or
         ``ifckit.IfcModel``.
@@ -1266,6 +1285,16 @@ class IfcSvgImporter:
             mesher_deflection:  OCC mesher linear deflection in metres.
                                 ``None`` = ifcopenshell default.  Try ``0.01`` for
                                 a significant speedup on curved profiles.
+            drawing_filter:     If given, only the drawing with this exact name
+                                is imported; all others are skipped.  A warning
+                                is issued when no matching drawing is found.
+            destination_plane:  Optional ``Rhino.Geometry.Plane``.  When
+                                provided, all curves and hatches are transformed
+                                from the section plane (``src_plane`` from the
+                                SVG ``ifc:plane`` attribute) to this plane using
+                                ``Transform.PlaneToPlane(src, dest)``.  Scale
+                                is always 1:1.  When ``None``, objects remain
+                                on the section plane as usual.
 
         Returns:
             ``{"curves": int, "hatches": int}``
@@ -1288,6 +1317,18 @@ class IfcSvgImporter:
             warnings.warn("IfcSvgImporter: no DRAWING annotations found in IFC file.")
             return {"curves": 0, "hatches": 0}
 
+        if drawing_filter is not None:
+            matched = [a for a in drawings if (a.Name or a.GlobalId) == drawing_filter]
+            if not matched:
+                import warnings
+                available = [a.Name or a.GlobalId for a in drawings]
+                warnings.warn(
+                    f"IfcSvgImporter: drawing {drawing_filter!r} not found. "
+                    f"Available: {available}"
+                )
+                return {"curves": 0, "hatches": 0}
+            drawings = matched
+
         total_curves = 0
         total_hatches = 0
 
@@ -1308,7 +1349,8 @@ class IfcSvgImporter:
             n_paths = len(_re.findall(rb'<path', svg_bytes if isinstance(svg_bytes, bytes) else svg_bytes.encode()))
             print(f"[ifckit]   SVG ok: {len(svg_bytes)} bytes, {n_paths} paths  ({_time.time()-t0:.1f}s)")
             t1 = _time.time()
-            result = self._process_svg(svg_bytes, drawing_name, uf)
+            result = self._process_svg(svg_bytes, drawing_name, uf,
+                                       destination_plane=destination_plane)
             print(f"[ifckit]   processed: curves={result['curves']} hatches={result['hatches']}  ({_time.time()-t1:.1f}s)")
             total_curves  += result["curves"]
             total_hatches += result["hatches"]
@@ -1341,21 +1383,60 @@ class IfcSvgImporter:
 
         return len(to_delete)
 
+    def clear_drawing(self, drawing_name: str) -> int:
+        """Remove all objects belonging to *drawing_name* (tagged
+        ``ifc_svg_drawing == drawing_name``) and delete its sublayer.
+
+        Unlike :meth:`clear`, this leaves all other drawings untouched.
+
+        Args:
+            drawing_name: Exact drawing name as used in the layer hierarchy
+                          and ``ifc_svg_drawing`` user-string.
+
+        Returns:
+            Number of objects removed.
+        """
+        to_delete = []
+        for obj in self.doc.Objects:
+            try:
+                if obj.Attributes.GetUserString("ifc_svg_drawing") == drawing_name:
+                    to_delete.append(obj.Id)
+            except Exception:
+                pass
+        for obj_id in to_delete:
+            obj = self.doc.Objects.Find(obj_id)
+            if obj:
+                self.doc.Objects.Delete(obj, True)
+
+        # Remove cached layer entries for this drawing.
+        prefix = f"{self.layer_root}::{drawing_name}"
+        for key in list(self._layer_cache):
+            if key == prefix or key.startswith(prefix + "::"):
+                del self._layer_cache[key]
+
+        # Delete the drawing sublayer tree by scanning all layers for the
+        # full path  "<layer_root>::<drawing_name>".
+        for i in range(self.doc.Layers.Count - 1, -1, -1):
+            try:
+                lyr = self.doc.Layers[i]
+                if lyr.FullPath == prefix:
+                    self._delete_layer_recursive(lyr.Index)
+                    break
+            except Exception:
+                pass
+
+        return len(to_delete)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     def _delete_layer_recursive(self, layer_index: int) -> None:
-        if layer_index < 0:
-            return
-        children = self.doc.Layers[layer_index].GetChildren()
-        for child in children or []:
-            self._delete_layer_recursive(child.Index)
-        self.doc.Layers.Delete(layer_index, False)
+        _delete_layer_recursive(self.doc, layer_index)
 
     def _resolve_hatch_pattern(self) -> None:
-        """Find the Solid hatch pattern index in the document."""
-        self._hatch_pattern_index = self._pattern_index_by_name("Solid")
+        """Find the default hatch pattern index in the document."""
+        self._hatch_pattern_index = self._pattern_index_by_name(self._default_hatch_pattern)
 
     def _pattern_index_by_name(self, name: str) -> int:
         """Return the Rhino hatch-pattern index for *name*, or 0 as fallback."""
@@ -1500,12 +1581,14 @@ class IfcSvgImporter:
         svg_bytes: bytes,
         drawing_name: str,
         uf: float,
+        destination_plane: Any = None,
     ) -> dict[str, int]:
         """Parse SVG bytes for one drawing and add curves + hatches to Rhino.
 
         The section plane geometry is already encoded in the IFC annotation;
-        all curves are placed at ``z = 0`` in Rhino (the drawing is in its own
-        section plane coordinate system).
+        curves are normally placed on the section plane in world space.
+        When *destination_plane* is given, that Rhino Plane is used instead
+        so curves are drawn directly onto the destination plane (scale 1:1).
 
         Layer structure::
 
@@ -1525,11 +1608,21 @@ class IfcSvgImporter:
             svg_bytes:    Raw SVG output from ``ifcopenshell.draw``.
             drawing_name: Name used as the layer and group name.
             uf:           Rhino unit factor (metres → Rhino units).
+
+        Returns:
+            dict with keys ``"curves"``, ``"hatches"``, ``"guids"`` (list of
+            Rhino GUIDs for all added objects), and ``"src_plane"`` (the
+            ``Rhino.Geometry.Plane`` of the section, or ``None`` when not
+            found in the SVG).
         """
         import System
         import warnings
 
-        root = ET.fromstring(svg_bytes)
+        try:
+            root = ET.fromstring(svg_bytes)
+        except ET.ParseError as exc:
+            warnings.warn(f"_process_svg: invalid SVG XML — {exc}")
+            return {"curves": 0, "hatches": 0, "guids": []}
         IFC_NS = self._NS["ifc"]
 
         n_curves  = 0
@@ -1562,7 +1655,14 @@ class IfcSvgImporter:
 
             segs = _parse_path_d(d)
             if plane is not None:
-                sc, tx, ty = transform if transform is not None else (1.0, 0.0, 0.0)
+                if transform is None:
+                    warnings.warn(
+                        f"_handle_path: plane-mode path has no ifc:matrix3 transform; "
+                        f"SVG coordinates will be used as-is (likely incorrect placement)."
+                    )
+                    sc, tx, ty = 1.0, 0.0, 0.0
+                else:
+                    sc, tx, ty = transform
                 open_crvs, closed_crvs = _segments_to_rhino(segs, 0.0, sc, tx, ty, uf, plane=plane)
             elif transform is not None:
                 sc, tx, ty = transform
@@ -1575,8 +1675,11 @@ class IfcSvgImporter:
 
             nc = nh = 0
             path_guids: list = []
+            # open_crvs: open polylines/splines; closed_crvs: closed loops.
+            # Draw open curves always; draw closed curves as outlines too
+            # (hatches are added separately below for cut groups).
             for crv in open_crvs + closed_crvs:
-                g = self._add_curve(crv, c_idx, ifc_guid, fill)
+                g = self._add_curve(crv, c_idx, ifc_guid, fill, drawing_name)
                 if g is not None:
                     path_guids.append(g)
                 nc += 1
@@ -1584,7 +1687,7 @@ class IfcSvgImporter:
             if closed_crvs and fill is not None and group_name == "cut":
                 hatch_layer = f"{self.layer_root}::{drawing_name}::cut_hatch::{effective_type or 'Unknown'}"
                 h_idx = _ensure_layer(self.doc, hatch_layer, self._layer_cache)
-                nh, hatch_guids = self._add_hatches(closed_crvs, h_idx, ifc_guid, fill)
+                nh, hatch_guids = self._add_hatches(closed_crvs, h_idx, ifc_guid, fill, drawing_name)
                 path_guids.extend(hatch_guids)
 
             return nc, nh, path_guids
@@ -1652,6 +1755,31 @@ class IfcSvgImporter:
                 plane_attr   = top_g.get(f"{{{IFC_NS}}}plane", "")
                 transform = _parse_matrix3(matrix3_attr)
                 plane     = _parse_ifc_plane(plane_attr)
+                print(f"[ifckit]   section branch: transform={transform is not None}, plane={plane is not None}, destination_plane={destination_plane is not None}")
+                # If a destination plane is given, replace the world-placement
+                # part of the matrix with it so _segments_to_rhino draws
+                # directly onto dest_plane.  The ifc:matrix3 scale/offset is
+                # kept for SVG→local coordinate conversion.
+                if destination_plane is not None:
+                    import Rhino
+                    dp = destination_plane
+                    print(f"[ifckit]   destination_plane origin={dp.Origin}, xaxis={dp.XAxis}, zaxis={dp.ZAxis}, uf={uf}")
+                    if plane is None:
+                        # No ifc:plane in SVG — build identity-like matrix at dest origin
+                        plane = [
+                            1.0, 0.0, 0.0, dp.Origin.X / uf,
+                            0.0, 1.0, 0.0, dp.Origin.Y / uf,
+                            0.0, 0.0, 1.0, dp.Origin.Z / uf,
+                            0.0, 0.0, 0.0, 1.0,
+                        ]
+                    else:
+                        # Replace world-placement axes+origin with dest_plane
+                        plane = [
+                            dp.XAxis.X,  dp.YAxis.X,  dp.ZAxis.X,  dp.Origin.X / uf,
+                            dp.XAxis.Y,  dp.YAxis.Y,  dp.ZAxis.Y,  dp.Origin.Y / uf,
+                            dp.XAxis.Z,  dp.YAxis.Z,  dp.ZAxis.Z,  dp.Origin.Z / uf,
+                            0.0,         0.0,          0.0,          1.0,
+                        ]
                 _process_storey_or_section(top_g, transform, plane=plane)
 
         # Group all objects for this drawing
@@ -1666,7 +1794,7 @@ class IfcSvgImporter:
             except Exception as exc:
                 warnings.warn(f"IfcSvgImporter: could not create group for '{drawing_name}': {exc}")
 
-        return {"curves": n_curves, "hatches": n_hatches}
+        return {"curves": n_curves, "hatches": n_hatches, "guids": drawing_guids}
 
     # ------------------------------------------------------------------
     # Object creation
@@ -1677,16 +1805,27 @@ class IfcSvgImporter:
         layer_index: int,
         ifc_guid: str,
         colour: Optional[tuple[int, int, int]],
+        drawing_name: str = "",
     ) -> Any:
-        """Build ``ObjectAttributes`` with layer, GUID tag and colour."""
+        """Build ``ObjectAttributes`` with layer, GUID tag and colour.
+
+        Args:
+            layer_index:   Target Rhino layer index.
+            ifc_guid:      IFC element GUID (written as ``ifc_guid`` user-string).
+            colour:        RGB object colour, or ``None`` to use layer colour.
+            drawing_name:  Drawing name written as ``ifc_svg_drawing`` user-string.
+                           Used by :meth:`clear_drawing` to scope removal to one drawing.
+        """
         import Rhino
         import System.Drawing
 
         attrs = Rhino.DocObjects.ObjectAttributes()
         attrs.LayerIndex = layer_index
-        attrs.SetUserString("ifc_svg",  "1")
+        attrs.SetUserString("ifc_svg", "1")
         if ifc_guid:
             attrs.SetUserString("ifc_guid", ifc_guid)
+        if drawing_name:
+            attrs.SetUserString("ifc_svg_drawing", drawing_name)
         if colour is not None:
             r, g, b = colour
             attrs.ColorSource = (
@@ -1701,13 +1840,14 @@ class IfcSvgImporter:
         layer_index: int,
         ifc_guid: str,
         colour: Optional[tuple[int, int, int]],
+        drawing_name: str = "",
     ) -> Any:
         """Add a single curve to the document.
 
         Returns:
             Rhino object ``Guid``, or ``None`` on failure.
         """
-        attrs = self._make_attributes(layer_index, ifc_guid, colour)
+        attrs = self._make_attributes(layer_index, ifc_guid, colour, drawing_name)
         return self.doc.Objects.AddCurve(crv, attrs)
 
     def _add_hatches(
@@ -1716,17 +1856,19 @@ class IfcSvgImporter:
         layer_index: int,
         ifc_guid: str,
         colour: tuple[int, int, int],
-    ) -> int:
+        drawing_name: str = "",
+    ) -> tuple[int, list]:
         """Create Rhino hatches from a list of closed boundary curves.
 
         Args:
-            boundaries:  Closed ``Curve`` objects to use as hatch boundaries.
-            layer_index: Target layer.
-            ifc_guid:    IFC GUID for user-string tagging.
-            colour:      RGB fill colour.
+            boundaries:   Closed ``Curve`` objects to use as hatch boundaries.
+            layer_index:  Target layer.
+            ifc_guid:     IFC GUID for user-string tagging.
+            colour:       RGB fill colour.
+            drawing_name: Drawing name written as ``ifc_svg_drawing`` user-string.
 
         Returns:
-            Number of hatch objects successfully added.
+            ``(count, guids)`` — number of hatch objects added and their Rhino GUIDs.
         """
         import Rhino
 
@@ -1735,7 +1877,9 @@ class IfcSvgImporter:
         # Per-element override from EPset_IfcKit.HatchPattern
         if ifc_guid and ifc_guid in self._guid_hatch_index:
             pat_idx = self._guid_hatch_index[ifc_guid]
-        tol = max(self.doc.ModelAbsoluteTolerance, 0.1)
+        # Use the document tolerance; clamp from below only at a very small
+        # value so we never pass tol=0 to Hatch.Create, regardless of units.
+        tol = max(self.doc.ModelAbsoluteTolerance, 1e-6)
 
         guids: list = []
         for boundary in boundaries:
@@ -1767,7 +1911,7 @@ class IfcSvgImporter:
                 continue
 
             move_up = Rhino.Geometry.Transform.Translation(0.0, 0.0, z_elev)
-            attrs = self._make_attributes(layer_index, ifc_guid, colour)
+            attrs = self._make_attributes(layer_index, ifc_guid, colour, drawing_name)
             for hatch in hatches:
                 if hatch and hatch.IsValid:
                     hatch.Transform(move_up)
@@ -1777,4 +1921,402 @@ class IfcSvgImporter:
                     added += 1
 
         return added, guids
+
+
+# ---------------------------------------------------------------------------
+# IfcSpaceImporter
+# ---------------------------------------------------------------------------
+
+class IfcSpaceImporter:
+    """Import ``IfcSpace`` entities from an IFC file into Rhino.
+
+    For each space this importer can create:
+
+    * **2-D footprint curves** on a per-storey layer hierarchy.
+    * **Hatch fills** using the space's ``RenderStyle`` colour (or a
+      configurable default colour).
+    * **TextDot annotations** with space name, long name and area.
+    * **3-D mesh body** via ``ifcopenshell.geom.iterator``
+      (same pipeline as ``IfcMeshImporter``).
+
+    Layer hierarchy::
+
+        IFC-Spaces
+         └── <StoreyName>
+              ├── footprint   ← 2-D boundary curves
+              ├── hatch       ← filled hatches
+              ├── annotation  ← TextDot labels
+              └── mesh        ← 3-D mesh bodies
+
+    Args:
+        doc:             Rhino document.  Defaults to ``RhinoDoc.ActiveDoc``.
+        layer_root:      Root layer name.  Default ``"IFC-Spaces"``.
+        default_color:   ``System.Drawing.Color`` used when the space has no
+                         ``RenderStyle``.  Default: light yellow.
+        hatch_pattern:   Rhino hatch pattern name for all spaces.
+                         Default ``"Solid"``.
+        import_footprint: Draw 2-D footprint curves.  Default ``True``.
+        import_hatch:    Draw hatch fills.  Default ``True``.
+        import_annotation: Draw TextDot labels.  Default ``True``.
+        import_mesh:     Tessellate and draw 3-D bodies.  Default ``False``.
+        mesh_quality:    Tessellation quality preset for mesh bodies.
+                         One of ``superfine/fine/default/coarse/supercoarse``.
+    """
+
+    def __init__(
+        self,
+        doc: Any = None,
+        layer_root: str = "IFC-Spaces",
+        default_color: Any = None,
+        hatch_pattern: str = "Solid",
+        import_footprint: bool = True,
+        import_hatch: bool = True,
+        import_annotation: bool = True,
+        import_mesh: bool = False,
+        mesh_quality: str = "default",
+    ) -> None:
+        import Rhino
+        import System.Drawing
+
+        self.doc = doc if doc is not None else Rhino.RhinoDoc.ActiveDoc
+        self.layer_root = layer_root
+        self.default_color = (
+            default_color
+            if default_color is not None
+            else System.Drawing.Color.FromArgb(255, 255, 220)
+        )
+        self.hatch_pattern = hatch_pattern
+        self.import_footprint = import_footprint
+        self.import_hatch = import_hatch
+        self.import_annotation = import_annotation
+        self.import_mesh = import_mesh
+        if mesh_quality not in MESH_QUALITY:
+            raise ValueError(f"mesh_quality must be one of {list(MESH_QUALITY)}")
+        self._mesh_linear_defl, self._mesh_angular_defl = MESH_QUALITY[mesh_quality]
+        self._layer_cache: dict = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def import_file(self, ifc_path: str) -> dict:
+        """Import all ``IfcSpace`` entities from *ifc_path* into Rhino.
+
+        Args:
+            ifc_path: Absolute path to the ``.ifc`` file.
+
+        Returns:
+            Dict with keys ``"spaces"``, ``"footprints"``, ``"hatches"``,
+            ``"annotations"``, ``"meshes"``.
+        """
+        import ifcopenshell
+
+        ifc = ifcopenshell.open(ifc_path)
+        return self._import_ifc(ifc)
+
+    def import_model(self, model: Any) -> dict:
+        """Import ``IfcSpace`` entities from an ``IfcModel`` instance.
+
+        Args:
+            model: ``ifckit.model.IfcModel`` instance.
+
+        Returns:
+            Same dict as :meth:`import_file`.
+        """
+        return self._import_ifc(model._file)
+
+    def clear(self) -> int:
+        """Remove all objects on layers under *layer_root*.
+
+        Returns:
+            Number of objects deleted.
+        """
+        import Rhino
+
+        root_idx = self.doc.Layers.FindByFullPath(self.layer_root, -1)
+        if root_idx < 0:
+            return 0
+        removed = _delete_layer_recursive(self.doc, root_idx)
+        self._layer_cache.clear()
+        return removed
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    def _import_ifc(self, ifc: Any) -> dict:
+        import Rhino
+        import Rhino.Geometry as rg
+        import System.Drawing
+
+        spaces = ifc.by_type("IfcSpace")
+        if not spaces:
+            return {"spaces": 0, "footprints": 0, "hatches": 0,
+                    "annotations": 0, "meshes": 0}
+
+        uf = self._unit_factor(ifc)
+
+        n_footprints = 0
+        n_hatches = 0
+        n_annotations = 0
+        n_meshes = 0
+
+        for space in spaces:
+            storey_name = self._storey_name(space)
+            name      = space.Name      or ""
+            long_name = getattr(space, "LongName", None) or ""
+            color     = self._space_color(space)
+
+            # Layer paths
+            fp_layer   = f"{self.layer_root}::{storey_name}::footprint"
+            ht_layer   = f"{self.layer_root}::{storey_name}::hatch"
+            ann_layer  = f"{self.layer_root}::{storey_name}::annotation"
+            mesh_layer = f"{self.layer_root}::{storey_name}::mesh"
+
+            # Footprint curves
+            pts = self._footprint_points(space, uf)
+            if pts and self.import_footprint:
+                curve = self._pts_to_curve(pts)
+                if curve is not None:
+                    idx = _ensure_layer(self.doc, fp_layer, self._layer_cache)
+                    attr = Rhino.DocObjects.ObjectAttributes()
+                    attr.LayerIndex = idx
+                    self.doc.Objects.AddCurve(curve, attr)
+                    n_footprints += 1
+
+            # Hatch
+            if pts and self.import_hatch:
+                area = self._polygon_area(pts)
+                n_hatches += self._add_hatch(pts, ht_layer, color)
+
+            # TextDot annotation
+            if pts and self.import_annotation:
+                cx, cy = self._centroid(pts)
+                area = self._polygon_area(pts)
+                area_uf = uf * uf  # length² → area unit conversion
+                area_m2 = area / area_uf  # footprint pts are in Rhino units
+                label_parts = [p for p in [name, long_name] if p]
+                label_parts.append(f"{area_m2:.1f} m²")
+                label = "\n".join(label_parts)
+                dot = rg.TextDot(label, rg.Point3d(cx, cy, 0.0))
+                idx = _ensure_layer(self.doc, ann_layer, self._layer_cache)
+                attr = Rhino.DocObjects.ObjectAttributes()
+                attr.LayerIndex = idx
+                self.doc.Objects.AddTextDot(dot, attr)
+                n_annotations += 1
+
+            # 3-D mesh
+            if self.import_mesh:
+                n_meshes += self._add_mesh(ifc, space, mesh_layer, uf)
+
+        return {
+            "spaces":      len(spaces),
+            "footprints":  n_footprints,
+            "hatches":     n_hatches,
+            "annotations": n_annotations,
+            "meshes":      n_meshes,
+        }
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _unit_factor(self, ifc: Any) -> float:
+        """Return scale factor: IFC file units → Rhino document units."""
+        import Rhino
+        import ifcopenshell.util.unit as ifc_unit
+
+        rhino_unit = self.doc.ModelUnitSystem
+        unit_map = {
+            Rhino.UnitSystem.Millimeters: 1000.0,
+            Rhino.UnitSystem.Centimeters: 100.0,
+            Rhino.UnitSystem.Meters:      1.0,
+            Rhino.UnitSystem.Feet:        3.28084,
+            Rhino.UnitSystem.Inches:      39.3701,
+        }
+        rhino_factor = unit_map.get(rhino_unit, 1.0)
+        try:
+            prefix = ifc_unit.get_prefix_multiplier(
+                ifc_unit.get_project_unit(ifc, "LENGTHUNIT").Prefix
+            )
+        except Exception:
+            prefix = 1.0
+        return (prefix or 1.0) * rhino_factor
+
+    def _storey_name(self, space: Any) -> str:
+        """Return the containing storey name for a space, or 'Unknown'."""
+        try:
+            for rel in space.Decomposes or []:
+                obj = rel.RelatingObject
+                if obj.is_a("IfcBuildingStorey"):
+                    return obj.Name or "Storey"
+        except Exception:
+            pass
+        try:
+            for rel in space.ContainedInStructure or []:
+                obj = rel.RelatingStructure
+                if obj.is_a("IfcBuildingStorey"):
+                    return obj.Name or "Storey"
+        except Exception:
+            pass
+        return "Unknown"
+
+    def _space_color(self, space: Any) -> Any:
+        """Return ``System.Drawing.Color`` for a space from its style pset or default."""
+        import System.Drawing
+
+        try:
+            for rel in space.IsDefinedBy or []:
+                if not rel.is_a("IfcRelDefinesByProperties"):
+                    continue
+                pset = rel.RelatingPropertyDefinition
+                if not hasattr(pset, "HasProperties"):
+                    continue
+                for prop in pset.HasProperties:
+                    if prop.Name == "Color" and hasattr(prop, "NominalValue"):
+                        val = prop.NominalValue.wrappedValue
+                        # Expect "R,G,B" string
+                        parts = str(val).split(",")
+                        if len(parts) == 3:
+                            r, g, b = (int(p.strip()) for p in parts)
+                            return System.Drawing.Color.FromArgb(r, g, b)
+        except Exception:
+            pass
+        return self.default_color
+
+    def _footprint_points(self, space: Any, uf: float) -> list:
+        """Extract 2-D footprint polygon from IfcSpace geometry (world XY).
+
+        Returns a list of ``(x, y)`` tuples in Rhino document units, or ``[]``
+        if no footprint can be extracted.
+        """
+        try:
+            import ifcopenshell.geom
+            import ifcopenshell.util.shape as shape_util
+
+            s = ifcopenshell.geom.settings()
+            s.set(s.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(s, space)
+            verts = shape.geometry.verts   # flat list x0,y0,z0, x1,y1,z1, …
+            faces = shape.geometry.faces   # flat list of triangle indices
+
+            # Find the lowest Z face (floor boundary) as the footprint.
+            pts3 = [(verts[i * 3] * uf,
+                     verts[i * 3 + 1] * uf,
+                     verts[i * 3 + 2] * uf)
+                    for i in range(len(verts) // 3)]
+
+            if not pts3:
+                return []
+
+            min_z = min(p[2] for p in pts3)
+            floor_pts = [(p[0], p[1]) for p in pts3 if abs(p[2] - min_z) < 1e-3 * uf]
+
+            # Deduplicate while preserving rough order (convex hull order not needed).
+            seen = set()
+            unique = []
+            for p in floor_pts:
+                key = (round(p[0], 4), round(p[1], 4))
+                if key not in seen:
+                    seen.add(key)
+                    unique.append(p)
+
+            return unique if len(unique) >= 3 else []
+
+        except Exception:
+            return []
+
+    def _pts_to_curve(self, pts: list) -> Any:
+        """Convert (x,y) list to a closed Rhino NurbsCurve."""
+        import Rhino.Geometry as rg
+
+        rhino_pts = [rg.Point3d(x, y, 0.0) for x, y in pts]
+        rhino_pts.append(rhino_pts[0])  # close
+        return rg.NurbsCurve.CreateFromPoints(rhino_pts, degree=1)
+
+    def _polygon_area(self, pts: list) -> float:
+        """Shoelace area of a 2-D polygon [(x,y), …] (absolute value)."""
+        n = len(pts)
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            area += pts[i][0] * pts[j][1]
+            area -= pts[j][0] * pts[i][1]
+        return abs(area) / 2.0
+
+    def _centroid(self, pts: list) -> tuple:
+        """Return the centroid (cx, cy) of a polygon."""
+        cx = sum(p[0] for p in pts) / len(pts)
+        cy = sum(p[1] for p in pts) / len(pts)
+        return cx, cy
+
+    def _add_hatch(self, pts: list, layer_path: str, color: Any) -> int:
+        """Add a hatch fill for a footprint polygon.  Returns 1 on success."""
+        import Rhino
+        import Rhino.Geometry as rg
+
+        try:
+            curve = self._pts_to_curve(pts)
+            if curve is None or not curve.IsValid:
+                return 0
+
+            hp_index = self.doc.HatchPatterns.Find(self.hatch_pattern, True)
+            if hp_index < 0:
+                hp_index = 0  # fallback to first pattern
+
+            hatches = rg.Hatch.Create(curve, hp_index, 0.0, 1.0, 1e-6)
+            if not hatches:
+                return 0
+
+            idx = _ensure_layer(self.doc, layer_path, self._layer_cache)
+            attr = Rhino.DocObjects.ObjectAttributes()
+            attr.LayerIndex = idx
+            attr.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject
+            attr.ObjectColor = color
+
+            for h in hatches:
+                if h and h.IsValid:
+                    self.doc.Objects.AddHatch(h, attr)
+            return 1
+        except Exception:
+            return 0
+
+    def _add_mesh(self, ifc: Any, space: Any, layer_path: str, uf: float) -> int:
+        """Tessellate and add the 3-D mesh body of a space.  Returns 1 on success."""
+        import Rhino
+        import Rhino.Geometry as rg
+
+        try:
+            import ifcopenshell.geom
+
+            s = ifcopenshell.geom.settings()
+            s.set(s.USE_WORLD_COORDS, True)
+            s.set(s.WELD_VERTICES, True)
+
+            shape = ifcopenshell.geom.create_shape(s, space)
+            verts = shape.geometry.verts
+            faces = shape.geometry.faces
+
+            mesh = rg.Mesh()
+            for i in range(0, len(verts), 3):
+                mesh.Vertices.Add(
+                    verts[i] * uf,
+                    verts[i + 1] * uf,
+                    verts[i + 2] * uf,
+                )
+            for i in range(0, len(faces), 3):
+                mesh.Faces.AddFace(faces[i], faces[i + 1], faces[i + 2])
+            mesh.Normals.ComputeNormals()
+
+            if not mesh.IsValid:
+                return 0
+
+            idx = _ensure_layer(self.doc, layer_path, self._layer_cache)
+            attr = Rhino.DocObjects.ObjectAttributes()
+            attr.LayerIndex = idx
+            self.doc.Objects.AddMesh(mesh, attr)
+            return 1
+        except Exception:
+            return 0
+
 
