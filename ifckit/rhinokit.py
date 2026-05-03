@@ -178,6 +178,26 @@ def curves_to_path(curves: Any) -> Path:
     return p
 
 
+def profile_to_rhino_curve(profile: Any) -> Any:
+    """Convert an ifckit Profile to a closed Rhino PolylineCurve in WorldXY.
+
+    The profile cross-section points (2-D, in the profile's local plane) are
+    placed at Z=0 around the world origin.  Rotation, offset and anchor
+    transforms are already baked into ``get_profile_points()``.
+
+    Args:
+        profile: Any ifckit ``Profile`` subclass instance.
+
+    Returns:
+        ``Rhino.Geometry.PolylineCurve`` — a closed polygon in WorldXY.
+    """
+    _require_rhino("profile_to_rhino_curve")
+    pts_2d = profile.get_profile_points()  # [(x, y), ...]
+    pts_3d = [Rhino.Geometry.Point3d(x, y, 0.0) for x, y in pts_2d]
+    pts_3d.append(pts_3d[0])  # close
+    return Rhino.Geometry.PolylineCurve(pts_3d)
+
+
 def ensure_layer(
     doc: Any,
     path: str,
