@@ -18,8 +18,9 @@ gh_profile.py  —  GH Script component: "ifckit Profile"
 @input  rotation         : float item — CCW rotation of profile around its origin (radians, default 0)
 @input  offset_x         : float item — Additional X offset in profile plane (m, default 0)
 @input  offset_y         : float item — Additional Y offset in profile plane (m, default 0)
-@output out      : str item — Status message
-@output json_out : str  item — Profile JSON (Profile.to_dict() format)
+@output out      : str      item — Status message
+@output json_out : str      item — Profile JSON (Profile.to_dict() format)
+@output preview  : geometry item — Profile outline curve in WorldXY
 
 Stateless: creates any supported ifckit profile type and outputs a
 Profile.to_dict() JSON dict consumable by beam/wall/column nodes.
@@ -32,6 +33,7 @@ from ifckit.profiles import (
     RectangleProfile, CircleProfile, HollowCircleProfile,
     SteelProfile,
 )
+from ifckit.rhinokit import path_to_rhino_curve
 from ifckit.schema import LengthUnit
 
 _pt = (profile_type or "").strip().lower()
@@ -41,6 +43,7 @@ _offset_x = float(offset_x or 0)
 _offset_y = float(offset_y or 0)
 messages = []
 json_out = ""
+preview = None
 
 try:
     profile = None
@@ -118,6 +121,7 @@ try:
         )
 
     json_out = json.dumps(profile.to_dict())
+    preview = path_to_rhino_curve(profile)
     messages.append(f"OK  {profile.name or _pt}")
 
 except Exception as exc:
