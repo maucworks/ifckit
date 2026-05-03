@@ -7,8 +7,8 @@ gh_create_wall.py  —  GH Script component: "ifckit Wall"
 @input  height     : float item — Wall height (m)
 @input  thickness  : float item — Wall thickness (m)
 @input  name       : str   item — Optional element name
-@output out      : str  item — Status message
-@output json_out : generic list — List of element JSON strings
+@output out      : str item — Status message
+@output json_out : str  list — List of element JSON strings
 
 Stateless: serializes wall curves → JSON strings.
 """
@@ -20,8 +20,8 @@ from ifckit import PendingWall, Plane, rhinokit as rk
 messages = []
 json_outputs = []
 
-if wall_curves:
-    curves = wall_curves if hasattr(wall_curves, "__iter__") else [wall_curves]
+if base_curve:
+    curves = base_curve if hasattr(base_curve, "__iter__") else [base_curve]
 
     for i, crv in enumerate(curves):
         if crv is None:

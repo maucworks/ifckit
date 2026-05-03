@@ -7,8 +7,8 @@ Run this inside Rhino 8 with Grasshopper open on a blank canvas:
 
 For each *.py file in grasshopper/src/ the builder:
   1. Parses @component / @input / @output annotations from the docstring.
-  2. Creates a "Python 3 Script" GH component with the declared params.
-  3. Injects the file's code (minus the docstring) via XML round-trip.
+  2. Creates a "Python 3 Script" GH component via the GH proxy API.
+  3. Injects typed params + script code entirely via XML surgery.
   4. Saves ifckit-components.gh in grasshopper/ and reopens it.
 
 Annotation syntax (inside the module docstring)
@@ -18,49 +18,96 @@ Annotation syntax (inside the module docstring)
 @output  param_name : type  access — Description text
 
 Types   : str | float | bool | int | curve | point | plane | generic
-Access  : item (default) | list
+Access  : item (default) | list | tree
+
+Implementation approach — XML surgery
+--------------------------------------
+The Rhino 8 "Python 3 Script" component exposes its internal Script param
+system (TypeHint, Access) through a `RhinoCodePlatform.GH` interface that is
+inaccessible from IronPython/pythonnet because all types are generic
+(`ScriptParamCTX\`1`) and cannot be resolved by name.
+
+The working solution serialises a freshly-created component to XML via
+`GH_Archive.Serialize_Xml()`, directly edits the XML string to replace the
+`<chunk name="ParameterData">` block and inject a `<chunk name="Script">`
+block, then deserialises back with `GH_Archive.Deserialize_Xml()` +
+`ExtractObject()`.
+
+Key XML facts discovered from a live fresh-component dump:
+  - Each input/output is a <chunk name="InputParam" index="N"> with 12 items.
+  - TypeHint is stored as `<item name="TypeHintID" type_name="gh_guid">`.
+  - Access (item/list/tree) is `<item name="ScriptParamAccess" type_name="gh_int32">` (0/1/2).
+  - The param type GUID in InputId/OutputId is 08908df5-fa14-4982-9ab2-1aa0927566aa.
+  - Outputs must NOT include a TypeHintID item — GH Script raises a type-
+    conversion error ("failed from string to object") if any hint GUID is
+    present on an output param. Outputs use a 10-item chunk (no TypeHintID,
+    no ShowTypeHints).
+  - Language is identified by a nested `<chunk name="LanguageSpec">` with
+    `<item name="Taxon">*.*.python</item>` and `<item name="Version">3.*</item>`.
+
+TypeHintID values (confirmed from live GH instances):
+  str    → 9e93878a-f9c5-4f0a-8a70-584bf09f24bb
+  float  → 19ff81a2-dc4f-4035-8de9-26224c561321
+  bool   → d60527f5-b5af-4ef6-8970-5f96fe412559
+  int    → 48d01794-d3d8-4aef-990e-127168822244
+  curve  → 9ba89ec2-5315-435f-a621-b66c5fa2f301
+  point  → e1937b56-b1da-4c12-8bd8-e34ee81746ef
+  plane  → 3897522d-58e9-4d60-b38c-978ddacfedd8
+  generic → 00000000-0000-0000-0000-000000000000
 """
 
 from __future__ import annotations
 import ast
+import base64
 import glob
 import os
 import re
-import sys
 import time
+import traceback
+import uuid
 
 import clr
 clr.AddReference("Grasshopper")
 clr.AddReference("GH_IO")
+
 import Grasshopper as GH
 import GH_IO.Serialization as GHSerial
-import System
 import System.Drawing as SD
 
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))          # grasshopper/script/
-_GH_DIR     = os.path.dirname(_SCRIPT_DIR)                        # grasshopper/
-_SRC_DIR    = os.path.join(_GH_DIR, "src")                        # grasshopper/src/
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_GH_DIR     = os.path.dirname(_SCRIPT_DIR)
+_SRC_DIR    = os.path.join(_GH_DIR, "src")
 _OUT_GH     = os.path.join(_GH_DIR, "ifckit-components.gh")
+
+# ---------------------------------------------------------------------------
+# Known GUIDs (confirmed from live Rhino session)
+# ---------------------------------------------------------------------------
+
+# TypeHintID values for ScriptParam — from HintID on each hint class
+_HINT_ID = {
+    "str":     "9e93878a-f9c5-4f0a-8a70-584bf09f24bb",  # GH_StringHint_CS
+    "float":   "19ff81a2-dc4f-4035-8de9-26224c561321",  # GH_DoubleHint_CS
+    "bool":    "d60527f5-b5af-4ef6-8970-5f96fe412559",  # GH_BooleanHint_CS
+    "int":     "48d01794-d3d8-4aef-990e-127168822244",  # GH_IntegerHint_CS
+    "curve":   "9ba89ec2-5315-435f-a621-b66c5fa2f301",  # GH_CurveHint
+    "point":   "e1937b56-b1da-4c12-8bd8-e34ee81746ef",  # GH_Point3dHint
+    "plane":   "3897522d-58e9-4d60-b38c-978ddacfedd8",  # GH_PlaneHint
+    "generic": "00000000-0000-0000-0000-000000000000",  # GH_NullHint / no hint
+}
+
+# ComponentId for Param_ScriptVariable (the GH param type used by Script components)
+_SCRIPT_PARAM_ID = "08908df5-fa14-4982-9ab2-1aa0927566aa"
+
+# ComponentId for the standard output param (the "out" text output)
+_OUT_PARAM_ID = "3ede854e-c753-40eb-84cb-b48008f14fd4"
+
+# ScriptParamAccess values
+_ACCESS = {"item": 0, "list": 1, "tree": 2}
+
 
 # ---------------------------------------------------------------------------
 # Annotation parser
 # ---------------------------------------------------------------------------
-
-_TYPE_MAP = {
-    "str":     "str",
-    "float":   "float",
-    "bool":    "bool",
-    "int":     "int",
-    "curve":   "curve",
-    "point":   "point",
-    "plane":   "generic",
-    "generic": "generic",
-}
-
-_ACCESS_MAP = {
-    "item": "item",
-    "list": "list",
-}
 
 _COMPONENT_RE = re.compile(
     r'@component\s+'
@@ -68,84 +115,276 @@ _COMPONENT_RE = re.compile(
     r'(?:\s+panel\s*:\s*"([^"]+)")?'
     r'(?:\s+tooltip\s*:\s*"([^"]+)")?'
 )
-
 _PARAM_RE = re.compile(
     r'@(input|output)\s+'
-    r'(\w+)'           # param name
+    r'(\w+)'
     r'\s*:\s*'
-    r'(\w+)'           # type
+    r'(\w+)'
     r'\s+'
-    r'(\w+)'           # access
-    r'(?:\s+—\s*(.+))?'  # optional description after em-dash
+    r'(\w+)'
+    r'(?:\s+[—-]\s*(.+))?'
 )
 
 
 def parse_annotations(src: str):
-    """
-    Extract @component, @input, @output lines from the module docstring.
-
-    Returns:
-        comp  : dict with keys nickname, panel, tooltip
-        inputs : list of dicts {name, type, access, desc}
-        outputs: list of dicts {name, type, access, desc}
-    Returns None if no @component line found.
-    """
     try:
         tree = ast.parse(src)
     except SyntaxError:
         return None, [], []
-
     if not (tree.body
             and isinstance(tree.body[0], ast.Expr)
             and isinstance(tree.body[0].value, ast.Constant)):
         return None, [], []
-
     docstring = tree.body[0].value.value
-
     comp_match = _COMPONENT_RE.search(docstring)
     if not comp_match:
         return None, [], []
-
     comp = {
         "nickname": comp_match.group(1),
         "panel":    comp_match.group(2) or "ifckit",
         "tooltip":  comp_match.group(3) or "",
     }
-
     inputs, outputs = [], []
     for m in _PARAM_RE.finditer(docstring):
         direction, name, ptype, access, desc = m.groups()
         entry = {
             "name":   name,
-            "type":   _TYPE_MAP.get(ptype.lower(), "generic"),
-            "access": _ACCESS_MAP.get(access.lower(), "item"),
+            "type":   ptype.lower(),
+            "access": access.lower(),
             "desc":   (desc or "").strip(),
         }
         (inputs if direction == "input" else outputs).append(entry)
-
     return comp, inputs, outputs
 
 
 # ---------------------------------------------------------------------------
-# Type-hint GUIDs  (from Rhino 8 empirical introspection)
+# Source code helpers
 # ---------------------------------------------------------------------------
 
-_HINT_GUID = {
-    "str":     System.Guid("37261734-eec7-4f50-b6a8-b8d1f3c4396b"),
-    "float":   System.Guid("39fbc626-7a01-46ab-a18e-ec1c0c41685b"),
-    "bool":    System.Guid("d60527f5-b5af-4ef6-8970-5f96fe412429"),
-    "int":     System.Guid("39fbc626-7a01-46ab-a18e-ec1c0c41685b"),  # use double hint
-    "curve":   System.Guid("6a184b65-baa3-42d1-a548-3915b401de53"),
-    "point":   System.Guid("6a184b65-baa3-42d1-a548-3915b401de53"),
-    "generic": System.Guid("6a184b65-baa3-42d1-a548-3915b401de53"),
-}
+_BOOTSTRAP = f"""\
+import sys as _sys
+_src_dir = r'{_SRC_DIR}'
+if _src_dir not in _sys.path:
+    _sys.path.insert(0, _src_dir)
+del _sys, _src_dir
 
-_OUT_TEXT_GUID = System.Guid("3ede854e-c753-40eb-84cb-b48008f14fd4")
-_OUT_GEN_GUID  = System.Guid("08908df5-fa14-4982-9ab2-1aa0927566aa")
+"""
+
+
+def _read_body(filepath: str) -> str:
+    with open(filepath, "r", encoding="utf-8") as f:
+        src = f.read()
+    try:
+        tree = ast.parse(src)
+        if (tree.body
+                and isinstance(tree.body[0], ast.Expr)
+                and isinstance(tree.body[0].value, ast.Constant)):
+            end_line = tree.body[0].end_lineno
+            lines = src.splitlines(keepends=True)
+            body = "".join(lines[end_line:]).lstrip("\n")
+            return _BOOTSTRAP + body
+    except Exception:
+        pass
+    return _BOOTSTRAP + src
 
 
 # ---------------------------------------------------------------------------
-# GH document helpers
+# XML builders
+# ---------------------------------------------------------------------------
+
+def _param_chunk(entry: dict, index: int, kind: str) -> str:
+    """Build a <chunk name="InputParam"> or <chunk name="OutputParam"> XML fragment.
+
+    Outputs omit TypeHintID and ShowTypeHints — GH Script components do not
+    support type hints on outputs and will raise a type-conversion error if a
+    hint GUID is present there.
+    """
+    is_output = kind == "OutputParam"
+    hint_id   = _HINT_ID.get(entry["type"], _HINT_ID["generic"])
+    access    = _ACCESS.get(entry["access"], 0)
+    guid      = str(uuid.uuid4())
+    name      = entry["name"]
+    desc      = entry["desc"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    if is_output:
+        return f'''        <chunk name="{kind}" index="{index}">
+          <items count="10">
+            <item name="AllowTreeAccess" type_name="gh_bool" type_code="1">true</item>
+            <item name="Description" type_name="gh_string" type_code="10">{desc}</item>
+            <item name="InstanceGuid" type_name="gh_guid" type_code="9">{guid}</item>
+            <item name="Name" type_name="gh_string" type_code="10">{name}</item>
+            <item name="NickName" type_name="gh_string" type_code="10">{name}</item>
+            <item name="Optional" type_name="gh_bool" type_code="1">true</item>
+            <item name="ScriptParamAccess" type_name="gh_int32" type_code="3">{access}</item>
+            <item name="ScriptParameterVersion" type_name="gh_int32" type_code="3">2</item>
+            <item name="SourceCount" type_name="gh_int32" type_code="3">0</item>
+            <item name="ToolTip" type_name="gh_string" type_code="10"></item>
+          </items>
+        </chunk>'''
+
+    return f'''        <chunk name="{kind}" index="{index}">
+          <items count="12">
+            <item name="AllowTreeAccess" type_name="gh_bool" type_code="1">true</item>
+            <item name="Description" type_name="gh_string" type_code="10">{desc}</item>
+            <item name="InstanceGuid" type_name="gh_guid" type_code="9">{guid}</item>
+            <item name="Name" type_name="gh_string" type_code="10">{name}</item>
+            <item name="NickName" type_name="gh_string" type_code="10">{name}</item>
+            <item name="Optional" type_name="gh_bool" type_code="1">true</item>
+            <item name="ScriptParamAccess" type_name="gh_int32" type_code="3">{access}</item>
+            <item name="ScriptParameterVersion" type_name="gh_int32" type_code="3">2</item>
+            <item name="ShowTypeHints" type_name="gh_bool" type_code="1">true</item>
+            <item name="SourceCount" type_name="gh_int32" type_code="3">0</item>
+            <item name="ToolTip" type_name="gh_string" type_code="10"></item>
+            <item name="TypeHintID" type_name="gh_guid" type_code="9">{hint_id}</item>
+          </items>
+        </chunk>'''
+
+
+def _parameter_data_chunk(inputs: list, outputs: list) -> str:
+    """Build the <chunk name="ParameterData"> block."""
+    n_in  = len(inputs)
+    n_out = len(outputs)
+    total_chunks = n_in + n_out
+    total_items  = 2 + n_in + 2 + n_out  # InputCount + n InputId + OutputCount + n OutputId
+
+    items = []
+    items.append(f'<item name="InputCount" type_name="gh_int32" type_code="3">{n_in}</item>')
+    for i in range(n_in):
+        items.append(f'<item name="InputId" index="{i}" type_name="gh_guid" type_code="9">{_SCRIPT_PARAM_ID}</item>')
+    items.append(f'<item name="OutputCount" type_name="gh_int32" type_code="3">{n_out}</item>')
+    for i in range(n_out):
+        items.append(f'<item name="OutputId" index="{i}" type_name="gh_guid" type_code="9">{_SCRIPT_PARAM_ID}</item>')
+
+    items_xml = "\n            ".join(items)
+
+    chunks = []
+    for i, entry in enumerate(inputs):
+        chunks.append(_param_chunk(entry, i, "InputParam"))
+    for i, entry in enumerate(outputs):
+        chunks.append(_param_chunk(entry, i, "OutputParam"))
+    chunks_xml = "\n".join(chunks)
+
+    return f'''      <chunk name="ParameterData">
+          <items count="{total_items}">
+            {items_xml}
+          </items>
+          <chunks count="{total_chunks}">
+{chunks_xml}
+          </chunks>
+        </chunk>'''
+
+
+def _script_chunk(code: str, nickname: str) -> str:
+    """Build the <chunk name="Script"> block with base64-encoded code."""
+    encoded = base64.b64encode(code.encode("utf-8")).decode("ascii")
+    return f'''      <chunk name="Script">
+          <items count="2">
+            <item name="Text" type_name="gh_string" type_code="10">{encoded}</item>
+            <item name="Title" type_name="gh_string" type_code="10">{nickname}</item>
+          </items>
+          <chunks count="1">
+            <chunk name="LanguageSpec">
+              <items count="2">
+                <item name="Taxon" type_name="gh_string" type_code="10">*.*.python</item>
+                <item name="Version" type_name="gh_string" type_code="10">3.*</item>
+              </items>
+            </chunk>
+          </chunks>
+        </chunk>'''
+
+
+# ---------------------------------------------------------------------------
+# XML round-trip: inject ParameterData + Script into component XML
+# ---------------------------------------------------------------------------
+
+def _find_chunk_end(xml: str, start: int) -> int:
+    depth = 0
+    pos   = start
+    while pos < len(xml):
+        o, c = -1, xml.find("</chunk>", pos)
+        search = pos
+        while True:
+            idx = xml.find("<chunk", search)
+            if idx == -1:
+                break
+            nc = xml[idx + 6] if idx + 6 < len(xml) else ""
+            if nc in (" ", ">", "\n", "\r", "\t"):
+                o = idx
+                break
+            search = idx + 1
+        if o == -1 and c == -1:
+            break
+        if o != -1 and (c == -1 or o < c):
+            depth += 1
+            pos = o + 1
+        else:
+            depth -= 1
+            end = c + len("</chunk>")
+            pos = c + 1
+            if depth == 0:
+                return end
+    return -1
+
+
+def _inject_xml(comp, inputs: list, outputs: list, code: str, nickname: str) -> bool:
+    """Serialize comp, replace ParameterData + inject Script chunk, deserialize back."""
+    archive_out = GHSerial.GH_Archive()
+    archive_out.AppendObject(comp, "Comp")
+    xml = archive_out.Serialize_Xml()
+
+    param_data_xml = _parameter_data_chunk(inputs, outputs)
+    script_xml     = _script_chunk(code, nickname)
+
+    # Locate <chunk name="Comp">
+    comp_tag   = '<chunk name="Comp">'
+    comp_start = xml.find(comp_tag)
+    if comp_start == -1:
+        print("    ERR: <chunk name='Comp'> not found")
+        return False
+    comp_end = _find_chunk_end(xml, comp_start)
+    comp_xml = xml[comp_start:comp_end]
+
+    # Replace <chunk name="ParameterData"> with our version
+    pd_tag   = '<chunk name="ParameterData">'
+    pd_start = comp_xml.find(pd_tag)
+    if pd_start != -1:
+        pd_end   = _find_chunk_end(comp_xml, pd_start)
+        comp_xml = comp_xml[:pd_start] + param_data_xml + comp_xml[pd_end:]
+    else:
+        # Insert before closing </chunks> of comp
+        close = comp_xml.rfind("</chunks>")
+        comp_xml = comp_xml[:close] + param_data_xml + "\n" + comp_xml[close:]
+
+    # Replace or insert <chunk name="Script">
+    sc_tag   = '<chunk name="Script">'
+    sc_start = comp_xml.find(sc_tag)
+    if sc_start != -1:
+        sc_end   = _find_chunk_end(comp_xml, sc_start)
+        comp_xml = comp_xml[:sc_start] + script_xml + comp_xml[sc_end:]
+    else:
+        close    = comp_xml.rfind("</chunks>")
+        comp_xml = comp_xml[:close] + script_xml + "\n" + comp_xml[close:]
+
+    # Also fix the chunks count attribute in the Comp chunk's <chunks> tag
+    # (count changes from 2 to 3 when Script is added)
+    comp_xml = re.sub(r'(<chunks count=")(\d+)(">\s*<chunk name="Attributes">)',
+                      lambda m: f'{m.group(1)}{int(m.group(2)) + (0 if sc_start != -1 else 1)}{m.group(3)}',
+                      comp_xml, count=1)
+
+    xml = xml[:comp_start] + comp_xml + xml[comp_end:]
+
+    archive_in = GHSerial.GH_Archive()
+    if not archive_in.Deserialize_Xml(xml):
+        print("    ERR: Deserialize_Xml failed")
+        return False
+    if not archive_in.ExtractObject(comp, "Comp"):
+        print("    ERR: ExtractObject failed")
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# GH helpers
 # ---------------------------------------------------------------------------
 
 def _get_or_open_gh_doc():
@@ -167,178 +406,39 @@ def _get_or_open_gh_doc():
 
 
 def _find_proxy(name: str):
-    server = GH.Instances.ComponentServer
-    for proxy in server.ObjectProxies:
+    for proxy in GH.Instances.ComponentServer.ObjectProxies:
         if str(proxy.Desc.Name) == name:
             return proxy
     return None
 
 
-# ---------------------------------------------------------------------------
-# Param factories
-# ---------------------------------------------------------------------------
-
-def _make_input_param(entry: dict):
-    import Grasshopper.Kernel.Parameters as GHP
-    p = GHP.Param_GenericObject()
-    p.Name        = entry["name"]
-    p.NickName    = entry["name"]
-    p.Description = entry["desc"]
-    p.Optional    = True
-    p.Access = (GH.Kernel.GH_ParamAccess.list
-                if entry["access"] == "list"
-                else GH.Kernel.GH_ParamAccess.item)
-    return p
-
-
-def _make_output_param(entry: dict):
-    import Grasshopper.Kernel.Parameters as GHP
-    p = GHP.Param_GenericObject()
-    p.Name        = entry["name"]
-    p.NickName    = entry["name"]
-    p.Description = entry["desc"]
-    p.Optional    = True
-    return p
-
-
-# ---------------------------------------------------------------------------
-# XML chunk helpers
-# ---------------------------------------------------------------------------
-
-def _find_chunk_end(xml: str, chunk_start: int) -> int:
-    """Return index just past the closing </chunk> matching the one at chunk_start."""
-    depth = 0
-    pos = chunk_start
-    while pos < len(xml):
-        # find next <chunk  (singular) — NOT <chunks
-        o = -1
-        search = pos
-        while True:
-            idx = xml.find("<chunk", search)
-            if idx == -1:
-                break
-            next_ch = xml[idx + 6] if idx + 6 < len(xml) else ""
-            if next_ch in (" ", ">", "\n", "\r", "\t"):
-                o = idx
-                break
-            search = idx + 1
-
-        c = xml.find("</chunk>", pos)
-        if o == -1 and c == -1:
-            break
-        if o != -1 and (c == -1 or o < c):
-            depth += 1
-            pos = o + 1
-        else:
-            depth -= 1
-            end = c + len("</chunk>")
-            pos = c + 1
-            if depth == 0:
-                return end
-    return -1
-
-
-def _set_code(comp, code: str) -> bool:
-    """Inject Python code into a Python 3 Script component via XML round-trip."""
-    import base64
-
-    archive_out = GHSerial.GH_Archive()
-    archive_out.AppendObject(comp, "Comp")
-    xml = archive_out.Serialize_Xml()
-
-    encoded = base64.b64encode(code.encode("utf-8")).decode("ascii")
-
-    script_chunk = (
-        '<chunk name="Script">'
-        '<items count="2">'
-        f'<item name="Text" type_name="gh_string" type_code="10">{encoded}</item>'
-        f'<item name="Title" type_name="gh_string" type_code="10">{comp.NickName}</item>'
-        '</items>'
-        '<chunks count="1">'
-        '<chunk name="LanguageSpec">'
-        '<items count="2">'
-        '<item name="Taxon" type_name="gh_string" type_code="10">*.*.python</item>'
-        '<item name="Version" type_name="gh_string" type_code="10">3.*</item>'
-        '</items>'
-        '</chunk>'
-        '</chunks>'
-        '</chunk>'
-    )
-
-    comp_tag = '<chunk name="Comp">'
-    comp_start = xml.find(comp_tag)
-    if comp_start == -1:
-        print(f"  WARN: <chunk name='Comp'> not found for {comp.NickName}")
-        return False
-    comp_end = _find_chunk_end(xml, comp_start)
-    if comp_end == -1:
-        print(f"  WARN: could not find end of Comp chunk for {comp.NickName}")
-        return False
-
-    comp_xml = xml[comp_start:comp_end]
-
-    if '<chunk name="Script">' in comp_xml:
-        sc_start = comp_xml.index('<chunk name="Script">')
-        sc_end   = _find_chunk_end(comp_xml, sc_start)
-        comp_xml = comp_xml[:sc_start] + script_chunk + comp_xml[sc_end:]
-    else:
-        insert_at = comp_xml.rfind("</chunks>")
-        if insert_at == -1:
-            inner_close = comp_xml.rfind("</chunk>")
-            comp_xml = (comp_xml[:inner_close]
-                        + '<chunks count="1">' + script_chunk + '</chunks>'
-                        + comp_xml[inner_close:])
-        else:
-            comp_xml = (comp_xml[:insert_at + len("</chunks>")]
-                        + script_chunk
-                        + comp_xml[insert_at + len("</chunks>"):])
-
-    xml = xml[:comp_start] + comp_xml + xml[comp_end:]
-
-    archive_in = GHSerial.GH_Archive()
-    if not archive_in.Deserialize_Xml(xml):
-        print(f"  WARN: Deserialize_Xml failed for {comp.NickName}")
-        return False
-    if not archive_in.ExtractObject(comp, "Comp"):
-        print(f"  WARN: ExtractObject failed for {comp.NickName}")
-        return False
-    return True
-
-
-# ---------------------------------------------------------------------------
-# Bootstrap prepended to every injected node body
-# ---------------------------------------------------------------------------
-
-_BOOTSTRAP = f"""\
-import sys as _sys
-_src_dir = r'{_SRC_DIR}'
-if _src_dir not in _sys.path:
-    _sys.path.insert(0, _src_dir)
-del _sys, _src_dir
-
-"""
-
-
-def _read_body(filepath: str) -> str:
-    """Read a src file, strip its docstring, prepend the bootstrap."""
-    with open(filepath, "r", encoding="utf-8") as f:
-        src = f.read()
+def _reopen(path: str):
+    errors = []
     try:
-        tree = ast.parse(src)
-        if (tree.body
-                and isinstance(tree.body[0], ast.Expr)
-                and isinstance(tree.body[0].value, ast.Constant)):
-            end_line = tree.body[0].end_lineno
-            lines = src.splitlines(keepends=True)
-            body = "".join(lines[end_line:]).lstrip("\n")
-            return _BOOTSTRAP + body
-    except Exception:
-        pass
-    return _BOOTSTRAP + src
+        io = GH.GH_DocumentIO()
+        io.Open(path)
+        new_doc = io.Document
+        if new_doc is None:
+            raise RuntimeError("Document is None after Open()")
+        GH.Instances.DocumentEditor.SetActiveDocument(new_doc, True)
+        new_doc.NewSolution(False)
+        print(f"  Reopened: {path}")
+        return
+    except Exception as e:
+        errors.append(f"GH_DocumentIO: {e}")
+    try:
+        GH.Instances.DocumentEditor.ScriptAccess_OpenDocument(path)
+        print(f"  Reopened: {path}")
+        return
+    except Exception as e:
+        errors.append(f"ScriptAccess_OpenDocument: {e}")
+    print(f"  WARN: auto-reopen failed — open {path} manually")
+    for err in errors:
+        print(f"    {err}")
 
 
 # ---------------------------------------------------------------------------
-# Add one component to the live GH document
+# Add one component
 # ---------------------------------------------------------------------------
 
 def _add_component(doc, filepath: str, x: float, y: float):
@@ -363,50 +463,18 @@ def _add_component(doc, filepath: str, x: float, y: float):
     comp.NickName    = comp_meta["nickname"]
     comp.Name        = comp_meta["nickname"]
     comp.Description = comp_meta["tooltip"]
-
     comp.Attributes.Pivot = SD.PointF(x, y)
     doc.AddObject(comp, False)
 
-    # Reconfigure params
-    params = comp.Params
-    while params.Input.Count > 0:
-        params.UnregisterInputParameter(params.Input[0], False)
-    while params.Output.Count > 0:
-        params.UnregisterOutputParameter(params.Output[0], False)
+    code   = _read_body(filepath)
+    set_ok = _inject_xml(comp, inputs, outputs, code, comp_meta["nickname"])
 
-    for entry in inputs:
-        params.RegisterInputParam(_make_input_param(entry))
-    for entry in outputs:
-        params.RegisterOutputParam(_make_output_param(entry))
-
-    params.OnParametersChanged()
-
-    # Inject code
-    code = _read_body(filepath)
-    _set_code(comp, code)
+    if set_ok:
+        print(f"    {len(inputs)} in / {len(outputs)} out  ({len(code)} chars code)")
+    else:
+        print(f"    ERR: XML injection failed")
 
     return comp, comp_meta["panel"]
-
-
-# ---------------------------------------------------------------------------
-# Reopen helper
-# ---------------------------------------------------------------------------
-
-def _reopen(path: str):
-    try:
-        io      = GH.Instances.DocumentIO
-        new_doc = io.LoadDocument(path)
-        if new_doc is None:
-            print("  WARN: LoadDocument returned None — open manually")
-            return
-        editor = GH.Instances.DocumentEditor
-        editor.NewDocument(False)
-        time.sleep(0.2)
-        GH.Instances.ActiveCanvas.Document = new_doc
-        new_doc.NewSolution(False)
-        print(f"  Reopened: {path}")
-    except Exception as e:
-        print(f"  WARN: auto-reopen failed ({e}) — open {path} manually")
 
 
 # ---------------------------------------------------------------------------
@@ -416,48 +484,48 @@ def _reopen(path: str):
 def build():
     doc = _get_or_open_gh_doc()
     if doc is None:
-        print("ERROR: No active Grasshopper document. Open Grasshopper first.")
+        print("ERROR: No active Grasshopper document.")
         return
 
     print(f"Using GH document: {doc.DisplayName or '(untitled)'}")
     print(f"Source dir: {_SRC_DIR}")
 
-    # Gather src files in sorted order
     src_files = sorted(glob.glob(os.path.join(_SRC_DIR, "gh_*.py")))
     if not src_files:
-        print(f"ERROR: no gh_*.py files found in {_SRC_DIR}")
+        print(f"ERROR: no gh_*.py files in {_SRC_DIR}")
         return
 
-    col_spacing = 500
-    row_spacing = 320
-    x_base      = 100
-    y_base      = 100
-
-    # Group by panel to arrange in columns
+    # Group by panel
     panels: dict[str, list] = {}
     for fp in src_files:
-        with open(fp, "r", encoding="utf-8") as f:
+        with open(fp) as f:
             src = f.read()
         comp_meta, _, _ = parse_annotations(src)
         panel = comp_meta["panel"] if comp_meta else "_unknown"
         panels.setdefault(panel, []).append(fp)
 
+    col_spacing = 500
+    row_spacing = 320
+    x_base, y_base = 100, 100
+
     placed = 0
-    col = 0
-    for panel_name, files in panels.items():
+    for col, (panel_name, files) in enumerate(panels.items()):
         for row, fp in enumerate(files):
             x = x_base + col * col_spacing
             y = y_base + row * row_spacing
-            result = _add_component(doc, fp, float(x), float(y))
+            print(f"\n  {os.path.basename(fp)}")
+            try:
+                result = _add_component(doc, fp, float(x), float(y))
+            except Exception:
+                traceback.print_exc()
+                result = None
             if result:
                 comp, panel = result
                 print(f"  OK  {comp.NickName}  [{panel}]")
                 placed += 1
             else:
-                print(f"  FAIL {os.path.basename(fp)}")
-        col += 1
+                print(f"  FAIL")
 
-    # Save
     doc.ExpireSolution()
     archive = GHSerial.GH_Archive()
     archive.AppendObject(doc, "Definition")
@@ -477,5 +545,4 @@ if __name__ == "__main__" or True:
     try:
         build()
     except Exception:
-        import traceback
         print(f"FATAL:\n{traceback.format_exc()}")

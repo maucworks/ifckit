@@ -11,7 +11,7 @@ gh_drawing.py  —  GH Script component: "ifckit Drawing"
 @input  hatch_pattern : str   item — Fallback hatch pattern (default "Solid")
 @input  clear         : bool  item — Remove existing curves/hatches first (default True)
 @input  sticky_key    : str   item — sc.sticky key to read model from (default "ifckit_model")
-@input  dest_plane    : generic item — Rhino Plane for drawing placement (optional)
+@input  dest_plane    : plane item — Rhino Plane for drawing placement (optional)
 @output out : str item — Status message
 
 Imports one named IFC drawing (section plane + projection) into the active

@@ -13,7 +13,7 @@ gh_profile.py  —  GH Script component: "ifckit Profile"
 @input  steel_name       : str   item — Steel section name, e.g. "HEA200"
 @input  unit             : str   item — Unit for steel dims: "m" (default) or "mm"
 @input  name             : str   item — Optional profile label
-@output out      : str  item — Status message
+@output out      : str item — Status message
 @output json_out : str  item — Profile JSON (Profile.to_dict() format)
 
 Stateless: creates any supported ifckit profile type and outputs a

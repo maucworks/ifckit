@@ -9,7 +9,7 @@ gh_create_beam_any.py  —  GH Script component: "ifckit Beam (Any Path)"
 @input  name         : str     item — Optional element name
 @output out       : str     item — Status message
 @output path_type : str     item — Detected path type
-@output json_out  : generic list — List of element JSON strings
+@output json_out  : str     list — List of element JSON strings
 
 Stateless: auto-detects path type (line → ExtrudedAreaSolid, arc → RevolvedAreaSolid).
 """

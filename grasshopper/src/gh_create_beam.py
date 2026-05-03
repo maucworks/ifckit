@@ -7,8 +7,8 @@ gh_create_beam.py  —  GH Script component: "ifckit Beam"
 @input  profile_pts  : point list — Cross-section polygon as Point3d list (fallback)
 @input  profile_json : str   item — Profile JSON from ifckit Profile node
 @input  name         : str   item — Optional element name
-@output out      : str  item — Status message
-@output json_out : generic list — List of element JSON strings
+@output out      : str item — Status message
+@output json_out : str  list — List of element JSON strings
 
 Stateless: serializes linear beam paths → IfcExtrudedAreaSolid via PendingBeam.
 """
