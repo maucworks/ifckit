@@ -1,47 +1,15 @@
-name: Publish to PyPI on Version Change
+name: Publish to PyPI
 
 on:
   push:
-    branches: [ master ]
-    paths:
-      - 'pyproject.toml'
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  check-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version-changed: ${{ steps.check.outputs.changed }}
-      new-version: ${{ steps.check.outputs.version }}
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 2
-
-    - name: Check if version changed
-      id: check
-      run: |
-        CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-        echo "Current version: $CURRENT_VERSION"
-        if git diff HEAD~1 HEAD --name-only | grep -q pyproject.toml; then
-          PREV_VERSION=$(git show HEAD~1:pyproject.toml | grep '^version = ' | sed 's/version = "\(.*\)"/\1/')
-          echo "Previous version: $PREV_VERSION"
-          if [ "$CURRENT_VERSION" != "$PREV_VERSION" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
-        else
-          echo "changed=false" >> $GITHUB_OUTPUT
-        fi
-
   build:
-    needs: check-version
-    if: needs.check-version.outputs.version-changed == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -68,8 +36,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    needs: [check-version, build]
-    if: needs.check-version.outputs.version-changed == 'true'
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -89,7 +56,7 @@ jobs:
 
   create-github-release:
     name: Create GitHub Release
-    needs: [check-version, publish-to-pypi]
+    needs: publish-to-pypi
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -97,19 +64,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Create git tag
-      run: |
-        VERSION="${{ needs.check-version.outputs.new-version }}"
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git tag -a "v${VERSION}" -m "Release v${VERSION}"
-        git push origin "v${VERSION}"
-
     - name: Create GitHub Release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        VERSION="${{ needs.check-version.outputs.new-version }}"
-        gh release create "v${VERSION}" \
-          --title "v${VERSION}" \
+        gh release create "${{ github.ref_name }}" \
+          --title "${{ github.ref_name }}" \
           --generate-notes
