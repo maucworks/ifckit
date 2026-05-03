@@ -15,13 +15,10 @@ import json
 import traceback
 
 # ---------------------------------------------------------------------------
-# Reload helper (development only — harmless in production)
+# Reload (import shim picks up live code changes without restarting Rhino)
 # ---------------------------------------------------------------------------
 try:
-    import ifckit.rhinokit  # noqa: F401
-    from ifckit.rhinokit import reload_all
-
-    reload_all(__file__)
+    import ifckit_reload  # noqa: F401
 except Exception:
     pass
 

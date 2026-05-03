@@ -392,6 +392,7 @@ def reload_all(project_root: str | None = None) -> None:
         "ifckit.builders.bridge",
         "ifckit.builders",
         "ifckit.rhinokit",
+        "ifckit.preview",
         "ifckit.rhino_import",
         "ifckit.model",
         "ifckit.validator",
