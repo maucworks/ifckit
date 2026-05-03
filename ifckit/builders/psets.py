@@ -49,8 +49,43 @@ from typing import Any, Dict, Optional, Sequence
 
 import ifcopenshell
 import ifcopenshell.api
+import ifcopenshell.util.unit
 
 from ifckit.elements.base import PendingElement
+
+# ---------------------------------------------------------------------------
+# Unit-aware rounding helpers
+# ---------------------------------------------------------------------------
+
+
+def _length_decimals(ifc_file: ifcopenshell.file) -> int:
+    """
+    Return the number of decimal places to use when rounding a length value
+    stored in the project's length unit.
+
+    Logic: the project unit scale gives  project_value * scale = metres.
+      scale = 1.0   (metres)    → 3 decimals  (nearest mm)
+      scale = 0.001 (mm)        → 0 decimals  (nearest mm expressed as integer mm)
+      scale = 0.01  (cm)        → 1 decimal
+      scale = 0.3048 (ft)       → 3 decimals  (nearest ~0.3 mm)
+    Formula: decimals = max(0, 3 + round(log10(scale)))
+    """
+    try:
+        scale = ifcopenshell.util.unit.calculate_unit_scale(ifc_file)
+        return max(0, 3 + round(math.log10(scale)))
+    except Exception:
+        return 3  # safe fallback
+
+
+def _round_length(ifc_file: ifcopenshell.file, value: float) -> float:
+    return round(value, _length_decimals(ifc_file))
+
+
+def _round_area(ifc_file: ifcopenshell.file, value: float) -> float:
+    """Area: 2× the length decimals (m² → 6 dec, mm² → 0 dec)."""
+    decimals = _length_decimals(ifc_file) * 2
+    return round(value, decimals)
+
 
 # ---------------------------------------------------------------------------
 # Known steel section names (used to detect SteelSectionName on a profile)
@@ -171,7 +206,7 @@ def _geometry_props_extruded(ifc_file, pending) -> list:
 
     # Length from axis
     try:
-        props.append(_length_prop(ifc_file, "Length", pending.axis.length))
+        props.append(_length_prop(ifc_file, "Length", _round_length(ifc_file, pending.axis.length)))
     except Exception:
         pass
 
@@ -181,7 +216,7 @@ def _geometry_props_extruded(ifc_file, pending) -> list:
         try:
             area = profile_source.area
             if area is not None:
-                props.append(_area_prop(ifc_file, "CrossSectionArea", area))
+                props.append(_area_prop(ifc_file, "CrossSectionArea", _round_area(ifc_file, area)))
         except Exception:
             pass
 
@@ -201,12 +236,11 @@ def _geometry_props_revolved(ifc_file, pending) -> list:
 
     arc = pending.arc
     try:
-        # Arc radius is the distance from center to start
         radius = (arc.start - arc.center).length()
         arc_length = radius * abs(arc.angle)
-        props.append(_length_prop(ifc_file, "ArcLength", arc_length))
-        props.append(_real_prop(ifc_file, "ArcAngle_rad", arc.angle))
-        props.append(_real_prop(ifc_file, "ArcAngle_deg", math.degrees(arc.angle)))
+        props.append(_length_prop(ifc_file, "ArcLength", _round_length(ifc_file, arc_length)))
+        props.append(_real_prop(ifc_file, "ArcAngle_rad", round(arc.angle, 2)))
+        props.append(_real_prop(ifc_file, "ArcAngle_deg", round(math.degrees(arc.angle), 1)))
     except Exception:
         pass
 
@@ -216,7 +250,7 @@ def _geometry_props_revolved(ifc_file, pending) -> list:
         try:
             area = profile_source.area
             if area is not None:
-                props.append(_area_prop(ifc_file, "CrossSectionArea", area))
+                props.append(_area_prop(ifc_file, "CrossSectionArea", _round_area(ifc_file, area)))
         except Exception:
             pass
 
@@ -238,11 +272,11 @@ def _geometry_props_wall(ifc_file, pending) -> list:
         pts = pending.footprint
         if len(pts) >= 2:
             edges = [(pts[i] - pts[i - 1]).length() for i in range(1, len(pts))]
-            props.append(_length_prop(ifc_file, "Length", max(edges)))
+            props.append(_length_prop(ifc_file, "Length", _round_length(ifc_file, max(edges))))
     except Exception:
         pass
     try:
-        props.append(_length_prop(ifc_file, "Height", pending.height))
+        props.append(_length_prop(ifc_file, "Height", _round_length(ifc_file, pending.height)))
     except Exception:
         pass
     return props

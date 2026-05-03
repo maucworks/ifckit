@@ -116,9 +116,9 @@ def test_revolved_beam_geometry_pset():
 
     geo = _get_pset(ifc, element, "EPset_IfcKit_Geometry")
     assert geo["Name"] == "Arch-1"
-    assert abs(geo["ArcAngle_rad"] - angle) < 1e-6
-    assert abs(geo["ArcAngle_deg"] - 90.0) < 1e-4
-    assert abs(geo["ArcLength"] - radius * angle) < 1e-6
+    assert abs(geo["ArcAngle_rad"] - angle) < 0.01   # rounded to 2 decimals
+    assert abs(geo["ArcAngle_deg"] - 90.0) < 0.1      # rounded to 1 decimal
+    assert abs(geo["ArcLength"] - radius * angle) < 0.001  # rounded to 3 decimals (mm)
 
 
 # ---------------------------------------------------------------------------
