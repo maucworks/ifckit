@@ -39,7 +39,7 @@ implying that alpha is reliable in IFC.
 from __future__ import annotations
 
 import re
-from typing import Dict, Any, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 _ColourInput = Union[str, Tuple]
 
@@ -130,23 +130,20 @@ class RenderStyle:
 # Internal parser
 # ------------------------------------------------------------------
 
+
 def _parse_colour(colour: _ColourInput) -> Tuple[float, float, float]:
     """Return (r, g, b) as floats 0–1."""
     if isinstance(colour, str):
         return _parse_hex(colour)
     if isinstance(colour, (tuple, list)):
         return _parse_tuple(colour)
-    raise TypeError(
-        f"colour must be a hex string or RGB tuple, got {type(colour).__name__!r}"
-    )
+    raise TypeError(f"colour must be a hex string or RGB tuple, got {type(colour).__name__!r}")
 
 
 def _parse_hex(s: str) -> Tuple[float, float, float]:
     s = s.strip().lstrip("#")
     if not re.fullmatch(r"[0-9a-fA-F]{6}", s):
-        raise ValueError(
-            f"Invalid hex colour {s!r}. Expected #RRGGBB."
-        )
+        raise ValueError(f"Invalid hex colour {s!r}. Expected #RRGGBB.")
     r = int(s[0:2], 16) / 255.0
     g = int(s[2:4], 16) / 255.0
     b = int(s[4:6], 16) / 255.0

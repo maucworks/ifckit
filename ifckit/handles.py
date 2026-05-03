@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Optional
 import ifcopenshell
 
 if TYPE_CHECKING:
-    from ifckit.model import IfcModel
     from ifckit.elements.base import PendingElement
+    from ifckit.model import IfcModel
 
 
 class Handle:

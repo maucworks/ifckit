@@ -16,7 +16,7 @@ from ifckit.elements.base import PendingElement
 from ifckit.elements.style import RenderStyle
 
 if TYPE_CHECKING:
-    from ifckit.geometry import Plane
+    pass
 
 
 @runtime_checkable
@@ -53,7 +53,6 @@ class IIfcBuilder(Protocol):
             The created primary IFC entity.
         """
         ...
-
 
     # Subclasses must implement geometry creation.
     @abstractmethod

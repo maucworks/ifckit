@@ -11,10 +11,11 @@ as a module vs package in some environments.
 import json
 from typing import Any, Dict, List, Optional
 
+from ifckit.elements.registry import ElementRegistry
 from ifckit.model import IfcModel
 from ifckit.schema import IfcSchema, LengthUnit
-from ifckit.validator import validate, ValidationResult as JsonValidationResult
-from ifckit.elements.registry import ElementRegistry
+from ifckit.validator import ValidationResult as JsonValidationResult
+from ifckit.validator import validate
 
 
 def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
@@ -24,7 +25,9 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
 
     if "ifc_version" in data:
         if data["ifc_version"] not in ("IFC2X3", "IFC4", "IFC4X3"):
-            errors.append(f"ifc_version must be 'IFC2X3', 'IFC4' or 'IFC4X3', got {data['ifc_version']}")
+            errors.append(
+                f"ifc_version must be 'IFC2X3', 'IFC4' or 'IFC4X3', got {data['ifc_version']}"
+            )
     else:
         errors.append("Missing required field: ifc_version")
 
@@ -75,18 +78,17 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
 
     for bldg_data in data.get("buildings", []):
         building = site.add_building(bldg_data.get("name", "Building"))
-        
+
         for storey_data in bldg_data.get("storeys", []):
             storey = building.add_storey(
-                storey_data.get("name", "Storey"),
-                elevation=storey_data.get("elevation", 0.0)
+                storey_data.get("name", "Storey"), elevation=storey_data.get("elevation", 0.0)
             )
-            
+
             for elem_data in storey_data.get("elements", []):
                 elem_type = elem_data.get("type")
                 # Support both formats: {"type": "...", "data": {...}} or {"type": "...", ...}
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
-                
+
                 try:
                     cls = ElementRegistry.get(elem_type)
                 except KeyError:
@@ -103,7 +105,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                 result = validate(pending)
                 if not result.ok:
                     raise ValueError(f"Validation failed: {result.errors}")
-                
+
                 storey.add(pending)
 
             # spaces[] — optional; each entry is a PendingSpace dict.
@@ -136,13 +138,17 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     #     "x_axis":      [x, y, z],           # default [1, 0, 0]
     #     "z_axis":      [x, y, z]}]          # default [0, 0, -1]
     for drawing_data in data.get("drawings", []):
-        dname       = drawing_data.get("name", "Drawing")
+        dname = drawing_data.get("name", "Drawing")
         target_view = drawing_data.get("target_view", "PLAN_VIEW")
-        raw_origin  = drawing_data.get("origin", [0.0, 0.0, 0.0])
-        raw_x_axis  = drawing_data.get("x_axis", [1.0, 0.0, 0.0])
-        raw_z_axis  = drawing_data.get("z_axis", [0.0, 0.0, -1.0])
+        raw_origin = drawing_data.get("origin", [0.0, 0.0, 0.0])
+        raw_x_axis = drawing_data.get("x_axis", [1.0, 0.0, 0.0])
+        raw_z_axis = drawing_data.get("z_axis", [0.0, 0.0, -1.0])
 
-        for field_name, val in (("origin", raw_origin), ("x_axis", raw_x_axis), ("z_axis", raw_z_axis)):
+        for field_name, val in (
+            ("origin", raw_origin),
+            ("x_axis", raw_x_axis),
+            ("z_axis", raw_z_axis),
+        ):
             if not isinstance(val, (list, tuple)) or len(val) != 3:
                 raise ValueError(
                     f"Drawing {dname!r}: '{field_name}' must be a list of 3 numbers, got {val!r}"
@@ -152,8 +158,8 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             name=dname,
             target_view=target_view,
             position=(float(raw_origin[0]), float(raw_origin[1]), float(raw_origin[2])),
-            x_axis=(float(raw_x_axis[0]),  float(raw_x_axis[1]),  float(raw_x_axis[2])),
-            z_axis=(float(raw_z_axis[0]),  float(raw_z_axis[1]),  float(raw_z_axis[2])),
+            x_axis=(float(raw_x_axis[0]), float(raw_x_axis[1]), float(raw_x_axis[2])),
+            z_axis=(float(raw_z_axis[0]), float(raw_z_axis[1]), float(raw_z_axis[2])),
         )
 
     if output_path:

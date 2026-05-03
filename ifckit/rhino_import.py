@@ -43,23 +43,20 @@ Usage::
 
 from __future__ import annotations
 
-import io
 import math
-import os
 import re
 import xml.etree.ElementTree as ET
 from typing import Any, Optional
-
 
 # (linear_deflection, angular_deflection)
 # linear_deflection: max chord deviation in metres
 # angular_deflection: max angle between facet normals in radians
 MESH_QUALITY: dict[str, tuple[float, float]] = {
-    "superfine":   (0.0001, 0.05),   # ~2.9°  — slowest, highest fidelity
-    "fine":        (0.0005, 0.1),    # ~5.7°
-    "default":     (0.001,  0.5),    # ~28.6° — ifcopenshell default
-    "coarse":      (0.005,  1.0),    # ~57.3°
-    "supercoarse": (0.01,   1.5),    # ~85.9° — fastest, lowest fidelity
+    "superfine": (0.0001, 0.05),  # ~2.9°  — slowest, highest fidelity
+    "fine": (0.0005, 0.1),  # ~5.7°
+    "default": (0.001, 0.5),  # ~28.6° — ifcopenshell default
+    "coarse": (0.005, 1.0),  # ~57.3°
+    "supercoarse": (0.01, 1.5),  # ~85.9° — fastest, lowest fidelity
 }
 
 
@@ -82,7 +79,7 @@ def _ifc_class_to_layer(ifc_class: str) -> str:
     # Naive pluralise
     if name.endswith("s") or name.endswith("x") or name.endswith("z"):
         return name + "es"
-    if name.endswith("y") and not name[-2] in "aeiou":
+    if name.endswith("y") and name[-2] not in "aeiou":
         return name[:-1] + "ies"
     return name + "s"
 
@@ -224,6 +221,7 @@ class IfcMeshImporter:
         mesh_quality: str = "default",
     ) -> None:
         import Rhino
+
         self.doc = doc if doc is not None else Rhino.RhinoDoc.ActiveDoc
 
         self.layer_root = layer_root
@@ -470,7 +468,9 @@ class IfcMeshImporter:
         element_type: str,
     ) -> None:
         """Process a single IFC element."""
-        layer_path = f"{self.layer_root}::{site_name}::{building_name}::{storey_name}::{element_type}"
+        layer_path = (
+            f"{self.layer_root}::{site_name}::{building_name}::{storey_name}::{element_type}"
+        )
 
         layer_index = self._ensure_layer(layer_path)
         element_name = element.Name or f"{element_type}_{guid[:8]}"
@@ -525,7 +525,7 @@ class IfcMeshImporter:
         s = self._ifc_unit_scale
 
         # Pre-index original vertices for fast lookup
-        all_verts = [verts[i:i + 3] for i in range(0, len(verts), 3)]
+        all_verts = [verts[i : i + 3] for i in range(0, len(verts), 3)]
 
         # Add one dedicated vertex triple per face (unweld)
         vi = 0
@@ -547,7 +547,11 @@ class IfcMeshImporter:
         return _ensure_layer(self.doc, path, self._layer_cache)
 
     def _add_geometry(
-        self, mesh: Any, layer_index: int, ifc_guid: str, element_name: str,
+        self,
+        mesh: Any,
+        layer_index: int,
+        ifc_guid: str,
+        element_name: str,
         colour: Optional[tuple] = None,
     ) -> Any:
         """Add new mesh to document."""
@@ -651,8 +655,8 @@ def _parse_path_d(d: str) -> list[tuple]:
         i += 2
 
     segments: list[tuple] = []
-    cx, cy = 0.0, 0.0   # current point
-    sx, sy = 0.0, 0.0   # sub-path start (for Z)
+    cx, cy = 0.0, 0.0  # current point
+    sx, sy = 0.0, 0.0  # sub-path start (for Z)
 
     for cmd, nums in cmd_blocks:
         # ---------- M / m ----------
@@ -660,7 +664,8 @@ def _parse_path_d(d: str) -> list[tuple]:
             pairs = list(zip(nums[0::2], nums[1::2]))
             for k, (dx, dy) in enumerate(pairs):
                 if cmd == "m":
-                    cx += dx; cy += dy
+                    cx += dx
+                    cy += dy  # noqa: E702
                 else:
                     cx, cy = dx, dy
                 if k == 0:
@@ -675,7 +680,8 @@ def _parse_path_d(d: str) -> list[tuple]:
             pairs = list(zip(nums[0::2], nums[1::2]))
             for dx, dy in pairs:
                 if cmd == "l":
-                    cx += dx; cy += dy
+                    cx += dx
+                    cy += dy  # noqa: E702
                 else:
                     cx, cy = dx, dy
                 segments.append(("L", cx, cy))
@@ -703,12 +709,13 @@ def _parse_path_d(d: str) -> list[tuple]:
             # 7 numbers per arc: rx ry x-rotation large-arc-flag sweep-flag x y
             n = 7
             for j in range(0, len(nums), n):
-                chunk = nums[j: j + n]
+                chunk = nums[j : j + n]
                 if len(chunk) < n:
                     break
                 rx, ry, x_rot, large_arc, sweep, ex, ey = chunk
                 if cmd == "a":
-                    ex += cx; ey += cy
+                    ex += cx
+                    ey += cy  # noqa: E702
                 segments.append(("A", rx, ry, x_rot, int(large_arc), int(sweep), ex, ey))
                 cx, cy = ex, ey
 
@@ -721,36 +728,39 @@ def _parse_path_d(d: str) -> list[tuple]:
         elif cmd in ("C", "c"):
             # 6 numbers per segment: cp1x cp1y cp2x cp2y ex ey
             for j in range(0, len(nums), 6):
-                chunk = nums[j: j + 6]
+                chunk = nums[j : j + 6]
                 if len(chunk) < 6:
                     break
                 ex, ey = chunk[4], chunk[5]
                 if cmd == "c":
-                    ex += cx; ey += cy
+                    ex += cx
+                    ey += cy  # noqa: E702
                 cx, cy = ex, ey
                 segments.append(("L", cx, cy))
 
         # ---------- S / s (smooth cubic — approximate) ----------
         elif cmd in ("S", "s"):
             for j in range(0, len(nums), 4):
-                chunk = nums[j: j + 4]
+                chunk = nums[j : j + 4]
                 if len(chunk) < 4:
                     break
                 ex, ey = chunk[2], chunk[3]
                 if cmd == "s":
-                    ex += cx; ey += cy
+                    ex += cx
+                    ey += cy  # noqa: E702
                 cx, cy = ex, ey
                 segments.append(("L", cx, cy))
 
         # ---------- Q / q (quadratic bezier — approximate) ----------
         elif cmd in ("Q", "q"):
             for j in range(0, len(nums), 4):
-                chunk = nums[j: j + 4]
+                chunk = nums[j : j + 4]
                 if len(chunk) < 4:
                     break
                 ex, ey = chunk[2], chunk[3]
                 if cmd == "q":
-                    ex += cx; ey += cy
+                    ex += cx
+                    ey += cy  # noqa: E702
                 cx, cy = ex, ey
                 segments.append(("L", cx, cy))
 
@@ -759,7 +769,8 @@ def _parse_path_d(d: str) -> list[tuple]:
             pairs = list(zip(nums[0::2], nums[1::2]))
             for dx, dy in pairs:
                 if cmd == "t":
-                    cx += dx; cy += dy
+                    cx += dx
+                    cy += dy  # noqa: E702
                 else:
                     cx, cy = dx, dy
                 segments.append(("L", cx, cy))
@@ -866,12 +877,15 @@ def _parse_ifc_plane(plane_attr: str) -> Optional[list]:
 
 
 def _arc_segment_to_rhino_curve(
-    x0: float, y0: float,
-    rx: float, ry: float,
+    x0: float,
+    y0: float,
+    rx: float,
+    ry: float,
     x_rot_deg: float,
     large_arc: int,
     sweep: int,
-    x1: float, y1: float,
+    x1: float,
+    y1: float,
     z: float,
 ) -> Any:
     """Convert an SVG arc segment to a Rhino ``ArcCurve``.
@@ -907,13 +921,13 @@ def _arc_segment_to_rhino_curve(
 
     if abs(rx - ry) < 1e-6 * rx and abs(x_rot_deg) < 1e-6:
         r = rx
-        phi = math.radians(x_rot_deg)   # == 0
+        phi = math.radians(x_rot_deg)  # == 0
         mx = (x0 - x1) / 2.0
         my = (y0 - y1) / 2.0
-        x1p =  math.cos(phi) * mx + math.sin(phi) * my
+        x1p = math.cos(phi) * mx + math.sin(phi) * my
         y1p = -math.sin(phi) * mx + math.cos(phi) * my
 
-        r2   = r * r
+        r2 = r * r
         x1p2 = x1p * x1p
         y1p2 = y1p * y1p
         denom = r2 * (x1p2 + y1p2)
@@ -925,7 +939,7 @@ def _arc_segment_to_rhino_curve(
         if large_arc == sweep:
             sq = -sq
 
-        cxp =  sq * r * y1p / r
+        cxp = sq * r * y1p / r
         cyp = -sq * r * x1p / r
         cx = math.cos(phi) * cxp - math.sin(phi) * cyp + (x0 + x1) / 2.0
         cy = math.sin(phi) * cxp + math.cos(phi) * cyp + (y0 + y1) / 2.0
@@ -935,8 +949,10 @@ def _arc_segment_to_rhino_curve(
 
         a_start = _angle(1, 0, (x0 - cx) / r, (y0 - cy) / r)
         d_theta = _angle(
-            (x0 - cx) / r, (y0 - cy) / r,
-            (x1 - cx) / r, (y1 - cy) / r,
+            (x0 - cx) / r,
+            (y0 - cy) / r,
+            (x1 - cx) / r,
+            (y1 - cy) / r,
         )
         # sweep=1 in SVG (CW in Y-down) → CCW in Rhino (Y-up) → d_theta > 0
         if sweep == 1 and d_theta < 0:
@@ -945,11 +961,11 @@ def _arc_segment_to_rhino_curve(
             d_theta -= 2 * math.pi
 
         centre = Rhino.Geometry.Point3d(cx, cy, z)
-        plane  = Rhino.Geometry.Plane(centre, Rhino.Geometry.Vector3d.ZAxis)
+        plane = Rhino.Geometry.Plane(centre, Rhino.Geometry.Vector3d.ZAxis)
         try:
             arc = Rhino.Geometry.Arc(plane, r, abs(d_theta))
             arc.StartAngle = a_start if d_theta > 0 else a_start + d_theta
-            arc.EndAngle   = a_start + d_theta if d_theta > 0 else a_start
+            arc.EndAngle = a_start + d_theta if d_theta > 0 else a_start
             crv = Rhino.Geometry.ArcCurve(arc)
             if crv.IsValid:
                 return crv
@@ -1015,13 +1031,13 @@ def _segments_to_rhino(
         # wx = m00*lx + m01*(-ly) + m03
         # wy = m10*lx + m11*(-ly) + m13
         # wz = m20*lx + m21*(-ly) + m23
-        m00,m01,m02,m03 = plane[0],plane[1],plane[2],plane[3]
-        m10,m11,m12,m13 = plane[4],plane[5],plane[6],plane[7]
-        m20,m21,m22,m23 = plane[8],plane[9],plane[10],plane[11]
+        m00, m01, m02, m03 = plane[0], plane[1], plane[2], plane[3]  # noqa: E702,F841
+        m10, m11, m12, m13 = plane[4], plane[5], plane[6], plane[7]  # noqa: E702,F841
+        m20, m21, m22, m23 = plane[8], plane[9], plane[10], plane[11]  # noqa: E702,F841
 
         def _to_rhino_xyz(svg_x: float, svg_y: float):
-            lx = (svg_x - tx) / sc   # local metres, x
-            ly = (svg_y - ty) / sc   # local metres, y (SVG Y-down, flip below)
+            lx = (svg_x - tx) / sc  # local metres, x
+            ly = (svg_y - ty) / sc  # local metres, y (SVG Y-down, flip below)
             # Apply Y-flip: SVG y-down → local y-up → negate ly
             wx = (m00 * lx + m01 * (-ly) + m03) * uf
             wy = (m10 * lx + m11 * (-ly) + m13) * uf
@@ -1037,14 +1053,20 @@ def _segments_to_rhino(
             ary_r = ary / sc * uf
             dest_wx, dest_wy, dest_wz = _to_rhino_xyz(ex, ey)
             return _arc_segment_to_rhino_curve(
-                prev_pt.X, prev_pt.Y,
-                arx_r, ary_r,
-                x_rot, large_arc, sweep,
-                dest_wx, dest_wy,
+                prev_pt.X,
+                prev_pt.Y,
+                arx_r,
+                ary_r,
+                x_rot,
+                large_arc,
+                sweep,
+                dest_wx,
+                dest_wy,
                 prev_pt.Z,
             ), Rhino.Geometry.Point3d(dest_wx, dest_wy, dest_wz)
 
     else:
+
         def _make_pt(svg_x, svg_y):
             return Rhino.Geometry.Point3d(
                 (svg_x - tx) / sc * uf,
@@ -1058,14 +1080,19 @@ def _segments_to_rhino(
             dest_rx = (ex - tx) / sc * uf
             dest_ry = -(ey - ty) / sc * uf
             return _arc_segment_to_rhino_curve(
-                prev_pt.X, prev_pt.Y,
-                arx_r, ary_r,
-                x_rot, large_arc, sweep,
-                dest_rx, dest_ry,
+                prev_pt.X,
+                prev_pt.Y,
+                arx_r,
+                ary_r,
+                x_rot,
+                large_arc,
+                sweep,
+                dest_rx,
+                dest_ry,
                 z,
             ), Rhino.Geometry.Point3d(dest_rx, dest_ry, z)
 
-    open_curves:   list = []
+    open_curves: list = []
     closed_curves: list = []
 
     # Split on M into sub-paths
@@ -1087,9 +1114,10 @@ def _segments_to_rhino(
         _last_seg = sub[-1]
         _last_xy = (_last_seg[1], _last_seg[2]) if len(_last_seg) >= 3 else None
         _first_xy = (sub[0][1], sub[0][2])
-        is_closed = (
-            _last_seg[0] == "Z"
-            or (_last_xy is not None and abs(_last_xy[0] - _first_xy[0]) < 1e-6 and abs(_last_xy[1] - _first_xy[1]) < 1e-6)
+        is_closed = _last_seg[0] == "Z" or (
+            _last_xy is not None
+            and abs(_last_xy[0] - _first_xy[0]) < 1e-6
+            and abs(_last_xy[1] - _first_xy[1]) < 1e-6
         )
         pts: list = []
         arc_entries: list[tuple[int, Any]] = []
@@ -1121,9 +1149,7 @@ def _segments_to_rhino(
             continue
 
         if not has_arcs:
-            crv = Rhino.Geometry.PolylineCurve(
-                Rhino.Collections.Point3dList(pts)
-            )
+            crv = Rhino.Geometry.PolylineCurve(Rhino.Collections.Point3dList(pts))
         else:
             poly = Rhino.Geometry.PolyCurve()
             arc_map = {idx: ac for idx, ac in arc_entries}
@@ -1132,9 +1158,7 @@ def _segments_to_rhino(
                 if i in arc_map:
                     poly.AppendSegment(arc_map[i])
                 else:
-                    poly.AppendSegment(
-                        Rhino.Geometry.LineCurve(pts[i], pts[i + 1])
-                    )
+                    poly.AppendSegment(Rhino.Geometry.LineCurve(pts[i], pts[i + 1]))
                 i += 1
             crv = poly
 
@@ -1149,7 +1173,6 @@ def _segments_to_rhino(
     return open_curves, closed_curves
 
 
-
 # ---------------------------------------------------------------------------
 # IfcSvgImporter
 # ---------------------------------------------------------------------------
@@ -1160,21 +1183,21 @@ def _segments_to_rhino(
 #: ifckit builder; values are the names of hatch patterns that must exist
 #: in the Rhino document.  Extend or override on the importer instance.
 BONSAI_HATCH_MAP: dict[str, str] = {
-    "Solid":            "Solid",
-    "ANSI31":           "ANSI31",     # 45° steel hatch
-    "ANSI32":           "ANSI32",
-    "ANSI33":           "ANSI33",
-    "ANSI34":           "ANSI34",
-    "ANSI35":           "ANSI35",
-    "ANSI36":           "ANSI36",
-    "ANSI37":           "ANSI37",
-    "ANSI38":           "ANSI38",
-    "CONCRETE":         "Concrete",
-    "EARTH":            "Earth",
-    "GRAVEL":           "Gravel",
-    "INSULATION":       "Insulation",
-    "SAND":             "Sand",
-    "WOOD":             "Wood",
+    "Solid": "Solid",
+    "ANSI31": "ANSI31",  # 45° steel hatch
+    "ANSI32": "ANSI32",
+    "ANSI33": "ANSI33",
+    "ANSI34": "ANSI34",
+    "ANSI35": "ANSI35",
+    "ANSI36": "ANSI36",
+    "ANSI37": "ANSI37",
+    "ANSI38": "ANSI38",
+    "CONCRETE": "Concrete",
+    "EARTH": "Earth",
+    "GRAVEL": "Gravel",
+    "INSULATION": "Insulation",
+    "SAND": "Sand",
+    "WOOD": "Wood",
 }
 
 
@@ -1223,6 +1246,7 @@ class IfcSvgImporter:
         hatch_map: Optional[dict] = None,
     ) -> None:
         import Rhino
+
         self.doc = doc if doc is not None else Rhino.RhinoDoc.ActiveDoc
         self.layer_root = layer_root
         self._default_hatch_pattern = hatch_pattern
@@ -1258,6 +1282,7 @@ class IfcSvgImporter:
             ``{"curves": int, "hatches": int}``
         """
         import ifcopenshell
+
         ifc_model = ifcopenshell.open(ifc_path)
         return self.import_model(ifc_model, hlr_poly=hlr_poly, mesher_deflection=mesher_deflection)
 
@@ -1308,12 +1333,14 @@ class IfcSvgImporter:
         self._build_guid_hatch_map(ifc_file)
 
         drawings = [
-            a for a in ifc_file.by_type("IfcAnnotation")
+            a
+            for a in ifc_file.by_type("IfcAnnotation")
             if getattr(a, "ObjectType", None) == "DRAWING"
         ]
 
         if not drawings:
             import warnings
+
             warnings.warn("IfcSvgImporter: no DRAWING annotations found in IFC file.")
             return {"curves": 0, "hatches": 0}
 
@@ -1321,10 +1348,10 @@ class IfcSvgImporter:
             matched = [a for a in drawings if (a.Name or a.GlobalId) == drawing_filter]
             if not matched:
                 import warnings
+
                 available = [a.Name or a.GlobalId for a in drawings]
                 warnings.warn(
-                    f"IfcSvgImporter: drawing {drawing_filter!r} not found. "
-                    f"Available: {available}"
+                    f"IfcSvgImporter: drawing {drawing_filter!r} not found. Available: {available}"
                 )
                 return {"curves": 0, "hatches": 0}
             drawings = matched
@@ -1333,26 +1360,41 @@ class IfcSvgImporter:
         total_hatches = 0
 
         import time as _time
+
         for ann in drawings:
             drawing_name = ann.Name or ann.GlobalId
             t0 = _time.time()
             print(f"[ifckit] generating SVG for {drawing_name!r} ...")
             svg_bytes = self._generate_svg(
-                ifc_model, ann.GlobalId,
+                ifc_model,
+                ann.GlobalId,
                 hlr_poly=hlr_poly,
                 mesher_deflection=mesher_deflection,
             )
             if not svg_bytes:
-                print(f"[ifckit]   _generate_svg returned None — skipping")
+                print("[ifckit]   _generate_svg returned None — skipping")
                 continue
             import re as _re
-            n_paths = len(_re.findall(rb'<path', svg_bytes if isinstance(svg_bytes, bytes) else svg_bytes.encode()))
-            print(f"[ifckit]   SVG ok: {len(svg_bytes)} bytes, {n_paths} paths  ({_time.time()-t0:.1f}s)")
+
+            n_paths = len(
+                _re.findall(
+                    rb"<path",
+                    svg_bytes if isinstance(svg_bytes, bytes) else svg_bytes.encode(),
+                )
+            )
+            print(
+                f"[ifckit]   SVG ok: {len(svg_bytes)} bytes,"
+                f" {n_paths} paths  ({_time.time() - t0:.1f}s)"
+            )
             t1 = _time.time()
-            result = self._process_svg(svg_bytes, drawing_name, uf,
-                                       destination_plane=destination_plane)
-            print(f"[ifckit]   processed: curves={result['curves']} hatches={result['hatches']}  ({_time.time()-t1:.1f}s)")
-            total_curves  += result["curves"]
+            result = self._process_svg(
+                svg_bytes, drawing_name, uf, destination_plane=destination_plane
+            )
+            print(
+                f"[ifckit]   processed: curves={result['curves']}"
+                f" hatches={result['hatches']}  ({_time.time() - t1:.1f}s)"
+            )
+            total_curves += result["curves"]
             total_hatches += result["hatches"]
 
         return {"curves": total_curves, "hatches": total_hatches}
@@ -1489,8 +1531,8 @@ class IfcSvgImporter:
             ep = psets.get("EPset_IfcKit", {})
             pattern_name = ep.get("HatchPattern", "")
             if pattern_name:
-                self._guid_hatch_index[product.GlobalId] = (
-                    self._resolve_named_hatch_pattern(pattern_name)
+                self._guid_hatch_index[product.GlobalId] = self._resolve_named_hatch_pattern(
+                    pattern_name
                 )
 
     def _rhino_unit_factor(self) -> float:
@@ -1499,12 +1541,13 @@ class IfcSvgImporter:
         E.g. ``1000.0`` for a millimetre document, ``1.0`` for metres.
         """
         import Rhino
+
         unit_map = {
             Rhino.UnitSystem.Millimeters: 1000.0,
             Rhino.UnitSystem.Centimeters: 100.0,
-            Rhino.UnitSystem.Meters:      1.0,
-            Rhino.UnitSystem.Feet:        3.28084,
-            Rhino.UnitSystem.Inches:      39.3701,
+            Rhino.UnitSystem.Meters: 1.0,
+            Rhino.UnitSystem.Feet: 3.28084,
+            Rhino.UnitSystem.Inches: 39.3701,
         }
         return unit_map.get(self.doc.ModelUnitSystem, 1.0)
 
@@ -1573,6 +1616,7 @@ class IfcSvgImporter:
 
         except Exception as exc:
             import warnings
+
             warnings.warn(f"IfcSvgImporter: SVG generation failed for {drawing_guid!r}: {exc}")
             return None
 
@@ -1615,8 +1659,9 @@ class IfcSvgImporter:
             ``Rhino.Geometry.Plane`` of the section, or ``None`` when not
             found in the SVG).
         """
-        import System
         import warnings
+
+        import System
 
         try:
             root = ET.fromstring(svg_bytes)
@@ -1625,7 +1670,7 @@ class IfcSvgImporter:
             return {"curves": 0, "hatches": 0, "guids": []}
         IFC_NS = self._NS["ifc"]
 
-        n_curves  = 0
+        n_curves = 0
         n_hatches = 0
         drawing_guids: list = []
 
@@ -1642,14 +1687,16 @@ class IfcSvgImporter:
             default_fill: Optional[tuple[int, int, int]] = None,
             plane: Optional[list] = None,
         ) -> tuple[int, int, list]:
-            d        = path_el.get("d", "")
-            style    = path_el.get("style", "")
+            d = path_el.get("d", "")
+            style = path_el.get("style", "")
             path_cls = path_el.get("class", "")
             effective_type = path_cls if path_cls.startswith("Ifc") else ifc_type
 
             # Projection curves use layer colour, not material fill.
             # Fill colour is only meaningful for cut hatches.
-            fill = (_parse_fill_colour(style) or default_fill) if group_name != "projection" else None
+            fill = (
+                (_parse_fill_colour(style) or default_fill) if group_name != "projection" else None
+            )
             if not d:
                 return 0, 0, []
 
@@ -1657,8 +1704,8 @@ class IfcSvgImporter:
             if plane is not None:
                 if transform is None:
                     warnings.warn(
-                        f"_handle_path: plane-mode path has no ifc:matrix3 transform; "
-                        f"SVG coordinates will be used as-is (likely incorrect placement)."
+                        "_handle_path: plane-mode path has no ifc:matrix3 transform; "
+                        "SVG coordinates will be used as-is (likely incorrect placement)."
                     )
                     sc, tx, ty = 1.0, 0.0, 0.0
                 else:
@@ -1670,7 +1717,9 @@ class IfcSvgImporter:
             else:
                 open_crvs, closed_crvs = _segments_to_rhino(segs, z, 1.0, 0.0, 0.0, uf)
 
-            curve_layer = f"{self.layer_root}::{drawing_name}::{group_name}::{effective_type or 'Unknown'}"
+            curve_layer = (
+                f"{self.layer_root}::{drawing_name}::{group_name}::{effective_type or 'Unknown'}"
+            )
             c_idx = _ensure_layer(self.doc, curve_layer, self._layer_cache)
 
             nc = nh = 0
@@ -1685,9 +1734,13 @@ class IfcSvgImporter:
                 nc += 1
 
             if closed_crvs and fill is not None and group_name == "cut":
-                hatch_layer = f"{self.layer_root}::{drawing_name}::cut_hatch::{effective_type or 'Unknown'}"
+                hatch_layer = (
+                    f"{self.layer_root}::{drawing_name}::cut_hatch::{effective_type or 'Unknown'}"
+                )
                 h_idx = _ensure_layer(self.doc, hatch_layer, self._layer_cache)
-                nh, hatch_guids = self._add_hatches(closed_crvs, h_idx, ifc_guid, fill, drawing_name)
+                nh, hatch_guids = self._add_hatches(
+                    closed_crvs, h_idx, ifc_guid, fill, drawing_name
+                )
                 path_guids.extend(hatch_guids)
 
             return nc, nh, path_guids
@@ -1708,10 +1761,14 @@ class IfcSvgImporter:
                         """Recurse into nested IfcType groups (ELEMENT_HIERARCHY nesting)."""
                         nonlocal n_curves, n_hatches
                         for path_el in g.findall("svg:path", self._NS):
-                            nc, nh, gs = _handle_path(path_el, group_name, ifc_type, ifc_guid, transform, plane=plane)
-                            n_curves += nc; n_hatches += nh; drawing_guids.extend(gs)
+                            nc, nh, gs = _handle_path(
+                                path_el, group_name, ifc_type, ifc_guid, transform, plane=plane
+                            )
+                            n_curves += nc
+                            n_hatches += nh
+                            drawing_guids.extend(gs)  # noqa: E702  # noqa: E702
                         for sub_g in g.findall("svg:g", self._NS):
-                            sub_cls  = sub_g.get("class", "Unknown")
+                            sub_cls = sub_g.get("class", "Unknown")
                             sub_guid = sub_g.get(f"{{{IFC_NS}}}guid", "") or ifc_guid
                             sub_type = sub_cls if sub_cls.startswith("Ifc") else ifc_type
                             _walk_ifc_group(sub_g, sub_type, sub_guid)
@@ -1720,8 +1777,12 @@ class IfcSvgImporter:
                     for path_el in child_g.findall("svg:path", self._NS):
                         ifc_guid = path_el.get(f"{{{IFC_NS}}}guid", "")
                         ifc_type = path_el.get("class", "Unknown")
-                        nc, nh, gs = _handle_path(path_el, group_name, ifc_type, ifc_guid, transform, plane=plane)
-                        n_curves += nc; n_hatches += nh; drawing_guids.extend(gs)
+                        nc, nh, gs = _handle_path(
+                            path_el, group_name, ifc_type, ifc_guid, transform, plane=plane
+                        )
+                        n_curves += nc
+                        n_hatches += nh
+                        drawing_guids.extend(gs)  # noqa: E702
                     # Recurse into nested IfcType groups
                     for type_g in child_g.findall("svg:g", self._NS):
                         ifc_type = type_g.get("class", "Unknown")
@@ -1732,8 +1793,18 @@ class IfcSvgImporter:
                     ifc_type = child_cls
                     ifc_guid = child_g.get(f"{{{IFC_NS}}}guid", "")
                     for path_el in child_g.findall("svg:path", self._NS):
-                        nc, nh, gs = _handle_path(path_el, "cut", ifc_type, ifc_guid, transform, default_fill=(200, 200, 200), plane=plane)
-                        n_curves += nc; n_hatches += nh; drawing_guids.extend(gs)
+                        nc, nh, gs = _handle_path(
+                            path_el,
+                            "cut",
+                            ifc_type,
+                            ifc_guid,
+                            transform,
+                            default_fill=(200, 200, 200),
+                            plane=plane,
+                        )
+                        n_curves += nc
+                        n_hatches += nh
+                        drawing_guids.extend(gs)  # noqa: E702
 
         for top_g in root.findall("svg:g", self._NS):
             top_cls = top_g.get("class", "")
@@ -1752,33 +1823,65 @@ class IfcSvgImporter:
             elif top_cls == "section":
                 # drawing_guid mode: parse ifc:matrix3 and ifc:plane from this <g>
                 matrix3_attr = top_g.get(f"{{{IFC_NS}}}matrix3", "")
-                plane_attr   = top_g.get(f"{{{IFC_NS}}}plane", "")
+                plane_attr = top_g.get(f"{{{IFC_NS}}}plane", "")
                 transform = _parse_matrix3(matrix3_attr)
-                plane     = _parse_ifc_plane(plane_attr)
-                print(f"[ifckit]   section branch: transform={transform is not None}, plane={plane is not None}, destination_plane={destination_plane is not None}")
+                plane = _parse_ifc_plane(plane_attr)
+                print(
+                    f"[ifckit]   section branch:"
+                    f" transform={transform is not None},"
+                    f" plane={plane is not None},"
+                    f" destination_plane={destination_plane is not None}"
+                )
                 # If a destination plane is given, replace the world-placement
                 # part of the matrix with it so _segments_to_rhino draws
                 # directly onto dest_plane.  The ifc:matrix3 scale/offset is
                 # kept for SVG→local coordinate conversion.
                 if destination_plane is not None:
-                    import Rhino
                     dp = destination_plane
-                    print(f"[ifckit]   destination_plane origin={dp.Origin}, xaxis={dp.XAxis}, zaxis={dp.ZAxis}, uf={uf}")
+                    print(
+                        f"[ifckit]   destination_plane"
+                        f" origin={dp.Origin}, xaxis={dp.XAxis},"
+                        f" zaxis={dp.ZAxis}, uf={uf}"
+                    )
                     if plane is None:
                         # No ifc:plane in SVG — build identity-like matrix at dest origin
                         plane = [
-                            1.0, 0.0, 0.0, dp.Origin.X / uf,
-                            0.0, 1.0, 0.0, dp.Origin.Y / uf,
-                            0.0, 0.0, 1.0, dp.Origin.Z / uf,
-                            0.0, 0.0, 0.0, 1.0,
+                            1.0,
+                            0.0,
+                            0.0,
+                            dp.Origin.X / uf,
+                            0.0,
+                            1.0,
+                            0.0,
+                            dp.Origin.Y / uf,
+                            0.0,
+                            0.0,
+                            1.0,
+                            dp.Origin.Z / uf,
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0,
                         ]
                     else:
                         # Replace world-placement axes+origin with dest_plane
                         plane = [
-                            dp.XAxis.X,  dp.YAxis.X,  dp.ZAxis.X,  dp.Origin.X / uf,
-                            dp.XAxis.Y,  dp.YAxis.Y,  dp.ZAxis.Y,  dp.Origin.Y / uf,
-                            dp.XAxis.Z,  dp.YAxis.Z,  dp.ZAxis.Z,  dp.Origin.Z / uf,
-                            0.0,         0.0,          0.0,          1.0,
+                            dp.XAxis.X,
+                            dp.YAxis.X,
+                            dp.ZAxis.X,
+                            dp.Origin.X / uf,
+                            dp.XAxis.Y,
+                            dp.YAxis.Y,
+                            dp.ZAxis.Y,
+                            dp.Origin.Y / uf,
+                            dp.XAxis.Z,
+                            dp.YAxis.Z,
+                            dp.ZAxis.Z,
+                            dp.Origin.Z / uf,
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0,
                         ]
                 _process_storey_or_section(top_g, transform, plane=plane)
 
@@ -1828,9 +1931,7 @@ class IfcSvgImporter:
             attrs.SetUserString("ifc_svg_drawing", drawing_name)
         if colour is not None:
             r, g, b = colour
-            attrs.ColorSource = (
-                Rhino.DocObjects.ObjectColorSource.ColorFromObject
-            )
+            attrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject
             attrs.ObjectColor = System.Drawing.Color.FromArgb(255, r, g, b)
         return attrs
 
@@ -1891,9 +1992,7 @@ class IfcSvgImporter:
                 z_elev = (bbox.Min.Z + bbox.Max.Z) * 0.5
 
                 flat = boundary.Duplicate()
-                flat.Transform(
-                    Rhino.Geometry.Transform.Translation(0.0, 0.0, -z_elev)
-                )
+                flat.Transform(Rhino.Geometry.Transform.Translation(0.0, 0.0, -z_elev))
 
                 hatches = Rhino.Geometry.Hatch.Create(
                     flat,
@@ -1904,6 +2003,7 @@ class IfcSvgImporter:
                 )
             except Exception as exc:
                 import warnings
+
                 warnings.warn(f"_add_hatches exception: {exc}")
                 hatches = None
 
@@ -1926,6 +2026,7 @@ class IfcSvgImporter:
 # ---------------------------------------------------------------------------
 # IfcSpaceImporter
 # ---------------------------------------------------------------------------
+
 
 class IfcSpaceImporter:
     """Import ``IfcSpace`` entities from an IFC file into Rhino.
@@ -2031,7 +2132,6 @@ class IfcSpaceImporter:
         Returns:
             Number of objects deleted.
         """
-        import Rhino
 
         root_idx = self.doc.Layers.FindByFullPath(self.layer_root, -1)
         if root_idx < 0:
@@ -2047,12 +2147,10 @@ class IfcSpaceImporter:
     def _import_ifc(self, ifc: Any) -> dict:
         import Rhino
         import Rhino.Geometry as rg
-        import System.Drawing
 
         spaces = ifc.by_type("IfcSpace")
         if not spaces:
-            return {"spaces": 0, "footprints": 0, "hatches": 0,
-                    "annotations": 0, "meshes": 0}
+            return {"spaces": 0, "footprints": 0, "hatches": 0, "annotations": 0, "meshes": 0}
 
         uf = self._unit_factor(ifc)
 
@@ -2063,14 +2161,14 @@ class IfcSpaceImporter:
 
         for space in spaces:
             storey_name = self._storey_name(space)
-            name      = space.Name      or ""
+            name = space.Name or ""
             long_name = getattr(space, "LongName", None) or ""
-            color     = self._space_color(space)
+            color = self._space_color(space)
 
             # Layer paths
-            fp_layer   = f"{self.layer_root}::{storey_name}::footprint"
-            ht_layer   = f"{self.layer_root}::{storey_name}::hatch"
-            ann_layer  = f"{self.layer_root}::{storey_name}::annotation"
+            fp_layer = f"{self.layer_root}::{storey_name}::footprint"
+            ht_layer = f"{self.layer_root}::{storey_name}::hatch"
+            ann_layer = f"{self.layer_root}::{storey_name}::annotation"
             mesh_layer = f"{self.layer_root}::{storey_name}::mesh"
 
             # Footprint curves
@@ -2110,11 +2208,11 @@ class IfcSpaceImporter:
                 n_meshes += self._add_mesh(ifc, space, mesh_layer, uf)
 
         return {
-            "spaces":      len(spaces),
-            "footprints":  n_footprints,
-            "hatches":     n_hatches,
+            "spaces": len(spaces),
+            "footprints": n_footprints,
+            "hatches": n_hatches,
             "annotations": n_annotations,
-            "meshes":      n_meshes,
+            "meshes": n_meshes,
         }
 
     # ------------------------------------------------------------------
@@ -2123,16 +2221,16 @@ class IfcSpaceImporter:
 
     def _unit_factor(self, ifc: Any) -> float:
         """Return scale factor: IFC file units → Rhino document units."""
-        import Rhino
         import ifcopenshell.util.unit as ifc_unit
+        import Rhino
 
         rhino_unit = self.doc.ModelUnitSystem
         unit_map = {
             Rhino.UnitSystem.Millimeters: 1000.0,
             Rhino.UnitSystem.Centimeters: 100.0,
-            Rhino.UnitSystem.Meters:      1.0,
-            Rhino.UnitSystem.Feet:        3.28084,
-            Rhino.UnitSystem.Inches:      39.3701,
+            Rhino.UnitSystem.Meters: 1.0,
+            Rhino.UnitSystem.Feet: 3.28084,
+            Rhino.UnitSystem.Inches: 39.3701,
         }
         rhino_factor = unit_map.get(rhino_unit, 1.0)
         try:
@@ -2192,19 +2290,18 @@ class IfcSpaceImporter:
         """
         try:
             import ifcopenshell.geom
-            import ifcopenshell.util.shape as shape_util
 
             s = ifcopenshell.geom.settings()
             s.set(s.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(s, space)
-            verts = shape.geometry.verts   # flat list x0,y0,z0, x1,y1,z1, …
-            faces = shape.geometry.faces   # flat list of triangle indices
+            verts = shape.geometry.verts  # flat list x0,y0,z0, x1,y1,z1, …
+            faces = shape.geometry.faces  # noqa: F841 flat list of triangle indices
 
             # Find the lowest Z face (floor boundary) as the footprint.
-            pts3 = [(verts[i * 3] * uf,
-                     verts[i * 3 + 1] * uf,
-                     verts[i * 3 + 2] * uf)
-                    for i in range(len(verts) // 3)]
+            pts3 = [
+                (verts[i * 3] * uf, verts[i * 3 + 1] * uf, verts[i * 3 + 2] * uf)
+                for i in range(len(verts) // 3)
+            ]
 
             if not pts3:
                 return []
@@ -2318,5 +2415,3 @@ class IfcSpaceImporter:
             return 1
         except Exception:
             return 0
-
-

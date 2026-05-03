@@ -8,7 +8,6 @@ IFC schema version management and unit helpers.
 from __future__ import annotations
 
 import enum
-from typing import Optional
 
 
 class IfcSchema(enum.Enum):

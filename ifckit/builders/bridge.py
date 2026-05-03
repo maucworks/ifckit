@@ -21,7 +21,7 @@ import ifcopenshell.api
 
 from ifckit.builders._geom import pt2
 from ifckit.elements.base import PendingElement
-from ifckit.elements.bridge import AlignmentSegment, PendingAlignment
+from ifckit.elements.bridge import AlignmentSegment
 from ifckit.geometry import Arc, Line
 
 
@@ -86,7 +86,7 @@ class AlignmentBuilder:
         """
         # Use element_type string comparison instead of isinstance() to handle
         # class identity mismatches from module reloading in Rhino/Grasshopper.
-        if not hasattr(pending, 'element_type') or pending.element_type != 'alignment':
+        if not hasattr(pending, "element_type") or pending.element_type != "alignment":
             raise TypeError(
                 f"AlignmentBuilder expects PendingAlignment, got {type(pending).__name__}"
             )

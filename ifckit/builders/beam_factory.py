@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import ifcopenshell
 
-from ifckit.builders._geom import local_placement, product_definition_shape
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
 from ifckit.elements.base import PendingElement
-from ifckit.elements.structural import PendingBeam, PendingRevolvedBeam
 from ifckit.geometry import Arc, Line, Path
 
 

@@ -56,18 +56,20 @@ class ElementRegistry:
     @classmethod
     def get(cls, element_type: str) -> Type:
         """Get element class by type string.
-        
+
         Supports both exact types and aliases (e.g., "beam" -> "basic_beam").
         """
         if element_type in cls._registry:
             return cls._registry[element_type]
-        
+
         # Try alias
         alias_type = _ELEMENT_ALIASES.get(element_type)
         if alias_type and alias_type in cls._registry:
             return cls._registry[alias_type]
-        
-        raise KeyError(f"Unknown element type: {element_type!r}. Available: {list(cls._registry.keys())}")
+
+        raise KeyError(
+            f"Unknown element type: {element_type!r}. Available: {list(cls._registry.keys())}"
+        )
 
     @classmethod
     def has(cls, element_type: str) -> bool:

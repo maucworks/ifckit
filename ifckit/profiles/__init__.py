@@ -56,8 +56,8 @@ from ifckit.profiles.shapes import (
     CircleProfile,
     HollowCircleProfile,
     PolygonProfile,
-    RoundedPolygonProfile,
     RectangleProfile,
+    RoundedPolygonProfile,
 )
 from ifckit.profiles.steel import SteelProfile
 

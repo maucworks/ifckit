@@ -22,16 +22,16 @@ Usage::
 
 from __future__ import annotations
 
-import math
 from typing import Any, List, Optional
 
-from ifckit.geometry import Arc, Line, Vec, Path
+from ifckit.geometry import Arc, Line, Path, Vec
 from ifckit.paper import iso_a_size_mm
 
 try:
-    import Rhino.Geometry
-    import Rhino.DocObjects
     import Rhino
+    import Rhino.DocObjects
+    import Rhino.Geometry
+
     _RHINO_AVAILABLE = True
 except ImportError:
     _RHINO_AVAILABLE = False
@@ -40,8 +40,7 @@ except ImportError:
 def _require_rhino(fn_name: str) -> None:
     if not _RHINO_AVAILABLE:
         raise ImportError(
-            f"ifckit.rhinokit.{fn_name}() requires Rhino — "
-            "run inside Rhino 8 / Grasshopper."
+            f"ifckit.rhinokit.{fn_name}() requires Rhino — run inside Rhino 8 / Grasshopper."
         )
 
 
@@ -115,7 +114,7 @@ def arc_to_arc(rhino_arc: Any) -> Arc:
 
     rh_center = arc.Center
     rh_start = arc.StartPoint
-    rh_end = arc.EndPoint
+    rh_end = arc.EndPoint  # noqa: F841
     rh_plane = arc.Plane
     rh_normal = rh_plane.Normal
     angle_rad = arc.Angle  # Rhino Arc.Angle is already in radians
@@ -296,9 +295,7 @@ def draw_paper_rectangle(
     w_mm, h_mm = iso_a_size_mm(iso_a, landscape=landscape)
 
     # Convert mm → Rhino document units then apply scale factor.
-    uf = Rhino.RhinoMath.UnitScale(
-        Rhino.UnitSystem.Millimeters, doc.ModelUnitSystem
-    )
+    uf = Rhino.RhinoMath.UnitScale(Rhino.UnitSystem.Millimeters, doc.ModelUnitSystem)
     w = w_mm * uf * scale
     h = h_mm * uf * scale
 
@@ -319,6 +316,7 @@ def draw_paper_rectangle(
 # ---------------------------------------------------------------------------
 # Dev reload helper
 # ---------------------------------------------------------------------------
+
 
 def reload_all(project_root: str | None = None) -> None:
     """
@@ -342,8 +340,8 @@ def reload_all(project_root: str | None = None) -> None:
     import os
     import sys
 
-    _default = r'/Users/Mauc/L140-py-ifckit'
-    root = project_root or os.environ.get('IFCKIT_PATH', _default)
+    _default = r"/Users/Mauc/L140-py-ifckit"
+    root = project_root or os.environ.get("IFCKIT_PATH", _default)
     if root not in sys.path:
         sys.path.insert(0, root)
 

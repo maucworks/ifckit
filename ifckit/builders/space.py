@@ -14,14 +14,12 @@ from ifckit.builders._geom import (
     axis2placement3d,
     extrude_profile,
     local_placement,
-    product_definition_shape,
     profile_from_points,
     pt2,
     storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
-from ifckit.elements.space import PendingSpace
 
 
 class SpaceBuilder(BaseBuilder):
@@ -50,11 +48,9 @@ class SpaceBuilder(BaseBuilder):
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
         if not hasattr(pending, "element_type") or pending.element_type != "basic_space":
-            raise TypeError(
-                f"SpaceBuilder expects PendingSpace, got {type(pending).__name__}"
-            )
+            raise TypeError(f"SpaceBuilder expects PendingSpace, got {type(pending).__name__}")
 
-        elev = storey_elevation(container)
+        elev = storey_elevation(container)  # noqa: F841
 
         # ------------------------------------------------------------------
         # 2-D footprint points (world XY → storey-local XY; Z irrelevant)

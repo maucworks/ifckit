@@ -70,11 +70,17 @@ def pt2(f: ifcopenshell.file, x: float, y: float) -> ifcopenshell.entity_instanc
 
 
 def pt3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
-    return f.create_entity("IfcCartesianPoint", Coordinates=[_round_coord(x), _round_coord(y), _round_coord(z)])
+    return f.create_entity(
+        "IfcCartesianPoint",
+        Coordinates=[_round_coord(x), _round_coord(y), _round_coord(z)],
+    )
 
 
 def dir3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
-    return f.create_entity("IfcDirection", DirectionRatios=[_round_coord(x), _round_coord(y), _round_coord(z)])
+    return f.create_entity(
+        "IfcDirection",
+        DirectionRatios=[_round_coord(x), _round_coord(y), _round_coord(z)],
+    )
 
 
 def axis2placement3d(
@@ -109,6 +115,7 @@ def shift_plane_elevation(plane: "Plane", elev: float) -> "Plane":
     (subtract the storey elevation from the origin Z component).
     """
     from ifckit.geometry import Vec
+
     local_origin = Vec(plane.origin.x, plane.origin.y, plane.origin.z - elev)
     return plane.__class__(local_origin, plane.x_axis, plane.y_axis)
 

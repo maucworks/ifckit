@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _signed_area_2d(pts: List[Tuple[float, float]]) -> float:
     """Shoelace signed area. Positive = CCW."""
     n = len(pts)
@@ -49,6 +50,7 @@ def _ensure_ccw(pts: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
 
 def _pt2(f: "ifcopenshell.file", x: float, y: float) -> "ifcopenshell.entity_instance":
     from ifckit.builders._geom import pt2
+
     return pt2(f, x, y)
 
 
@@ -73,7 +75,8 @@ def _build_polyline_profile(
 
 
 def _arc_fillet(
-    cx: float, cy: float,
+    cx: float,
+    cy: float,
     r: float,
     start_angle: float,
     sweep_angle: float,
@@ -90,6 +93,7 @@ def _arc_fillet(
 # ---------------------------------------------------------------------------
 # PolygonProfile
 # ---------------------------------------------------------------------------
+
 
 class PolygonProfile(Profile):
     """
@@ -146,6 +150,7 @@ class PolygonProfile(Profile):
 # RoundedPolygonProfile
 # ---------------------------------------------------------------------------
 
+
 class RoundedPolygonProfile(Profile):
     """
     Closed polygon with circular arc fillets at each corner.
@@ -186,9 +191,7 @@ class RoundedPolygonProfile(Profile):
         else:
             radii = [float(r) for r in radius]
             if len(radii) != n:
-                raise ValueError(
-                    f"radius list length {len(radii)} != points length {n}"
-                )
+                raise ValueError(f"radius list length {len(radii)} != points length {n}")
 
         self.points = raw
         self.radii = radii
@@ -212,8 +215,10 @@ class RoundedPolygonProfile(Profile):
                 continue
 
             # Vectors from corner toward neighbours
-            dx0 = prev[0] - curr[0]; dy0 = prev[1] - curr[1]
-            dx1 = nxt[0] - curr[0];  dy1 = nxt[1] - curr[1]
+            dx0 = prev[0] - curr[0]
+            dy0 = prev[1] - curr[1]  # noqa: E702
+            dx1 = nxt[0] - curr[0]
+            dy1 = nxt[1] - curr[1]  # noqa: E702
             d0 = math.hypot(dx0, dy0)
             d1 = math.hypot(dx1, dy1)
             if d0 < 1e-12 or d1 < 1e-12:
@@ -225,7 +230,7 @@ class RoundedPolygonProfile(Profile):
             ux1, uy1 = dx1 / d1, dy1 / d1
 
             # Half-angle between incoming/outgoing edge
-            cos_half = (ux0 * ux1 + uy0 * uy1)
+            cos_half = ux0 * ux1 + uy0 * uy1
             cos_half = max(-1.0, min(1.0, cos_half))
             half_angle = math.acos(cos_half) / 2.0
             if half_angle < 1e-9 or abs(math.pi / 2 - half_angle) < 1e-9:
@@ -248,12 +253,14 @@ class RoundedPolygonProfile(Profile):
             # Arc centre: offset inward perpendicular to each tangent by r
             # Inward normal to edge 0 (left-perpendicular of ux0,uy0)
             # We pick the normal that points toward the bisector
-            bx = ux0 + ux1; by = uy0 + uy1
+            bx = ux0 + ux1
+            by = uy0 + uy1  # noqa: E702
             b_len = math.hypot(bx, by)
             if b_len < 1e-12:
                 outline.append(curr)
                 continue
-            bx /= b_len; by /= b_len
+            bx /= b_len
+            by /= b_len  # noqa: E702
 
             # Distance from corner to centre along bisector
             dist_centre = r / math.sin(half_angle)
@@ -317,6 +324,7 @@ class RoundedPolygonProfile(Profile):
 # ---------------------------------------------------------------------------
 # RectangleProfile
 # ---------------------------------------------------------------------------
+
 
 class RectangleProfile(Profile):
     """
@@ -388,6 +396,7 @@ class RectangleProfile(Profile):
 # CircleProfile
 # ---------------------------------------------------------------------------
 
+
 class CircleProfile(Profile):
     """
     Parametric solid circle profile.
@@ -409,14 +418,16 @@ class CircleProfile(Profile):
 
     @property
     def area(self) -> float:
-        return math.pi * self.radius ** 2
+        return math.pi * self.radius**2
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """Approximate circle as 32-segment polygon."""
         n = 32
         return [
-            (self.radius * math.cos(2 * math.pi * i / n),
-             self.radius * math.sin(2 * math.pi * i / n))
+            (
+                self.radius * math.cos(2 * math.pi * i / n),
+                self.radius * math.sin(2 * math.pi * i / n),
+            )
             for i in range(n)
         ]
 
@@ -447,6 +458,7 @@ class CircleProfile(Profile):
 # ---------------------------------------------------------------------------
 # HollowCircleProfile  (tube / CHS)
 # ---------------------------------------------------------------------------
+
 
 class HollowCircleProfile(Profile):
     """
@@ -482,14 +494,16 @@ class HollowCircleProfile(Profile):
 
     @property
     def area(self) -> float:
-        return math.pi * (self.radius ** 2 - self.inner_radius ** 2)
+        return math.pi * (self.radius**2 - self.inner_radius**2)
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """Outer circle approximated as 32-segment polygon (inner ring ignored)."""
         n = 32
         return [
-            (self.radius * math.cos(2 * math.pi * i / n),
-             self.radius * math.sin(2 * math.pi * i / n))
+            (
+                self.radius * math.cos(2 * math.pi * i / n),
+                self.radius * math.sin(2 * math.pi * i / n),
+            )
             for i in range(n)
         ]
 

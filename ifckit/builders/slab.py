@@ -23,7 +23,6 @@ from ifckit.builders._geom import (
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
-from ifckit.elements.building import PendingSlab
 
 
 class SlabBuilder(BaseBuilder):
@@ -45,10 +44,8 @@ class SlabBuilder(BaseBuilder):
     ) -> ifcopenshell.entity_instance:
         # Use element_type string comparison instead of isinstance() to handle
         # class identity mismatches from module reloading in Rhino/Grasshopper.
-        if not hasattr(pending, 'element_type') or pending.element_type != 'basic_slab':
-            raise TypeError(
-                f"SlabBuilder expects PendingSlab, got {type(pending).__name__}"
-            )
+        if not hasattr(pending, "element_type") or pending.element_type != "basic_slab":
+            raise TypeError(f"SlabBuilder expects PendingSlab, got {type(pending).__name__}")
 
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
         profile = profile_from_points(ifc_file, pts_2d)

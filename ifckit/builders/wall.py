@@ -16,7 +16,6 @@ from ifckit.builders._geom import (
     local_placement,
     product_definition_shape,
     profile_from_points,
-    profile_to_ifc,
     project_profile_to_plane,
     shape_representation,
     shift_plane_elevation,
@@ -24,7 +23,6 @@ from ifckit.builders._geom import (
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
-from ifckit.elements.building import PendingWall
 
 
 class WallBuilder(BaseBuilder):
@@ -46,10 +44,8 @@ class WallBuilder(BaseBuilder):
     ) -> ifcopenshell.entity_instance:
         # Use element_type string comparison instead of isinstance() to handle
         # class identity mismatches from module reloading in Rhino/Grasshopper.
-        if not hasattr(pending, 'element_type') or pending.element_type != 'basic_wall':
-            raise TypeError(
-                f"WallBuilder expects PendingWall, got {type(pending).__name__}"
-            )
+        if not hasattr(pending, "element_type") or pending.element_type != "basic_wall":
+            raise TypeError(f"WallBuilder expects PendingWall, got {type(pending).__name__}")
 
         # Project footprint to local 2D
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)

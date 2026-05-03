@@ -14,8 +14,8 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.building import PendingSlab, PendingWall
-from ifckit.elements.space import PendingSpace
 from ifckit.elements.registry import ElementRegistry
+from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import (
     PendingBeam,
     PendingColumn,

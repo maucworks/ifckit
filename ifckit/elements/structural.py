@@ -126,6 +126,7 @@ class PendingExtrudedElement(PendingElement):
         }
         # Prefer to serialize the original profile object (preserves type + metadata).
         from ifckit.profiles.base import Profile as _Profile
+
         if isinstance(self._profile_source, _Profile):
             d["profile"] = self._profile_source.to_dict()
         else:
@@ -147,6 +148,7 @@ class PendingExtrudedElement(PendingElement):
         # Profile can be a dict (Profile subclass) or a list of point tuples.
         if isinstance(profile_raw, dict) and "profile_type" in profile_raw:
             from ifckit.profiles.base import Profile as _Profile
+
             profile: Any = _Profile.dispatch_from_dict(profile_raw)
         else:
             profile = [Vec(*pt) for pt in profile_raw]
@@ -198,7 +200,13 @@ class PendingBeam(PendingExtrudedElement):
         style: Optional[RenderStyle] = None,
     ) -> None:
         super().__init__(
-            axis=axis, profile=profile, up=up, start_clip=start_clip, end_clip=end_clip, name=name, style=style,
+            axis=axis,
+            profile=profile,
+            up=up,
+            start_clip=start_clip,
+            end_clip=end_clip,
+            name=name,
+            style=style,
         )
         self.ref_line = ref_line
 
@@ -322,5 +330,10 @@ class PendingRevolvedBeam(PendingElement):
         )
         profile = [Vec(*pt) for pt in cls._require(d, "profile")]
         cp_normal = Vec(*d["cp_normal"]) if "cp_normal" in d else None
-        return cls(arc=arc, profile=profile, name=d.get("name", ""), 
-                  cp_normal=cp_normal, style=cls._style_from_dict(d))
+        return cls(
+            arc=arc,
+            profile=profile,
+            name=d.get("name", ""),
+            cp_normal=cp_normal,
+            style=cls._style_from_dict(d),
+        )

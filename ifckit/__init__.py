@@ -43,27 +43,31 @@ from ifckit.geometry import (
 from ifckit.json_build import build, build_from_json, validate_json
 from ifckit.model import IfcModel
 
+
 def __getattr__(name):
     if name == "rk":
         import ifckit.rhinokit as rk
+
         return rk
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-from ifckit.handles import (
-    SiteHandle,
-    BuildingHandle,
-    StoreyHandle,
+
+from ifckit.handles import (  # noqa: E402
+    AlignmentHandle,
     BridgeHandle,
     BridgePartHandle,
-    AlignmentHandle,
+    BuildingHandle,
     EntityHandle,
+    SiteHandle,
+    StoreyHandle,
 )
-from ifckit.profiles import IBeamProfile, LBeamProfile
-from ifckit.schema import IfcSchema, LengthUnit
-from ifckit.validator import ValidationResult, validate
+from ifckit.profiles import IBeamProfile, LBeamProfile  # noqa: E402
+from ifckit.schema import IfcSchema, LengthUnit  # noqa: E402
+from ifckit.validator import ValidationResult, validate  # noqa: E402
 
 try:
     from ifckit.rhino_import import IfcMeshImporter
+
     _RHINO_IMPORT_AVAILABLE = True
 except ImportError:
     _RHINO_IMPORT_AVAILABLE = False
@@ -76,6 +80,7 @@ except ImportError:
                 "IfcMeshImporter requires Rhino 8+ with ifcopenshell. "
                 "Run this code inside Rhino / Grasshopper."
             )
+
 
 __version__ = "0.1.0"
 

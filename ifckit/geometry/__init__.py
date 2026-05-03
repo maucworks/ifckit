@@ -256,17 +256,12 @@ class Plane:
             # tangent nearly parallel to up — use +Y as fallback
             up = Vec(0, 1, 0)
         y = (up - t * (t @ up)).normalized()
-        x = (t**y).normalized()
+        x = (t**y).normalized()  # noqa: F841
         return cls(origin, t, y)
 
     def transform_point(self, local: "Vec") -> "Vec":
         """Transform a point from local frame coordinates to world coordinates."""
-        return (
-            self.origin
-            + self.x_axis * local.x
-            + self.y_axis * local.y
-            + self.z_axis * local.z
-        )
+        return self.origin + self.x_axis * local.x + self.y_axis * local.y + self.z_axis * local.z
 
     def transform_vector(self, local: "Vec") -> "Vec":
         """Transform a vector (no translation) from local to world."""
@@ -428,7 +423,9 @@ class Arc:
         return (self.normal**radial) * sign
 
     def __repr__(self) -> str:
-        return f"Arc(center={self.center}, r={self.radius:.3f}, angle={math.degrees(self.angle):.1f}°)"
+        return (
+            f"Arc(center={self.center}, r={self.radius:.3f}, angle={math.degrees(self.angle):.1f}°)"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -623,7 +620,8 @@ class Path:
             return True
 
         # For Lines only — check if all collinear.
-        # isinstance is safe here — Line is a module-internal primitive, not a reloadable user class.
+        # isinstance is safe here — Line is a module-internal primitive,
+        # not a reloadable user class.
         all_lines = all(
             isinstance(seg, Line) for seg in self._segments
         )  # safe: Line never reloaded
@@ -654,7 +652,8 @@ class Path:
                 return seg.normal
 
         # For Lines only: use first segment direction and derive a perpendicular.
-        # isinstance is safe here — Line is a module-internal primitive, not a reloadable user class.
+        # isinstance is safe here — Line is a module-internal primitive,
+        # not a reloadable user class.
         if len(self._segments) > 0 and isinstance(
             self._segments[0], Line
         ):  # safe: Line never reloaded
@@ -720,9 +719,7 @@ def parallel_transport_frames(
     prev_tangent = (pts[1] - pts[0]).normalized()
     prev_normal = seed_normal.normalized()
     # ensure normal is orthogonal to first tangent
-    prev_normal = (
-        prev_normal - prev_tangent * (prev_normal @ prev_tangent)
-    ).normalized()
+    prev_normal = (prev_normal - prev_tangent * (prev_normal @ prev_tangent)).normalized()
 
     for i, pt in enumerate(pts):
         if i == 0:
@@ -822,8 +819,8 @@ def assemble_path(
             path.add_arc(seg.center, seg.normal, seg.start, seg.angle)
 
         while True:
-            current_end = path.end_point()
-            current_start = path.start_point()
+            current_end = path.end_point()  # noqa: F841
+            current_start = path.start_point()  # noqa: F841
             added = False
 
             for i in sorted(unused):
@@ -845,9 +842,7 @@ def assemble_path(
                         path.add_line(flipped.start, flipped.end)
                     elif isinstance(nxt, Arc):
                         flipped = nxt.reverse()
-                        path.add_arc(
-                            flipped.center, flipped.normal, flipped.start, flipped.angle
-                        )
+                        path.add_arc(flipped.center, flipped.normal, flipped.start, flipped.angle)
                     break
 
             if not added:

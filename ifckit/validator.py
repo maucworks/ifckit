@@ -25,10 +25,9 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Type
+from typing import Callable, Dict, List, Type
 
 from ifckit.elements.base import PendingElement
-from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.bridge import (
     AlignmentSegment,
     PendingAlignment,
@@ -36,10 +35,10 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.building import PendingSlab, PendingWall
+from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
 from ifckit.geometry import Vec
-
 
 # ---------------------------------------------------------------------------
 # Validator registry with auto-registration
@@ -61,6 +60,7 @@ class ValidatorRegistry:
         element_cls: Type[PendingElement],
     ) -> Callable[[Callable[..., ValidationResult]], Callable[..., ValidationResult]]:
         """Decorator to register a validator for a PendingElement subclass."""
+
         def decorator(func: Callable[..., ValidationResult]) -> Callable[..., ValidationResult]:
             cls._validators[element_cls] = func
             # Also register by element_type string when available
@@ -68,6 +68,7 @@ class ValidatorRegistry:
             if elem_type:
                 cls._validators_by_type[elem_type] = func
             return func
+
         return decorator
 
     @classmethod
@@ -442,8 +443,10 @@ def validate(pending: PendingElement) -> ValidationResult:
                 return validator(pending)
 
         # Nothing found — provide helpful error listing registered validators
-        registered = [f"{c.__name__} (type={getattr(c,'element_type',None)!r})" for c in ValidatorRegistry._validators.keys()]
+        registered = [
+            f"{c.__name__} (type={getattr(c, 'element_type', None)!r})"
+            for c in ValidatorRegistry._validators.keys()
+        ]
         raise TypeError(
-            f"No validator registered for {pending_cls.__name__}."
-            f" Available: {registered}"
+            f"No validator registered for {pending_cls.__name__}. Available: {registered}"
         )

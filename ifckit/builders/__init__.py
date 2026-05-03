@@ -5,6 +5,7 @@ ifckit.builders
 Builder implementations and default registry.
 """
 
+from ifckit.builders._geom import get_precision, set_precision
 from ifckit.builders.base import BuilderRegistry, IIfcBuilder
 from ifckit.builders.beam_factory import PathType, build_beam, classify_path
 from ifckit.builders.bridge import AlignmentBuilder
@@ -13,7 +14,6 @@ from ifckit.builders.revolved_beam import RevolvedBeamBuilder
 from ifckit.builders.slab import SlabBuilder
 from ifckit.builders.space import SpaceBuilder
 from ifckit.builders.wall import WallBuilder
-from ifckit.builders._geom import set_precision, get_precision
 
 
 def default_registry() -> BuilderRegistry:

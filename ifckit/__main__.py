@@ -30,7 +30,8 @@ def main() -> int:
         help="Input JSON file (default: stdin)",
     )
     build_parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         required=True,
         help="Output IFC file path",
     )
@@ -81,7 +82,7 @@ def handle_build(args) -> int:
         return 0
 
     try:
-        model = build(data, args.output)
+        build(data, args.output)
         print(f"Successfully created: {args.output}")
         return 0
     except Exception as e:

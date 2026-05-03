@@ -10,21 +10,24 @@ Supports IFC2X3 (legacy buildings), IFC4 (buildings) and IFC4X3 (bridges / infra
 from __future__ import annotations
 
 import warnings as _warnings
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import ifcopenshell
 import ifcopenshell.api
 
-from ifckit.schema import IfcSchema, LengthUnit, get_schema_name
 from ifckit.handles import (
-    SiteHandle,
-    BuildingHandle,
-    StoreyHandle,
+    AlignmentHandle,
     BridgeHandle,
     BridgePartHandle,
-    AlignmentHandle,
+    BuildingHandle,
     EntityHandle,
+    SiteHandle,
+    StoreyHandle,
 )
+from ifckit.schema import IfcSchema, LengthUnit, get_schema_name
+
+if TYPE_CHECKING:
+    from ifckit.elements.base import PendingElement
 
 _UNIT_PREFIX: dict = {
     LengthUnit.METRE: None,
@@ -350,9 +353,9 @@ class IfcModel:
         from ifckit.builders._geom import axis2placement3d
         from ifckit.geometry import Vec
 
-        origin  = Vec(*[float(v) for v in position])
-        z_vec   = Vec(*[float(v) for v in z_axis])
-        x_vec   = Vec(*[float(v) for v in x_axis])
+        origin = Vec(*[float(v) for v in position])
+        z_vec = Vec(*[float(v) for v in z_axis])
+        x_vec = Vec(*[float(v) for v in x_axis])
 
         # Bonsai stores the placement Axis as the camera's outward normal
         # (pointing away from the scene toward the viewer), which is the
@@ -387,21 +390,25 @@ class IfcModel:
         #   - Block centred on the annotation origin: position (-half, -half, -depth)
         #   - Annotation Z-axis = (0,0,1) — camera looks toward -Z in world space
         #   - Block: 50 m × 50 m × 10 m (large enough for any model)
-        half   = 25000.0   # mm — half of 50 m box in XY
-        depth  = 10000.0   # mm — 10 m clip depth below the section plane
+        half = 25000.0  # mm — half of 50 m box in XY
+        depth = 10000.0  # mm — 10 m clip depth below the section plane
 
         # Use the 'Body' subcontext — the geometry iterator only processes
         # representations under subcontexts, not the root Model context.
         model_ctx = next(
-            (c for c in self._file.by_type("IfcGeometricRepresentationContext")
-             if not c.is_a("IfcGeometricRepresentationSubContext")
-             and c.ContextType == "Model"),
+            (
+                c
+                for c in self._file.by_type("IfcGeometricRepresentationContext")
+                if not c.is_a("IfcGeometricRepresentationSubContext") and c.ContextType == "Model"
+            ),
             self._file.by_type("IfcGeometricRepresentationContext")[0],
         )
         geom_ctx = next(
-            (c for c in self._file.by_type("IfcGeometricRepresentationSubContext")
-             if c.ContextIdentifier == "Body"
-             and c.ParentContext == model_ctx),
+            (
+                c
+                for c in self._file.by_type("IfcGeometricRepresentationSubContext")
+                if c.ContextIdentifier == "Body" and c.ParentContext == model_ctx
+            ),
             None,
         )
         if geom_ctx is None:
@@ -455,18 +462,18 @@ class IfcModel:
             self._file,
             pset=pset,
             properties={
-                "TargetView":        target_view,
-                "Scale":             scale_str,
-                "HumanScale":        human_scale,
-                "HasUnderlay":       False,
-                "HasLinework":       True,
-                "HasAnnotation":     False,
+                "TargetView": target_view,
+                "Scale": scale_str,
+                "HumanScale": human_scale,
+                "HasUnderlay": False,
+                "HasLinework": True,
+                "HasAnnotation": False,
                 "GlobalReferencing": True,
-                "Stylesheet":        "",
-                "Markers":           "",
-                "Symbols":           "",
-                "Patterns":          "",
-                "ShadingStyles":     "",
+                "Stylesheet": "",
+                "Markers": "",
+                "Symbols": "",
+                "Patterns": "",
+                "ShadingStyles": "",
                 "CurrentShadingStyle": "",
             },
         )

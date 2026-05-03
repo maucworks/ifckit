@@ -19,7 +19,6 @@ import ifcopenshell.api
 
 from ifckit.builders._geom import (
     dir3,
-    local_placement,
     product_definition_shape,
     profile_from_points,
     pt3,
@@ -28,8 +27,6 @@ from ifckit.builders._geom import (
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.elements.base import PendingElement
-from ifckit.elements.structural import PendingRevolvedBeam
-from ifckit.geometry import Plane
 
 
 class RevolvedBeamBuilder(BaseBuilder):
@@ -42,16 +39,13 @@ class RevolvedBeamBuilder(BaseBuilder):
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        if (
-            not hasattr(pending, "element_type")
-            or pending.element_type != "revolved_beam"
-        ):
+        if not hasattr(pending, "element_type") or pending.element_type != "revolved_beam":
             raise TypeError(
                 f"RevolvedBeamBuilder expects PendingRevolvedBeam, got {type(pending).__name__}"
             )
 
         arc = pending.arc
-        elev = storey_elevation(container)
+        elev = storey_elevation(container)  # noqa: F841
 
         # Canonical plane normal for profile continuity
         cp_normal = pending.cp_normal  # may be None
@@ -114,9 +108,7 @@ class RevolvedBeamBuilder(BaseBuilder):
         )
 
         body_ctx = context
-        shape_rep = shape_representation(
-            ifc_file, body_ctx, solid, rep_type="SweptSolid"
-        )
+        shape_rep = shape_representation(ifc_file, body_ctx, solid, rep_type="SweptSolid")
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         # Beam placement - at origin, solid already correctly positioned
