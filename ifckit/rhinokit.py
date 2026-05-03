@@ -366,9 +366,9 @@ def reload_all(project_root: str | None = None) -> None:
     import os
     import sys
 
-    _default = r"/Users/Mauc/L140-py-ifckit"
+    _default = None
     root = project_root or os.environ.get("IFCKIT_PATH", _default)
-    if root not in sys.path:
+    if root and root not in sys.path:
         sys.path.insert(0, root)
 
     _RELOAD_ORDER = [

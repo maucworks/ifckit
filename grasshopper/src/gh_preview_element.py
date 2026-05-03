@@ -15,6 +15,15 @@ from __future__ import annotations
 import traceback
 
 # ---------------------------------------------------------------------------
+# Reload (development only — harmless in production)
+# ---------------------------------------------------------------------------
+try:
+    from ifckit.rhinokit import reload_all
+    reload_all()
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 preview = []

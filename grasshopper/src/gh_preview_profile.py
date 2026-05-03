@@ -15,6 +15,15 @@ import json
 import traceback
 
 # ---------------------------------------------------------------------------
+# Reload (development only — harmless in production)
+# ---------------------------------------------------------------------------
+try:
+    from ifckit.rhinokit import reload_all
+    reload_all()
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
 # Reload (picks up live code changes without restarting Rhino)
 # ---------------------------------------------------------------------------
 try:
