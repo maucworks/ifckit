@@ -2,7 +2,8 @@
 gh_create_beam.py  —  GH Script component: "ifckit Beam"
 =========================================================
 
-@component  nickname:"ifckit Beam"  panel:"Elements"
+@component  nickname:"ifckit Beam"
+@group "Elements"
 @input  line_curve   : curve item — LineCurve defining the beam axis
 @input  profile_pts  : point list — Cross-section polygon as Point3d list (fallback)
 @input  profile_json : str   item — Profile JSON from ifckit Profile node
@@ -14,7 +15,6 @@ Stateless: serializes linear beam paths → IfcExtrudedAreaSolid via PendingBeam
 """
 
 import json
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit import PendingBeam, Vec
 from ifckit.profiles import Profile

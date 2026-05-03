@@ -13,7 +13,8 @@ For each *.py file in grasshopper/src/ the builder:
 
 Annotation syntax (inside the module docstring)
 ------------------------------------------------
-@component  nickname:"My Node"  panel:"My Panel"  tooltip:"Optional tooltip"
+@component  nickname:"My Node"  tooltip:"Optional tooltip"
+@group      "My Group"
 @input   param_name : type  access — Description text
 @output  param_name : type  access — Description text
 
@@ -112,9 +113,9 @@ _ACCESS = {"item": 0, "list": 1, "tree": 2}
 _COMPONENT_RE = re.compile(
     r'@component\s+'
     r'nickname\s*:\s*"([^"]+)"'
-    r'(?:\s+panel\s*:\s*"([^"]+)")?'
     r'(?:\s+tooltip\s*:\s*"([^"]+)")?'
 )
+_GROUP_RE = re.compile(r'@group\s+"([^"]+)"')
 _PARAM_RE = re.compile(
     r'@(input|output)\s+'
     r'(\w+)'
@@ -139,10 +140,11 @@ def parse_annotations(src: str):
     comp_match = _COMPONENT_RE.search(docstring)
     if not comp_match:
         return None, [], []
+    group_match = _GROUP_RE.search(docstring)
     comp = {
         "nickname": comp_match.group(1),
-        "panel":    comp_match.group(2) or "ifckit",
-        "tooltip":  comp_match.group(3) or "",
+        "group":    group_match.group(1) if group_match else "ifckit",
+        "tooltip":  comp_match.group(2) or "",
     }
     inputs, outputs = [], []
     for m in _PARAM_RE.finditer(docstring):
@@ -161,17 +163,8 @@ def parse_annotations(src: str):
 # Source code helpers
 # ---------------------------------------------------------------------------
 
-_BOOTSTRAP = f"""\
-import sys as _sys
-_src_dir = r'{_SRC_DIR}'
-if _src_dir not in _sys.path:
-    _sys.path.insert(0, _src_dir)
-del _sys, _src_dir
-
-"""
-
-
 def _read_body(filepath: str) -> str:
+    """Return the script body, stripping the module docstring (annotations only)."""
     with open(filepath, "r", encoding="utf-8") as f:
         src = f.read()
     try:
@@ -181,11 +174,10 @@ def _read_body(filepath: str) -> str:
                 and isinstance(tree.body[0].value, ast.Constant)):
             end_line = tree.body[0].end_lineno
             lines = src.splitlines(keepends=True)
-            body = "".join(lines[end_line:]).lstrip("\n")
-            return _BOOTSTRAP + body
+            return "".join(lines[end_line:]).lstrip("\n")
     except Exception:
         pass
-    return _BOOTSTRAP + src
+    return src
 
 
 # ---------------------------------------------------------------------------
@@ -474,7 +466,34 @@ def _add_component(doc, filepath: str, x: float, y: float):
     else:
         print(f"    ERR: XML injection failed")
 
-    return comp, comp_meta["panel"]
+    return comp, comp_meta["group"]
+
+
+# ---------------------------------------------------------------------------
+# Panel colours  (ARGB — alpha=180 for a semi-transparent fill)
+# ---------------------------------------------------------------------------
+
+_PANEL_COLOURS = {
+    "Elements": SD.Color.FromArgb(180, 152, 210, 140),  # green
+    "Export":   SD.Color.FromArgb(180, 210, 163, 100),  # orange
+    "Drawing":  SD.Color.FromArgb(180, 100, 175, 210),  # blue
+    "Profiles": SD.Color.FromArgb(180, 185, 140, 210),  # purple
+    "Import":   SD.Color.FromArgb(180, 210, 210, 110),  # yellow
+}
+_PANEL_COLOUR_DEFAULT = SD.Color.FromArgb(180, 180, 180, 180)  # grey
+
+
+def _add_group(doc, panel_name: str, comp_list: list):
+    """Add a GH_Group around all components in comp_list. Returns the group."""
+    import Grasshopper.Kernel.Special as GHS
+    group = GHS.GH_Group()
+    group.NickName = panel_name
+    colour = _PANEL_COLOURS.get(panel_name, _PANEL_COLOUR_DEFAULT)
+    group.Colour = colour
+    for comp in comp_list:
+        group.AddObject(comp.InstanceGuid)
+    doc.AddObject(group, False)
+    return group
 
 
 # ---------------------------------------------------------------------------
@@ -501,15 +520,17 @@ def build():
         with open(fp) as f:
             src = f.read()
         comp_meta, _, _ = parse_annotations(src)
-        panel = comp_meta["panel"] if comp_meta else "_unknown"
+        panel = comp_meta["group"] if comp_meta else "_unknown"
         panels.setdefault(panel, []).append(fp)
 
-    col_spacing = 500
-    row_spacing = 320
+    col_spacing = 250
+    row_spacing = 160
     x_base, y_base = 100, 100
 
     placed = 0
+    panel_comps: dict[str, list] = {}
     for col, (panel_name, files) in enumerate(panels.items()):
+        panel_comps[panel_name] = []
         for row, fp in enumerate(files):
             x = x_base + col * col_spacing
             y = y_base + row * row_spacing
@@ -521,10 +542,36 @@ def build():
                 result = None
             if result:
                 comp, panel = result
+                panel_comps[panel_name].append(comp)
                 print(f"  OK  {comp.NickName}  [{panel}]")
                 placed += 1
             else:
                 print(f"  FAIL")
+
+    # Add colour-coded groups; collect their GUIDs for the supergroup
+    group_guids = []
+    for panel_name, comps in panel_comps.items():
+        if comps:
+            try:
+                group = _add_group(doc, panel_name, comps)
+                group_guids.append(group.InstanceGuid)
+                print(f"  Group: {panel_name} ({len(comps)} components)")
+            except Exception:
+                traceback.print_exc()
+
+    # Supergroup wrapping all panel groups
+    if group_guids:
+        try:
+            import Grasshopper.Kernel.Special as GHS
+            supergroup = GHS.GH_Group()
+            supergroup.NickName = "ifckit"
+            supergroup.Colour = SD.Color.FromArgb(60, 100, 100, 100)
+            for guid in group_guids:
+                supergroup.AddObject(guid)
+            doc.AddObject(supergroup, False)
+            print(f"  Supergroup: ifckit ({len(group_guids)} groups)")
+        except Exception:
+            traceback.print_exc()
 
     doc.ExpireSolution()
     archive = GHSerial.GH_Archive()

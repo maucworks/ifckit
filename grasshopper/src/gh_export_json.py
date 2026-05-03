@@ -2,7 +2,8 @@
 gh_export_json.py  —  GH Script component: "ifckit Export IFC"
 ===============================================================
 
-@component  nickname:"ifckit Export IFC"  panel:"Export"
+@component  nickname:"ifckit Export IFC"
+@group "Export"
 @input  json_input   : str  item — Full IFC project JSON from Build JSON node
 @input  ifc_output   : str  item — Absolute path for the output .ifc file (optional)
 @input  run_export   : bool item — Set True to write the IFC file
@@ -17,7 +18,6 @@ meshes in Rhino, and stores the model in sc.sticky for downstream drawing nodes.
 """
 
 import json
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit.json_build import build
 

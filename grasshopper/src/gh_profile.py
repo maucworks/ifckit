@@ -2,7 +2,8 @@
 gh_profile.py  —  GH Script component: "ifckit Profile"
 =========================================================
 
-@component  nickname:"ifckit Profile"  panel:"Profiles"
+@component  nickname:"ifckit Profile"
+@group "Profiles"
 @input  profile_type     : str   item — Profile type: "I","L","rect","circle","hollow_circle","steel"
 @input  height           : float item — Height or leg A (m)
 @input  width            : float item — Width or leg B (m)
@@ -21,7 +22,6 @@ Profile.to_dict() JSON dict consumable by beam/wall/column nodes.
 """
 
 import json
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit.profiles import (
     IBeamProfile, LBeamProfile,

@@ -2,7 +2,8 @@
 gh_spaces.py  —  GH Script component: "ifckit Spaces"
 ======================================================
 
-@component  nickname:"ifckit Spaces"  panel:"Import"
+@component  nickname:"ifckit Spaces"
+@group "Import"
 @input  ifc_path      : str   item — Absolute path to the .ifc file
 @input  run           : bool  item — Set True to import
 @input  layer_root    : str   item — Root layer name (default "IFC-Spaces")
@@ -19,7 +20,6 @@ Reads IfcSpace entities from an IFC file and draws footprint curves,
 hatches, annotations and/or 3-D mesh bodies in the active Rhino document.
 """
 
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit.rhino_import import IfcSpaceImporter
 

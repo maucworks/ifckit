@@ -2,7 +2,8 @@
 gh_create_beam_any.py  —  GH Script component: "ifckit Beam (Any Path)"
 ========================================================================
 
-@component  nickname:"ifckit Beam (Any Path)"  panel:"Elements"
+@component  nickname:"ifckit Beam (Any Path)"
+@group "Elements"
 @input  path_curve   : curve   item — LineCurve or ArcCurve defining the beam path
 @input  profile_pts  : point   list — Cross-section polygon as Point3d list (fallback)
 @input  profile_json : str     item — Profile JSON from ifckit Profile node
@@ -16,7 +17,6 @@ Stateless: auto-detects path type (line → ExtrudedAreaSolid, arc → RevolvedA
 
 import math
 import json
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit import PendingBeam, PendingRevolvedBeam, Vec
 from ifckit.profiles import Profile

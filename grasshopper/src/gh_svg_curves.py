@@ -2,7 +2,8 @@
 gh_svg_curves.py  —  GH Script component: "ifckit SVG Curves"
 ==============================================================
 
-@component  nickname:"ifckit SVG Curves"  panel:"Drawing"
+@component  nickname:"ifckit SVG Curves"
+@group "Drawing"
 @input  json_input   : str   item — JSON string from Build JSON node (or leave empty)
 @input  project_name : str   item — IFC project name (default "GH Project")
 @input  author       : str   item — Author (default "GH")
@@ -17,7 +18,6 @@ Generates 2-D section drawings from an IFC model via ifcopenshell.draw,
 parses the SVG and places curves + hatches on structured Rhino layers.
 """
 
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 # ---------------------------------------------------------------------------
 # Resolve inputs with sensible defaults

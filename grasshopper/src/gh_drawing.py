@@ -2,7 +2,8 @@
 gh_drawing.py  —  GH Script component: "ifckit Drawing"
 ========================================================
 
-@component  nickname:"ifckit Drawing"  panel:"Drawing"
+@component  nickname:"ifckit Drawing"
+@group "Drawing"
 @input  model_ready   : int   item — From Export node; confirms model version
 @input  drawing_name  : str   item — Name of the IfcAnnotation drawing to generate
 @input  run           : bool  item — Set True to generate
@@ -18,7 +19,6 @@ Imports one named IFC drawing (section plane + projection) into the active
 Rhino document as curves and hatches.
 """
 
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 from ifckit.rhino_import import IfcSvgImporter
 

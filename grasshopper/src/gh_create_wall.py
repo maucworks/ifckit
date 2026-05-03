@@ -2,7 +2,8 @@
 gh_create_wall.py  —  GH Script component: "ifckit Wall"
 =========================================================
 
-@component  nickname:"ifckit Wall"  panel:"Elements"
+@component  nickname:"ifckit Wall"
+@group "Elements"
 @input  base_curve : curve item — Base line curve of the wall
 @input  height     : float item — Wall height (m)
 @input  thickness  : float item — Wall thickness (m)
@@ -14,7 +15,6 @@ Stateless: serializes wall curves → JSON strings.
 """
 
 import json
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 from ifckit import PendingWall, Plane, rhinokit as rk
 
 messages = []

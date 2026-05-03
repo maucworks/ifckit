@@ -2,7 +2,8 @@
 gh_build_json.py  —  GH Script component: "ifckit Build JSON"
 ==============================================================
 
-@component  nickname:"ifckit Build JSON"  panel:"Export"
+@component  nickname:"ifckit Build JSON"
+@group "Export"
 @input  json_input   : str  list — JSON strings from element nodes
 @input  project_name : str  item — IFC project name (default "GH Project")
 @input  author       : str  item — Author string (default "GH")
@@ -15,7 +16,6 @@ Stateless: merges element JSON strings into a full IFC project JSON.
 """
 
 import json
-import ifckit_reload  # noqa: F401 — sets sys.path and reloads all of ifckit
 
 out = ""
 json_out = ""
