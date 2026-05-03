@@ -18,11 +18,12 @@ class TestPendingWall:
         assert w.name == "W1"
         assert w.height == pytest.approx(3.0)
         assert len(w.footprint) == 4
-        assert w.clip_data is None
+        assert w.clips == []
 
-    def test_clip_data(self):
-        w = PendingWall(FOOTPRINT, PLANE, 3.0, clip_data={"plane": [0, 0, 1, 2]})
-        assert w.clip_data is not None
+    def test_clips(self):
+        clip = Plane(Vec(2, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+        w = PendingWall(FOOTPRINT, PLANE, 3.0, clips=[clip])
+        assert len(w.clips) == 1
 
     def test_to_dict(self):
         w = PendingWall(FOOTPRINT, PLANE, 3.0, name="W1")
@@ -33,10 +34,12 @@ class TestPendingWall:
         assert len(d["footprint"]) == 4
         assert isinstance(d["footprint"][0], tuple)
 
-    def test_to_dict_with_clip(self):
-        w = PendingWall(FOOTPRINT, PLANE, 3.0, clip_data={"x": 1})
+    def test_to_dict_with_clips(self):
+        clip = Plane(Vec(2, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+        w = PendingWall(FOOTPRINT, PLANE, 3.0, clips=[clip])
         d = w.to_dict()
-        assert "clip_data" in d
+        assert "clips" in d
+        assert len(d["clips"]) == 1
 
     def test_from_dict_roundtrip(self):
         w = PendingWall(FOOTPRINT, PLANE, 3.0, name="W1")
@@ -98,6 +101,6 @@ class TestPendingSlab:
         with pytest.raises(ValueError, match="thickness"):
             PendingSlab.from_dict({"footprint": [(0, 0, 0)]})
 
-    def test_clip_data_optional(self):
+    def test_clips_optional(self):
         s = PendingSlab(FOOTPRINT, PLANE, 0.2)
-        assert s.clip_data is None
+        assert s.clips == []

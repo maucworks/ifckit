@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ifckit.elements.base import ClipData, PendingElement, UserProperties
+from ifckit.elements.base import PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Plane, Vec
 
@@ -25,7 +25,8 @@ class PendingWall(PendingElement):
         plane:      Placement plane (defines position and orientation in world).
         height:     Extrusion height along plane.z_axis (metres).
         name:       Element name (used as IfcWall.Name).
-        clip_data:  Optional clip plane data for boolean trimming.
+        clips:      Optional list of Planes for boolean clipping.  Each
+                    plane's z_axis points toward the material to keep.
     """
 
     element_type = "basic_wall"
@@ -36,11 +37,11 @@ class PendingWall(PendingElement):
         plane: Plane,
         height: float,
         name: str = "",
-        clip_data: Optional[ClipData] = None,
+        clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data, style=style, properties=properties)
+        super().__init__(name=name, clips=clips, style=style, properties=properties)
         self.footprint = list(footprint)
         self.plane = plane
         self.height = float(height)
@@ -62,7 +63,7 @@ class PendingWall(PendingElement):
             plane=plane,
             height=height,
             name=d.get("name", ""),
-            clip_data=d.get("clip_data"),
+            clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),
             properties=d.get("properties") or {},
         )
@@ -78,7 +79,7 @@ class PendingSlab(PendingElement):
         plane:      Placement plane.
         thickness:  Extrusion thickness along plane.z_axis (metres).
         name:       Element name.
-        clip_data:  Optional clip plane data.
+        clips:      Optional list of Planes for boolean clipping.
     """
 
     element_type = "basic_slab"
@@ -89,10 +90,11 @@ class PendingSlab(PendingElement):
         plane: Plane,
         thickness: float,
         name: str = "",
-        clip_data: Optional[ClipData] = None,
+        clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data, style=style)
+        super().__init__(name=name, clips=clips, style=style, properties=properties)
         self.footprint = list(footprint)
         self.plane = plane
         self.thickness = float(thickness)
@@ -114,6 +116,7 @@ class PendingSlab(PendingElement):
             plane=plane,
             thickness=thickness,
             name=d.get("name", ""),
-            clip_data=d.get("clip_data"),
+            clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),
+            properties=d.get("properties") or {},
         )

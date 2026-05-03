@@ -14,6 +14,14 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.building import PendingSlab, PendingWall
+from ifckit.elements.opening import (
+    DOOR_OPERATION_TYPES,
+    OPENING_HOST_IFC_CLASSES,
+    WINDOW_TYPES,
+    PendingDoor,
+    PendingOpening,
+    PendingWindow,
+)
 from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import (
@@ -23,6 +31,7 @@ from ifckit.elements.structural import (
     PendingRevolvedBeam,
 )
 from ifckit.elements.style import RenderStyle
+from ifckit.elements.types import PendingDoorType, PendingTypeObject, PendingWindowType
 
 __all__ = [
     "PendingElement",
@@ -32,6 +41,15 @@ __all__ = [
     "PendingWall",
     "PendingSlab",
     "PendingSpace",
+    "PendingOpening",
+    "PendingDoor",
+    "PendingWindow",
+    "DOOR_OPERATION_TYPES",
+    "WINDOW_TYPES",
+    "OPENING_HOST_IFC_CLASSES",
+    "PendingTypeObject",
+    "PendingDoorType",
+    "PendingWindowType",
     "PendingBeam",
     "PendingColumn",
     "PendingExtrudedElement",

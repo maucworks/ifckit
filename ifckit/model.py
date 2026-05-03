@@ -24,7 +24,7 @@ from ifckit.handles import (
     SiteHandle,
     StoreyHandle,
 )
-from ifckit.schema import IfcSchema, LengthUnit, get_schema_name
+from ifckit.schema import IfcSchema, LengthUnit
 
 if TYPE_CHECKING:
     from ifckit.elements.base import PendingElement
@@ -68,7 +68,7 @@ class IfcModel:
         self.author = author
         self.unit = unit
 
-        schema_str = get_schema_name(schema)
+        schema_str = schema.value
         self._file = ifcopenshell.file(schema=schema_str)
 
         # IFC2X3 requires OwnerHistory on every root entity.
@@ -136,10 +136,24 @@ class IfcModel:
         from ifckit.builders import default_registry
 
         self._registry = default_registry()
+        self._type_cache: dict = {}
 
     # ------------------------------------------------------------------
     # High-level element API
     # ------------------------------------------------------------------
+
+    def _validate_or_raise(self, pending: "PendingElement", stacklevel: int = 3) -> None:
+        """Validate *pending*; emit warnings and raise ValueError on errors."""
+        from ifckit.validator import validate
+
+        result = validate(pending)
+        for w in result.warnings:
+            _warnings.warn(w, stacklevel=stacklevel)
+        if not result.ok:
+            raise ValueError(
+                f"Validation failed for {type(pending).__name__} '{pending.name}':\n"
+                + "\n".join(f"  - {e}" for e in result.errors)
+            )
 
     def add(
         self,
@@ -162,22 +176,13 @@ class IfcModel:
             LookupError:  If no builder is registered for the element type.
             ValueError:   If validation fails (message lists all errors).
         """
-        from ifckit.validator import validate
-
         if not isinstance(container, (StoreyHandle, BridgePartHandle)):
             raise TypeError(
                 f"model.add() expects a StoreyHandle or BridgePartHandle, "
                 f"got {type(container).__name__}"
             )
 
-        result = validate(pending)
-        for w in result.warnings:
-            _warnings.warn(w, stacklevel=2)
-        if not result.ok:
-            raise ValueError(
-                f"Validation failed for {type(pending).__name__} "
-                f"'{pending.name}':\n" + "\n".join(f"  - {e}" for e in result.errors)
-            )
+        self._validate_or_raise(pending)
 
         try:
             builder = self._registry.get(pending.element_type)
@@ -642,6 +647,203 @@ class IfcModel:
             products=[entity],
             relating_structure=part.entity,
         )
+        return EntityHandle(entity, self)
+
+    # ------------------------------------------------------------------
+    # Openings, doors, windows and type objects (M2 / M3)
+    # ------------------------------------------------------------------
+
+    def add_opening(
+        self,
+        pending,  # PendingOpening
+        host: "EntityHandle",
+        container: "StoreyHandle",
+    ) -> "EntityHandle":
+        """
+        Create an ``IfcOpeningElement`` voiding *host* and place it in *container*.
+
+        Args:
+            pending:   A ``PendingOpening`` instance.
+            host:      ``EntityHandle`` wrapping the host element
+                       (IfcWall, IfcSlab or IfcRoof).
+            container: ``StoreyHandle`` for spatial containment.
+
+        Returns:
+            ``EntityHandle`` wrapping the created ``IfcOpeningElement``.
+
+        Raises:
+            TypeError:  If *host* or *container* are wrong types.
+            ValueError: If *pending* fails validation.
+        """
+        from ifckit.builders._geom import get_body_context
+        from ifckit.builders.opening import build_opening
+        from ifckit.elements.opening import OPENING_HOST_IFC_CLASSES
+
+        if not isinstance(host, EntityHandle):
+            raise TypeError(f"add_opening: host must be an EntityHandle, got {type(host).__name__}")
+        if not isinstance(container, StoreyHandle):
+            raise TypeError(
+                f"add_opening: container must be a StoreyHandle, got {type(container).__name__}"
+            )
+
+        # Validate that host is an allowed IFC class.
+        host_class = host.entity.is_a()
+        if not any(host.entity.is_a(cls) for cls in OPENING_HOST_IFC_CLASSES):
+            raise ValueError(
+                f"add_opening: host entity is {host_class!r}, "
+                f"which is not in the allowed host classes: {sorted(OPENING_HOST_IFC_CLASSES)}"
+            )
+
+        self._validate_or_raise(pending)
+
+        ctx = get_body_context(self._file)
+        opening_entity = build_opening(self._file, pending, host.entity, container.entity, ctx)
+        return EntityHandle(opening_entity, self)
+
+    def add_door(
+        self,
+        pending,  # PendingDoor
+        opening: "EntityHandle",
+        container: "StoreyHandle",
+        door_type: "Optional[EntityHandle]" = None,
+    ) -> "EntityHandle":
+        """
+        Create an ``IfcDoor`` filling *opening* and place it in *container*.
+
+        Args:
+            pending:   A ``PendingDoor`` instance.
+            opening:   ``EntityHandle`` wrapping the ``IfcOpeningElement``.
+            container: ``StoreyHandle`` for spatial containment.
+            door_type: Optional ``EntityHandle`` wrapping an ``IfcDoorType``
+                       entity to assign via ``IfcRelDefinesByType``.
+
+        Returns:
+            ``EntityHandle`` wrapping the created ``IfcDoor``.
+        """
+        from ifckit.builders._geom import get_body_context
+        from ifckit.builders.door_window import build_door
+
+        if not isinstance(opening, EntityHandle):
+            raise TypeError(
+                f"add_door: opening must be an EntityHandle, got {type(opening).__name__}"
+            )
+        if not isinstance(container, StoreyHandle):
+            raise TypeError(
+                f"add_door: container must be a StoreyHandle, got {type(container).__name__}"
+            )
+        if not opening.entity.is_a("IfcOpeningElement"):
+            raise ValueError(
+                f"add_door: opening entity is {opening.entity.is_a()!r}, expected IfcOpeningElement"
+            )
+
+        self._validate_or_raise(pending)
+
+        ctx = get_body_context(self._file)
+        type_entity = door_type.entity if door_type is not None else None
+        door_entity = build_door(
+            self._file, pending, opening.entity, container.entity, ctx, type_entity
+        )
+        return EntityHandle(door_entity, self)
+
+    def add_window(
+        self,
+        pending,  # PendingWindow
+        opening: "EntityHandle",
+        container: "StoreyHandle",
+        window_type: "Optional[EntityHandle]" = None,
+    ) -> "EntityHandle":
+        """
+        Create an ``IfcWindow`` filling *opening* and place it in *container*.
+
+        Args:
+            pending:     A ``PendingWindow`` instance.
+            opening:     ``EntityHandle`` wrapping the ``IfcOpeningElement``.
+            container:   ``StoreyHandle`` for spatial containment.
+            window_type: Optional ``EntityHandle`` wrapping an ``IfcWindowType``.
+
+        Returns:
+            ``EntityHandle`` wrapping the created ``IfcWindow``.
+        """
+        from ifckit.builders._geom import get_body_context
+        from ifckit.builders.door_window import build_window
+
+        if not isinstance(opening, EntityHandle):
+            raise TypeError(
+                f"add_window: opening must be an EntityHandle, got {type(opening).__name__}"
+            )
+        if not isinstance(container, StoreyHandle):
+            raise TypeError(
+                f"add_window: container must be a StoreyHandle, got {type(container).__name__}"
+            )
+        if not opening.entity.is_a("IfcOpeningElement"):
+            raise ValueError(
+                f"add_window: opening entity is {opening.entity.is_a()!r}, "
+                "expected IfcOpeningElement"
+            )
+
+        self._validate_or_raise(pending)
+
+        ctx = get_body_context(self._file)
+        type_entity = window_type.entity if window_type is not None else None
+        window_entity = build_window(
+            self._file, pending, opening.entity, container.entity, ctx, type_entity
+        )
+        return EntityHandle(window_entity, self)
+
+    def add_door_type(self, pending) -> "EntityHandle":  # pending: PendingDoorType
+        """
+        Create (or retrieve from cache) an ``IfcDoorType`` entity.
+
+        If a type with the same ``type_key`` already exists, the cached
+        entity is returned immediately.  If a type with the same key
+        but different parameters is requested, ``ValueError`` is raised.
+
+        Args:
+            pending: A ``PendingDoorType`` instance.
+
+        Returns:
+            ``EntityHandle`` wrapping the ``IfcDoorType`` entity.
+        """
+        from ifckit.builders.types import build_door_type
+
+        return self._add_type(pending, build_door_type)
+
+    def add_window_type(self, pending) -> "EntityHandle":  # pending: PendingWindowType
+        """
+        Create (or retrieve from cache) an ``IfcWindowType`` entity.
+
+        If a type with the same ``type_key`` already exists, the cached
+        entity is returned immediately.  If a type with the same key
+        but different parameters is requested, ``ValueError`` is raised.
+
+        Args:
+            pending: A ``PendingWindowType`` instance.
+
+        Returns:
+            ``EntityHandle`` wrapping the ``IfcWindowType`` entity.
+        """
+        from ifckit.builders.types import build_window_type
+
+        return self._add_type(pending, build_window_type)
+
+    def _add_type(self, pending, builder_fn) -> "EntityHandle":
+        """
+        Internal: check type cache, create if absent, enforce collision rule.
+        """
+        key = pending.type_key
+        if key in self._type_cache:
+            cached_pending, cached_entity = self._type_cache[key]
+            # Collision check: same key must match same to_dict payload.
+            if cached_pending.to_dict() != pending.to_dict():
+                raise ValueError(
+                    f"Type key {key!r} is already registered with different parameters.\n"
+                    f"  Existing : {cached_pending.to_dict()}\n"
+                    f"  Requested: {pending.to_dict()}"
+                )
+            return EntityHandle(cached_entity, self)
+
+        entity = builder_fn(self._file, pending)
+        self._type_cache[key] = (pending, entity)
         return EntityHandle(entity, self)
 
     # ------------------------------------------------------------------

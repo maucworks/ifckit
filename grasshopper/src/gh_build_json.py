@@ -4,7 +4,7 @@ gh_build_json.py  —  GH Script component: "ifckit Build JSON"
 
 @component  nickname:"ifckit Build JSON"
 @group "Export"
-@input  json_input   : str  list — JSON strings from element nodes
+@input  storeys      : str  list — Storey bundle JSON strings from gh_storey nodes
 @input  project_name : str  item — IFC project name (default "GH Project")
 @input  author       : str  item — Author string (default "GH")
 @input  unit         : str  item — "METRE" or "MILLIMETRE" (default "MILLIMETRE")
@@ -12,60 +12,100 @@ gh_build_json.py  —  GH Script component: "ifckit Build JSON"
 @output out      : str item — Status message
 @output json_out : str item — Full IFC project JSON for Export node
 
-Stateless: merges element JSON strings into a full IFC project JSON.
+Assembles storeys into a project JSON ready for gh_export_json.
+Openings and their fills are nested inside elements (no flat openings/doors/windows arrays).
+door_types / window_types are hoisted from storey bundles to project root.
+
+Storey bundle format (from gh_storey):
+    {
+        "storey_name": "Ground Floor",
+        "elevation": 0.0,
+        "elements":     [...],   ← openings nested inside elements
+        "door_types":   [...],   ← hoisted to root
+        "window_types": [...]    ← hoisted to root
+    }
 """
 
 import json
+from ifckit import rhinokit as rk
 
 out = ""
 json_out = ""
 
-if not json_input:
-    out = "ERROR: no JSON input."
+if not storeys:
+    out = "ERROR: no storey input."
 else:
     try:
         _project_name = str(project_name) if project_name else "GH Project"
-        _author = str(author) if author else "GH"
-        _unit = str(unit).upper() if unit else "MILLIMETRE"
-        _ifc_version = str(ifc_version).upper() if ifc_version else "IFC2X3"
+        _author       = str(author) if author else "GH"
+        _unit         = str(unit).upper() if unit else "MILLIMETRE"
+        _ifc_version  = str(ifc_version).upper() if ifc_version else "IFC2X3"
 
-        inputs = json_input if isinstance(json_input, list) else [json_input]
+        inputs = storeys if isinstance(storeys, list) else [storeys]
 
-        storeys_out = []
-        total = 0
+        storeys_out   = []
+        door_types    = []
+        window_types  = []
+        total_elems   = 0
 
-        for item in inputs:
-            s = str(item).strip()
+        for raw in inputs:
+            s = str(raw).strip()
             if not s:
                 continue
-            storey = json.loads(s)
-            sname = storey.get("storey_name", "Default")
-            elev = float(storey.get("elevation", 0.0))
-            elems = storey.get("elements", [])
-            parsed = [json.loads(e) if isinstance(e, str) else e for e in elems]
-            storeys_out.append(
-                {
-                    "name": sname,
-                    "elevation": elev,
-                    "elements": parsed,
-                }
-            )
-            total += len(parsed)
+            bundle = json.loads(s)
+
+            elems = rk.parse_json_list(bundle.get("elements", []))
+
+            # Hoist type arrays to root — deduplicate by type_key/name.
+            for dt in rk.parse_json_list(bundle.get("door_types", [])):
+                key = dt.get("type_key") or dt.get("name")
+                if not any((x.get("type_key") or x.get("name")) == key for x in door_types):
+                    door_types.append(dt)
+
+            for wt in rk.parse_json_list(bundle.get("window_types", [])):
+                key = wt.get("type_key") or wt.get("name")
+                if not any((x.get("type_key") or x.get("name")) == key for x in window_types):
+                    window_types.append(wt)
+
+            storeys_out.append({
+                "name":      bundle.get("storey_name", "Storey"),
+                "elevation": float(bundle.get("elevation", 0.0)),
+                "elements":  elems,
+            })
+            total_elems += len(elems)
 
         project_json = {
             "ifc_version": _ifc_version,
-            "project": {"name": _project_name, "author": _author},
-            "unit": _unit,
-            "site": {"name": "Site"},
-            "buildings": [{"name": "Building", "storeys": storeys_out}],
+            "project":     {"name": _project_name, "author": _author},
+            "unit":        _unit,
+            "site":        {"name": "Site"},
+            "buildings":   [{"name": "Building", "storeys": storeys_out}],
         }
+        if door_types:
+            project_json["door_types"] = door_types
+        if window_types:
+            project_json["window_types"] = window_types
 
-        out = "Built project JSON: {} elements across {} storey(s).".format(
-            total, len(storeys_out)
+        n_openings = sum(
+            len(e.get("openings", []))
+            for s in storeys_out for e in s.get("elements", [])
+            if isinstance(e, dict)
+        )
+        n_fills = sum(
+            len(op.get("doors", [])) + len(op.get("windows", []))
+            for s in storeys_out for e in s.get("elements", [])
+            if isinstance(e, dict)
+            for op in e.get("openings", [])
+        )
+
+        out = (
+            "Built: {} elements, {} openings, {} fills, "
+            "{} door types, {} window types across {} storey(s).".format(
+                total_elems, n_openings, n_fills,
+                len(door_types), len(window_types), len(storeys_out),
+            )
         )
         json_out = json.dumps(project_json, separators=(",", ":"))
 
     except Exception as exc:
-        out = "FAILED: {}".format(exc)
-
-print(out)
+        out = f"FAILED: {exc}"

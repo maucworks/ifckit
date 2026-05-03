@@ -35,6 +35,7 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.building import PendingSlab, PendingWall
+from ifckit.elements.opening import PendingDoor, PendingOpening, PendingWindow
 from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
@@ -112,6 +113,11 @@ class ValidatorRegistry:
             if reg_cls.__name__ == element_cls.__name__:
                 return True
         return False
+
+    @classmethod
+    def items(cls):
+        """Iterate (element_cls, validator_fn) pairs — use instead of _validators.items()."""
+        return cls._validators.items()
 
 
 register_validator = ValidatorRegistry.register
@@ -244,49 +250,38 @@ def _validate_space(s: PendingSpace) -> ValidationResult:
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
-@register_validator(PendingBeam)
-def _validate_beam(b: PendingBeam) -> ValidationResult:
+def _validate_extruded_element(elem, label: str) -> tuple:
+    """Shared checks for beam/column: axis length + profile area."""
     errors: List[str] = []
     warnings: List[str] = []
 
-    axis_len = b.axis.length
+    axis_len = elem.axis.length
     if axis_len < _MIN_LENGTH:
-        errors.append(f"PendingBeam '{b.name}': axis length must be > 0, got {axis_len:.6f}")
+        errors.append(f"{label} '{elem.name}': axis length must be > 0, got {axis_len:.6f}")
     elif axis_len < _WARN_SHORT:
-        warnings.append(f"PendingBeam '{b.name}': axis is very short ({axis_len:.4f} m)")
+        warnings.append(f"{label} '{elem.name}': axis is very short ({axis_len:.4f} m)")
 
-    if len(b.profile) < 3:
+    if len(elem.profile) < 3:
         errors.append(
-            f"PendingBeam '{b.name}': profile must have at least 3 points, got {len(b.profile)}"
+            f"{label} '{elem.name}': profile must have at least 3 points, got {len(elem.profile)}"
         )
     else:
-        area = abs(_profile_area_2d(b.profile))
+        area = abs(_profile_area_2d(elem.profile))
         if area < _MIN_LENGTH**2:
-            errors.append(f"PendingBeam '{b.name}': profile area is effectively zero")
+            errors.append(f"{label} '{elem.name}': profile area is effectively zero")
 
+    return errors, warnings
+
+
+@register_validator(PendingBeam)
+def _validate_beam(b: PendingBeam) -> ValidationResult:
+    errors, warnings = _validate_extruded_element(b, "PendingBeam")
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
 @register_validator(PendingColumn)
 def _validate_column(c: PendingColumn) -> ValidationResult:
-    errors: List[str] = []
-    warnings: List[str] = []
-
-    axis_len = c.axis.length
-    if axis_len < _MIN_LENGTH:
-        errors.append(f"PendingColumn '{c.name}': axis length must be > 0, got {axis_len:.6f}")
-    elif axis_len < _WARN_SHORT:
-        warnings.append(f"PendingColumn '{c.name}': axis is very short ({axis_len:.4f} m)")
-
-    if len(c.profile) < 3:
-        errors.append(
-            f"PendingColumn '{c.name}': profile must have at least 3 points, got {len(c.profile)}"
-        )
-    else:
-        area = abs(_profile_area_2d(c.profile))
-        if area < _MIN_LENGTH**2:
-            errors.append(f"PendingColumn '{c.name}': profile area is effectively zero")
-
+    errors, warnings = _validate_extruded_element(c, "PendingColumn")
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 
@@ -398,6 +393,71 @@ def _validate_bridge(b: PendingBridge) -> ValidationResult:
 
 
 # ---------------------------------------------------------------------------
+# Opening / door / window validators
+# ---------------------------------------------------------------------------
+
+
+@register_validator(PendingOpening)
+def _validate_opening(o: PendingOpening) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # Dimensions already enforced by constructor, but re-validate defensively.
+    if o.width <= 0:
+        errors.append(f"width must be positive, got {o.width}")
+    if o.height <= 0:
+        errors.append(f"height must be positive, got {o.height}")
+
+    # Warn on unusual dimensions (< 10 cm or > 10 m).
+    if o.width < 0.1:
+        warnings.append(f"opening width {o.width:.3f} m is unusually narrow (< 0.1 m)")
+    if o.height < 0.1:
+        warnings.append(f"opening height {o.height:.3f} m is unusually short (< 0.1 m)")
+    if o.width > 10.0:
+        warnings.append(f"opening width {o.width:.3f} m is unusually wide (> 10 m)")
+    if o.height > 10.0:
+        warnings.append(f"opening height {o.height:.3f} m is unusually tall (> 10 m)")
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingDoor)
+def _validate_door(d: PendingDoor) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if d.overall_width <= 0:
+        errors.append(f"overall_width must be positive, got {d.overall_width}")
+    if d.overall_height <= 0:
+        errors.append(f"overall_height must be positive, got {d.overall_height}")
+
+    if d.overall_width < 0.3:
+        warnings.append(f"door width {d.overall_width:.3f} m is unusually narrow (< 0.3 m)")
+    if d.overall_height < 1.5:
+        warnings.append(f"door height {d.overall_height:.3f} m is unusually short (< 1.5 m)")
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingWindow)
+def _validate_window(w: PendingWindow) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if w.overall_width <= 0:
+        errors.append(f"overall_width must be positive, got {w.overall_width}")
+    if w.overall_height <= 0:
+        errors.append(f"overall_height must be positive, got {w.overall_height}")
+
+    if w.overall_width < 0.1:
+        warnings.append(f"window width {w.overall_width:.3f} m is unusually narrow (< 0.1 m)")
+    if w.overall_height < 0.1:
+        warnings.append(f"window height {w.overall_height:.3f} m is unusually short (< 0.1 m)")
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -436,7 +496,7 @@ def validate(pending: PendingElement) -> ValidationResult:
                 # element type not in ElementRegistry — fall through to scanning
                 pass
 
-        for reg_cls, validator in ValidatorRegistry._validators.items():
+        for reg_cls, validator in ValidatorRegistry.items():
             if elem_type is not None and getattr(reg_cls, "element_type", None) == elem_type:
                 return validator(pending)
             if reg_cls.__name__ == pending_cls.__name__:
@@ -445,7 +505,7 @@ def validate(pending: PendingElement) -> ValidationResult:
         # Nothing found — provide helpful error listing registered validators
         registered = [
             f"{c.__name__} (type={getattr(c, 'element_type', None)!r})"
-            for c in ValidatorRegistry._validators.keys()
+            for c, _ in ValidatorRegistry.items()
         ]
         raise TypeError(
             f"No validator registered for {pending_cls.__name__}. Available: {registered}"

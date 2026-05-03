@@ -21,7 +21,7 @@ class TestPendingBeam:
         assert b.name == "B1"
         assert len(b.profile) == 4
         assert b.ref_line is None
-        assert b.clip_data is None
+        assert b.clips == []
 
     def test_ref_line(self):
         b = PendingBeam(AXIS, PROFILE, ref_line=AXIS)

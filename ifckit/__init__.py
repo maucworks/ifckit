@@ -18,6 +18,9 @@ Quick start::
 
 from ifckit.builders import BuilderRegistry, default_registry
 from ifckit.elements import (
+    DOOR_OPERATION_TYPES,
+    OPENING_HOST_IFC_CLASSES,
+    WINDOW_TYPES,
     AlignmentSegment,
     BridgePartType,
     PendingAlignment,
@@ -25,10 +28,16 @@ from ifckit.elements import (
     PendingBridge,
     PendingBridgePart,
     PendingColumn,
+    PendingDoor,
+    PendingDoorType,
     PendingExtrudedElement,
+    PendingOpening,
     PendingRevolvedBeam,
     PendingSlab,
+    PendingTypeObject,
     PendingWall,
+    PendingWindow,
+    PendingWindowType,
 )
 from ifckit.elements.registry import ElementRegistry
 from ifckit.geometry import (
@@ -97,6 +106,15 @@ __all__ = [
     "IfcModel",
     "PendingWall",
     "PendingSlab",
+    "PendingOpening",
+    "PendingDoor",
+    "PendingWindow",
+    "DOOR_OPERATION_TYPES",
+    "WINDOW_TYPES",
+    "OPENING_HOST_IFC_CLASSES",
+    "PendingTypeObject",
+    "PendingDoorType",
+    "PendingWindowType",
     "PendingBeam",
     "PendingColumn",
     "PendingExtrudedElement",
@@ -124,5 +142,4 @@ __all__ = [
     "AlignmentHandle",
     "EntityHandle",
     "IfcMeshImporter",
-    "rk",
 ]

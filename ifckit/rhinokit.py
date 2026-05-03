@@ -479,3 +479,141 @@ def reload_all(project_root: str | None = None) -> None:
                 importlib.import_module(mod_name)
             except ImportError:
                 pass  # optional submodule not installed
+
+
+# ---------------------------------------------------------------------------
+# GH node helpers — pure Python, no Rhino dependency
+# ---------------------------------------------------------------------------
+
+
+def parse_user_properties(s: Any) -> dict:
+    """Parse a JSON string into a properties dict.
+
+    Used in GH nodes for the ``properties`` input.  Returns ``{}`` on any
+    error so the node degrades gracefully rather than crashing.
+
+    Example::
+
+        props = rk.parse_user_properties(properties)
+    """
+    import json
+
+    if not s:
+        return {}
+    try:
+        result = json.loads(str(s))
+        if isinstance(result, dict):
+            return result
+    except (ValueError, TypeError):
+        pass
+    return {}
+
+
+def parse_clips(clips: Any) -> list:
+    """Convert a GH clips input (plane or list of planes) to ifckit Planes.
+
+    Accepts a single Rhino plane or an iterable of planes.
+    Silently skips ``None`` entries.
+
+    Example::
+
+        clip_planes = rk.parse_clips(clips)
+    """
+    _require_rhino("parse_clips")
+    if not clips:
+        return []
+    clip_list = clips if hasattr(clips, "__iter__") else [clips]
+    return [rhino_plane_to_plane(p) for p in clip_list if p is not None]
+
+
+def extract_first_id(envelope_json: Any, key: str) -> Optional[str]:
+    """Extract the ``id`` field from the first item in an envelope list.
+
+    Args:
+        envelope_json: JSON string of a keyed envelope e.g.
+                       ``{"elements": [{"id": "...", ...}]}``.
+        key:           The envelope key to look in, e.g. ``"elements"``,
+                       ``"openings"``.
+
+    Returns:
+        The ``id`` string, or ``None`` if not found / parse error.
+
+    Example::
+
+        host_id = rk.extract_first_id(host_json, "elements")
+        opening_id = rk.extract_first_id(opening_json, "openings")
+    """
+    import json
+
+    if not envelope_json:
+        return None
+    try:
+        d = json.loads(str(envelope_json))
+        items = d.get(key, [])
+        if items:
+            first = items[0]
+            if isinstance(first, str):
+                first = json.loads(first)
+            return first.get("id")
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return None
+
+
+def parse_json_list(lst: Any) -> list:
+    """Ensure each item in a list is a dict, parsing JSON strings as needed.
+
+    Useful when an envelope list may contain either pre-parsed dicts or
+    JSON strings (both are valid in the storey bundle format).
+
+    Example::
+
+        elements = rk.parse_json_list(bundle.get("elements", []))
+    """
+    import json
+
+    result = []
+    for e in lst or []:
+        if isinstance(e, str):
+            result.append(json.loads(e))
+        else:
+            result.append(e)
+    return result
+
+
+def merge_envelopes(inputs: Any) -> dict:
+    """Merge any number of keyed envelope JSON strings into one dict.
+
+    Lists under the same key are extended (no deduplication).
+    Non-list values: last write wins.
+
+    Supported keys: ``elements``, ``openings``, ``doors``, ``windows``,
+    ``door_types``, ``window_types``.
+
+    Args:
+        inputs: A single envelope JSON string or a list of them.
+
+    Returns:
+        Merged dict, e.g. ``{"elements": [...], "openings": [...]}``.
+
+    Example::
+
+        merged = rk.merge_envelopes(envelopes)
+    """
+    import json
+
+    merged: dict = {}
+    items = inputs if hasattr(inputs, "__iter__") and not isinstance(inputs, str) else [inputs]
+    for raw in items:
+        if raw is None:
+            continue
+        s = str(raw).strip()
+        if not s:
+            continue
+        d = json.loads(s)
+        for key, value in d.items():
+            if isinstance(value, list):
+                merged.setdefault(key, []).extend(value)
+            else:
+                merged[key] = value
+    return merged

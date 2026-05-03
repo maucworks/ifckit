@@ -16,20 +16,22 @@ Usage (inside a GH Python Script component)::
 
 Supported input JSON formats
 -----------------------------
-1. **Collector / storey JSON** (from ``gh_collector.py``)::
+1. **Keyed envelope** (from any element node)::
 
-       {"storey_name": "Ground Floor", "elevation": 0.0, "elements": [...]}
+       {"elements": [...]}
+       {"openings": [...]}
+       {"doors": [...]}   etc.
 
-   Each entry in ``elements`` must be a JSON *string* (as produced by the
-   beam/wall/arc GH nodes).
+2. **Storey bundle** (from ``gh_storey``)::
 
-2. **Single element JSON string** — the raw ``json_out`` of a beam, wall or
-   arc node.  Wrapped automatically in a dummy storey.
+       {"storey_name": "GF", "elevation": 0.0, "elements": [...], ...}
 
-The function builds a throw-away ``IfcModel`` in memory, adds all elements,
-then tessellates via ``ifcopenshell.geom.iterator`` and converts the result
-to ``Rhino.Geometry.Mesh`` objects.  Nothing is written to disk; nothing is
-added to ``sc.doc``.
+3. **Full project JSON** (from ``gh_build_json``)::
+
+       {"ifc_version": "IFC4", "project": {...}, "buildings": [...], ...}
+
+All formats run through the 3-pass ``json_build.build()`` so openings,
+doors and windows are properly subtracted/placed.
 """
 
 from __future__ import annotations
@@ -38,8 +40,7 @@ import json
 from typing import Any, Dict, List
 
 # ---------------------------------------------------------------------------
-# Rhino guard — module import succeeds outside Rhino; only the function call
-# will fail when Rhino.Geometry is not available.
+# Rhino guard
 # ---------------------------------------------------------------------------
 try:
     import Rhino.Geometry as _rg
@@ -63,7 +64,6 @@ def _require_rhino() -> None:
 
 
 def _doc_unit_scale() -> float:
-    """Return scale factor: ifcopenshell.geom metres → Rhino doc units."""
     try:
         import Rhino
         import scriptcontext as sc
@@ -81,17 +81,11 @@ def _doc_unit_scale() -> float:
 
 
 # ---------------------------------------------------------------------------
-# Mesh builder (same unwelded technique as IfcMeshImporter)
+# Mesh builder
 # ---------------------------------------------------------------------------
 
 
 def _verts_faces_to_mesh(verts: List[float], faces: List[int], scale: float) -> Any:
-    """Convert flat verts/faces arrays from ifcopenshell.geom to a Rhino Mesh.
-
-    Uses unwelded vertices (one set of 3 per triangle) so that
-    ``ComputeNormals()`` produces flat (hard-edge) shading rather than
-    smooth interpolated normals — which is correct for architectural elements.
-    """
     mesh = _rg.Mesh()
     all_verts = [verts[i : i + 3] for i in range(0, len(verts), 3)]
 
@@ -110,47 +104,78 @@ def _verts_faces_to_mesh(verts: List[float], faces: List[int], scale: float) -> 
 
 
 # ---------------------------------------------------------------------------
-# Normalise input JSON
+# Normalise any input format → full project JSON dict
 # ---------------------------------------------------------------------------
 
+_STOREY_KEYS = {"elements", "openings", "doors", "windows", "door_types", "window_types"}
 
-def _parse_input(json_str: str) -> Dict[str, Any]:
-    """Return a normalised storey dict regardless of input format.
 
-    Accepts:
-    - Collector JSON:  {"storey_name": ..., "elevation": ..., "elements": [...]}
-    - Element JSON:    {"type": "basic_beam", ...}  (any single element)
-    """
-    d = json.loads(json_str)
+def _to_project_dict(d: Dict[str, Any], unit: str) -> Dict[str, Any]:
+    """Wrap envelope / storey bundle / project dict in a minimal project dict."""
 
-    # Collector / storey format
-    if "elements" in d and "storey_name" in d:
-        # elements are JSON strings — parse each one
-        raw = d["elements"]
-        parsed_elements = []
-        for e in raw:
-            if isinstance(e, str):
-                parsed_elements.append(json.loads(e))
-            elif isinstance(e, dict):
-                parsed_elements.append(e)
-        return {
-            "storey_name": d.get("storey_name", "Preview"),
-            "elevation": float(d.get("elevation", 0.0)),
-            "elements": parsed_elements,
+    # Already a full project JSON.
+    if "buildings" in d and "ifc_version" in d:
+        return d
+
+    # Storey bundle: has storey_name or at least one STOREY_KEYS key + elevation.
+    if "storey_name" in d or ("elements" in d and "elevation" in d):
+        return _storey_bundle_to_project(d, unit)
+
+    # Raw keyed envelope: any of the STOREY_KEYS at top level.
+    if _STOREY_KEYS & set(d.keys()):
+        fake_bundle: Dict[str, Any] = {
+            "storey_name": "Preview",
+            "elevation": 0.0,
         }
+        for k in _STOREY_KEYS:
+            if k in d:
+                fake_bundle[k] = d[k]
+        return _storey_bundle_to_project(fake_bundle, unit)
 
-    # Single element dict
+    # Single element dict (legacy — {"type": "basic_beam", ...}).
     if "type" in d:
-        return {
+        fake_bundle = {
             "storey_name": "Preview",
             "elevation": 0.0,
             "elements": [d],
         }
+        return _storey_bundle_to_project(fake_bundle, unit)
 
     raise ValueError(
-        "Cannot parse input JSON: expected a collector storey dict "
-        '(with "storey_name" + "elements") or a single element dict (with "type").'
+        "Cannot parse preview input: expected envelope, storey bundle, or project JSON."
     )
+
+
+def _parse_list(lst: list) -> list:
+    """Ensure each item is a dict (parse JSON strings if needed)."""
+    result = []
+    for e in lst or []:
+        result.append(json.loads(e) if isinstance(e, str) else e)
+    return result
+
+
+def _storey_bundle_to_project(bundle: Dict[str, Any], unit: str) -> Dict[str, Any]:
+    storey = {
+        "name": bundle.get("storey_name", "Preview"),
+        "elevation": float(bundle.get("elevation", 0.0)),
+        "elements": _parse_list(bundle.get("elements", [])),
+        "openings": _parse_list(bundle.get("openings", [])),
+        "doors": _parse_list(bundle.get("doors", [])),
+        "windows": _parse_list(bundle.get("windows", [])),
+    }
+    project: Dict[str, Any] = {
+        "ifc_version": "IFC4",
+        "project": {"name": "Preview", "author": "preview"},
+        "unit": unit,
+        "site": {"name": "Site"},
+        "buildings": [{"name": "Building", "storeys": [storey]}],
+    }
+    # Hoist type arrays.
+    if bundle.get("door_types"):
+        project["door_types"] = _parse_list(bundle["door_types"])
+    if bundle.get("window_types"):
+        project["window_types"] = _parse_list(bundle["window_types"])
+    return project
 
 
 # ---------------------------------------------------------------------------
@@ -159,18 +184,14 @@ def _parse_input(json_str: str) -> Dict[str, Any]:
 
 
 def build_preview_meshes(json_str: str, unit: str = "MILLIMETRE") -> List[Any]:
-    """Build ephemeral Rhino meshes from a collector or element JSON string.
+    """Build ephemeral Rhino meshes from any ifckit JSON format.
 
     Args:
-        json_str: JSON string — either a ``gh_collector`` storey JSON or a
-                  single element JSON (``json_out`` of a beam/wall/arc node).
-        unit:     Length unit used in the input JSON coordinates.
-                  ``"MILLIMETRE"`` (default) or ``"METRE"``.  Must match the
-                  unit setting in ``gh_build_json`` for this project.
+        json_str: JSON string — envelope, storey bundle, or full project JSON.
+        unit:     ``"MILLIMETRE"`` (default) or ``"METRE"``.
 
     Returns:
-        List of ``Rhino.Geometry.Mesh`` objects.  Empty list if no geometry
-        could be tessellated.
+        List of ``Rhino.Geometry.Mesh`` objects.
 
     Raises:
         ImportError: when called outside Rhino / Grasshopper.
@@ -180,46 +201,15 @@ def build_preview_meshes(json_str: str, unit: str = "MILLIMETRE") -> List[Any]:
 
     import ifcopenshell.geom
 
-    from ifckit.elements.registry import ElementRegistry
-    from ifckit.model import IfcModel
-    from ifckit.schema import IfcSchema, LengthUnit
+    from ifckit.json_build import build
 
-    storey_data = _parse_input(json_str)
+    d = json.loads(json_str)
+    project_dict = _to_project_dict(d, unit.upper())
 
-    ifc_unit = LengthUnit.MILLIMETRE if unit.upper() == "MILLIMETRE" else LengthUnit.METRE
+    # Run 3-pass build — no output path → in-memory only.
+    model = build(project_dict)
 
-    # ------------------------------------------------------------------
-    # Build a throw-away IfcModel in memory
-    # ------------------------------------------------------------------
-    model = IfcModel(name="Preview", schema=IfcSchema.IFC4, unit=ifc_unit)
-    site = model.add_site("PreviewSite")
-    building = site.add_building("PreviewBuilding")
-    storey = building.add_storey(
-        storey_data["storey_name"],
-        elevation=storey_data["elevation"],
-    )
-
-    errors: List[str] = []
-    built = 0
-
-    for elem_dict in storey_data["elements"]:
-        elem_type = elem_dict.get("type")
-        # Support both {"type": ..., "data": {...}} and flat {"type": ..., ...}
-        data = elem_dict.get("data", elem_dict)
-        try:
-            cls = ElementRegistry.get(elem_type)
-            pending = cls.from_dict(data)
-            storey.add(pending)
-            built += 1
-        except Exception as exc:
-            errors.append(f"{elem_type}: {exc}")
-
-    if built == 0:
-        return []
-
-    # ------------------------------------------------------------------
-    # Tessellate via ifcopenshell.geom (no disk I/O)
-    # ------------------------------------------------------------------
+    # Tessellate.
     settings = ifcopenshell.geom.settings()
     settings.set(settings.USE_WORLD_COORDS, True)
 

@@ -18,6 +18,7 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
     PendingBridge,
 )
+from ifckit.elements.opening import PendingOpening, PendingDoor, PendingWindow
 
 
 # ---------------------------------------------------------------------------
@@ -498,3 +499,128 @@ class TestUnknownType:
 
         with pytest.raises(TypeError, match="No validator"):
             validate(Alien())
+
+
+# ---------------------------------------------------------------------------
+# Opening / Door / Window validators
+# ---------------------------------------------------------------------------
+
+_OP_PLANE = Plane.world_xy()
+
+
+def _opening(width=0.9, height=2.1):
+    return PendingOpening(plane=_OP_PLANE, width=width, height=height,
+                          name="Op")
+
+
+def _door(width=0.9, height=2.1):
+    return PendingDoor(overall_width=width, overall_height=height,
+                       operation_type="SINGLE_SWING_LEFT",
+                       name="Door")
+
+
+def _window(width=1.2, height=1.4):
+    return PendingWindow(overall_width=width, overall_height=height,
+                         window_type="SINGLE_PANEL",
+                         name="Win")
+
+
+class TestValidateOpening:
+    def test_valid_passes(self):
+        result = validate(_opening())
+        assert result.ok
+        assert result.errors == []
+
+    def test_zero_width_error(self):
+        with pytest.raises(ValueError):
+            _opening(width=0.0)
+
+    def test_negative_width_error(self):
+        with pytest.raises(ValueError):
+            _opening(width=-0.5)
+
+    def test_zero_height_error(self):
+        with pytest.raises(ValueError):
+            _opening(height=0.0)
+
+    def test_negative_height_error(self):
+        with pytest.raises(ValueError):
+            _opening(height=-1.0)
+
+    def test_narrow_width_warning(self):
+        result = validate(_opening(width=0.05))
+        assert result.ok
+        assert any("narrow" in w for w in result.warnings)
+
+    def test_short_height_warning(self):
+        result = validate(_opening(height=0.05))
+        assert result.ok
+        assert any("short" in w for w in result.warnings)
+
+    def test_wide_width_warning(self):
+        result = validate(_opening(width=12.0))
+        assert result.ok
+        assert any("wide" in w for w in result.warnings)
+
+    def test_tall_height_warning(self):
+        result = validate(_opening(height=12.0))
+        assert result.ok
+        assert any("tall" in w for w in result.warnings)
+
+
+class TestValidateDoor:
+    def test_valid_passes(self):
+        result = validate(_door())
+        assert result.ok
+        assert result.errors == []
+
+    def test_zero_width_error(self):
+        with pytest.raises(ValueError):
+            _door(width=0.0)
+
+    def test_negative_height_error(self):
+        with pytest.raises(ValueError):
+            _door(height=-1.0)
+
+    def test_narrow_width_warning(self):
+        result = validate(_door(width=0.2))
+        assert result.ok
+        assert any("narrow" in w for w in result.warnings)
+
+    def test_short_height_warning(self):
+        result = validate(_door(height=1.0))
+        assert result.ok
+        assert any("short" in w for w in result.warnings)
+
+    def test_no_spurious_warnings_normal_door(self):
+        result = validate(_door(width=0.9, height=2.1))
+        assert result.warnings == []
+
+
+class TestValidateWindow:
+    def test_valid_passes(self):
+        result = validate(_window())
+        assert result.ok
+        assert result.errors == []
+
+    def test_zero_width_error(self):
+        with pytest.raises(ValueError):
+            _window(width=0.0)
+
+    def test_negative_height_error(self):
+        with pytest.raises(ValueError):
+            _window(height=-0.5)
+
+    def test_narrow_width_warning(self):
+        result = validate(_window(width=0.05))
+        assert result.ok
+        assert any("narrow" in w for w in result.warnings)
+
+    def test_short_height_warning(self):
+        result = validate(_window(height=0.05))
+        assert result.ok
+        assert any("short" in w for w in result.warnings)
+
+    def test_no_spurious_warnings_normal_window(self):
+        result = validate(_window(width=1.2, height=1.4))
+        assert result.warnings == []

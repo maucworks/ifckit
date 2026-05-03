@@ -73,8 +73,15 @@ class PendingExtrudedElement(PendingElement):
     """
     Shared base for straight extruded structural elements (beam, column).
 
-    Holds the common data: axis, profile, up, start_clip, end_clip.
+    Holds the common data: axis, profile, up, clips.
     Subclasses must declare ``element_type``.
+
+    ``clips`` is a list of ``Plane`` objects (world space).  Each plane's
+    z_axis points toward the material to keep.  Applied in order as
+    IfcBooleanClippingResult.
+
+    For backwards compatibility, ``start_clip`` and ``end_clip`` keyword
+    arguments are still accepted and prepended to ``clips``.
     """
 
     def __init__(
@@ -82,18 +89,24 @@ class PendingExtrudedElement(PendingElement):
         axis: Line,
         profile: "Sequence[ProfilePoint]",
         up: Optional[Vec] = None,
+        clips: Optional[List[Plane]] = None,
+        # backwards-compat — converted to clips entries
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, style=style, properties=properties)
+        # Build clips list: explicit clips first, then legacy start/end
+        merged: List[Plane] = list(clips) if clips else []
+        if start_clip is not None:
+            merged.insert(0, start_clip)
+        if end_clip is not None:
+            merged.append(end_clip)
+        super().__init__(name=name, clips=merged, style=style, properties=properties)
         self.axis = axis
         self._profile_source = profile  # preserve original Profile object if given
         self.profile = _coerce_profile(profile)
-        self.start_clip = start_clip
-        self.end_clip = end_clip
         if up is not None:
             _validate_up(up, axis, type(self).__name__)
         self.up = up
@@ -105,8 +118,7 @@ class PendingExtrudedElement(PendingElement):
         profile: "List[Vec]",
         plane: Plane,
         up: Optional[Vec] = None,
-        start_clip: Optional[Plane] = None,
-        end_clip: Optional[Plane] = None,
+        clips: Optional[List[Plane]] = None,
         name: str = "",
     ) -> "PendingExtrudedElement":
         """Construct with up extracted from plane.y_axis."""
@@ -114,8 +126,7 @@ class PendingExtrudedElement(PendingElement):
             axis=axis,
             profile=profile,
             up=plane.y_axis,
-            start_clip=start_clip,
-            end_clip=end_clip,
+            clips=clips,
             name=name,
         )
 
@@ -134,10 +145,6 @@ class PendingExtrudedElement(PendingElement):
             d["profile"] = [p.to_tuple() for p in self.profile]
         if self.up is not None:
             d["up"] = self.up.to_tuple()
-        if self.start_clip is not None:
-            d["start_clip"] = _plane_to_dict(self.start_clip)
-        if self.end_clip is not None:
-            d["end_clip"] = _plane_to_dict(self.end_clip)
         return d
 
     @classmethod
@@ -155,12 +162,22 @@ class PendingExtrudedElement(PendingElement):
             profile = [Vec(*pt) for pt in profile_raw]
         up_raw = d.get("up")
         up = Vec(*up_raw) if up_raw is not None else None
+
+        # Support both new "clips" list and legacy "start_clip"/"end_clip" keys.
+        clips = cls._clips_from_dict(d)
+        if not clips:
+            legacy: List[Plane] = []
+            if "start_clip" in d:
+                legacy.insert(0, _plane_from_dict(d["start_clip"]))
+            if "end_clip" in d:
+                legacy.append(_plane_from_dict(d["end_clip"]))
+            clips = legacy
+
         return cls(
             axis=axis,
             profile=profile,
             up=up,
-            start_clip=_plane_from_dict(d["start_clip"]) if "start_clip" in d else None,
-            end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
+            clips=clips,
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
             properties=d.get("properties") or {},
@@ -172,20 +189,18 @@ class PendingBeam(PendingExtrudedElement):
     A straight beam defined by an axis (Line) and a cross-section profile.
 
     Args:
-        axis:        Line from start to end of the beam.
-        profile:     Closed list of Vec points defining the cross-section
-                     in the local XY plane (perpendicular to axis).
-        up:          Optional guide-up vector (world space).  Defines the
-                     profile Y direction (vertical up in cross-section).
-                     Must not be parallel to the beam axis — raises
-                     ValueError immediately if it is.
-                     Defaults to world +Z (or +Y if axis is vertical).
-        start_clip:  Optional Plane that clips the start of the extrusion.
-                     The plane's z_axis points toward the material to keep.
-        end_clip:    Optional Plane that clips the end of the extrusion.
-                     The plane's z_axis points toward the material to keep.
-        name:        Element name.
-        ref_line:    Optional reference line for web orientation.
+        axis:       Line from start to end of the beam.
+        profile:    Closed list of Vec points defining the cross-section
+                    in the local XY plane (perpendicular to axis).
+        up:         Optional guide-up vector (world space).  Defines the
+                    profile Y direction (vertical up in cross-section).
+                    Must not be parallel to the beam axis — raises
+                    ValueError immediately if it is.
+                    Defaults to world +Z (or +Y if axis is vertical).
+        clips:      Optional list of Planes for boolean clipping. Each
+                    plane's z_axis points toward the material to keep.
+        name:       Element name.
+        ref_line:   Optional reference line for web orientation.
     """
 
     element_type = "basic_beam"
@@ -195,6 +210,8 @@ class PendingBeam(PendingExtrudedElement):
         axis: Line,
         profile: "Sequence[ProfilePoint]",
         up: Optional[Vec] = None,
+        clips: Optional[List[Plane]] = None,
+        # backwards-compat
         start_clip: Optional[Plane] = None,
         end_clip: Optional[Plane] = None,
         name: str = "",
@@ -206,6 +223,7 @@ class PendingBeam(PendingExtrudedElement):
             axis=axis,
             profile=profile,
             up=up,
+            clips=clips,
             start_clip=start_clip,
             end_clip=end_clip,
             name=name,
@@ -221,8 +239,7 @@ class PendingBeam(PendingExtrudedElement):
         profile: "List[Vec]",
         plane: Plane,
         up: Optional[Vec] = None,
-        start_clip: Optional[Plane] = None,
-        end_clip: Optional[Plane] = None,
+        clips: Optional[List[Plane]] = None,
         name: str = "",
         ref_line: Optional[Line] = None,
     ) -> "PendingBeam":
@@ -231,8 +248,7 @@ class PendingBeam(PendingExtrudedElement):
             axis=axis,
             profile=profile,
             up=plane.y_axis,
-            start_clip=start_clip,
-            end_clip=end_clip,
+            clips=clips,
             name=name,
             ref_line=ref_line,
         )
@@ -260,15 +276,14 @@ class PendingColumn(PendingExtrudedElement):
     A column defined by an axis (Line) and a cross-section profile.
 
     Args:
-        axis:        Line from base to top of the column.
-        profile:     Closed list of Vec points defining the cross-section.
-        up:          Optional guide-up vector (world space).  Defines the
-                     profile Y direction.  Must not be parallel to the
-                     column axis — raises ValueError immediately if it is.
-                     Defaults to world +Z (or +Y if axis is vertical).
-        start_clip:  Optional Plane that clips the base of the extrusion.
-        end_clip:    Optional Plane that clips the top of the extrusion.
-        name:        Element name.
+        axis:       Line from base to top of the column.
+        profile:    Closed list of Vec points defining the cross-section.
+        up:         Optional guide-up vector (world space).  Defines the
+                    profile Y direction.  Must not be parallel to the
+                    column axis — raises ValueError immediately if it is.
+                    Defaults to world +Z (or +Y if axis is vertical).
+        clips:      Optional list of Planes for boolean clipping.
+        name:       Element name.
     """
 
     element_type = "basic_column"

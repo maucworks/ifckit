@@ -10,7 +10,7 @@ dependency. It is converted to a real IFC entity by a Builder.
 from __future__ import annotations
 
 import json as _json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from ifckit.elements.registry import ElementRegistry, RegisterElementType
 from ifckit.elements.style import RenderStyle
@@ -29,6 +29,10 @@ class PendingElement(metaclass=RegisterElementType):
     Each subclass must define ``element_type`` as a class variable (str).
     When the class is defined, it's automatically registered in ElementRegistry.
 
+    ``clips`` is an optional list of ``ifckit.geometry.Plane`` objects used
+    for boolean clipping (``IfcBooleanClippingResult``).  Each plane's
+    z_axis points toward the material to keep.
+
     ``properties`` is an optional free-form dict of user-supplied key/value
     pairs written to ``EPset_IfcKit`` in the IFC output.  Values may be
     str, float, int or bool; other types are coerced to str.
@@ -39,22 +43,31 @@ class PendingElement(metaclass=RegisterElementType):
     def __init__(
         self,
         name: str = "",
-        clip_data: Optional[ClipData] = None,
+        clips: Optional[List[Any]] = None,
+        clip_data: Optional[ClipData] = None,  # legacy — ignored
         style: Optional[RenderStyle] = None,
         hatch_pattern: str = "",
         properties: Optional[UserProperties] = None,
     ) -> None:
         self.name = name
-        self.clip_data = clip_data
+        self.clips: List[Any] = list(clips) if clips else []
         self.style = style
         self.hatch_pattern = hatch_pattern
         self.properties: UserProperties = properties or {}
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict (useful for JSON transport / debugging)."""
+
         d: Dict[str, Any] = {"type": self.element_type, "name": self.name}
-        if self.clip_data is not None:
-            d["clip_data"] = self.clip_data
+        if self.clips:
+            d["clips"] = [
+                {
+                    "origin": c.origin.to_tuple(),
+                    "x_axis": c.x_axis.to_tuple(),
+                    "y_axis": c.y_axis.to_tuple(),
+                }
+                for c in self.clips
+            ]
         if self.style is not None:
             d["style"] = self.style.to_dict()
         if self.hatch_pattern:
@@ -66,6 +79,14 @@ class PendingElement(metaclass=RegisterElementType):
     def to_json(self, **kwargs) -> str:
         """Serialise to a JSON string."""
         return _json.dumps(self.to_dict(), **kwargs)
+
+    @classmethod
+    def _clips_from_dict(cls, d: Dict[str, Any]) -> List[Any]:
+        """Deserialise clips list from dict."""
+        from ifckit.geometry import Plane, Vec
+
+        raw = d.get("clips") or []
+        return [Plane(Vec(*c["origin"]), Vec(*c["x_axis"]), Vec(*c["y_axis"])) for c in raw]
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingElement":

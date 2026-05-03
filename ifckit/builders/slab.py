@@ -22,6 +22,7 @@ from ifckit.builders._geom import (
     storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
+from ifckit.builders.extruded import _apply_clip, _iter_clips
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 
@@ -32,6 +33,7 @@ class SlabBuilder(BaseBuilder):
 
     The footprint is projected to the slab's local XY plane,
     then extruded along local Z by `thickness`.
+    Optional clip planes are applied as IfcBooleanClippingResult.
     """
 
     entity_type = "basic_slab"
@@ -62,7 +64,13 @@ class SlabBuilder(BaseBuilder):
         )
         solid = extrude_profile(ifc_file, profile, pending.thickness, position=placement)
 
-        shape_rep = shape_representation(ifc_file, context, solid)
+        # Apply clip planes
+        geometry = solid
+        for clip_plane in _iter_clips(pending):
+            geometry = _apply_clip(ifc_file, geometry, clip_plane, local_plane, elev)
+
+        rep_type = "SweptSolid" if geometry is solid else "Clipping"
+        shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         slab = ifcopenshell.api.run(

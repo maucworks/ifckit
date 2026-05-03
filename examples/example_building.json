@@ -8,6 +8,20 @@
   "site": {
     "name": "Main Site"
   },
+  "door_types": [
+    {
+      "name": "DT-900x2100",
+      "overall_width": 900.0,
+      "overall_height": 2100.0
+    }
+  ],
+  "window_types": [
+    {
+      "name": "WT-1500x1200",
+      "overall_width": 1500.0,
+      "overall_height": 1200.0
+    }
+  ],
   "buildings": [
     {
       "name": "Building A",
@@ -17,6 +31,7 @@
           "elevation": 0.0,
           "elements": [
             {
+              "id": "wall-north-gf",
               "type": "basic_wall",
               "data": {
                 "type": "basic_wall",
@@ -33,7 +48,41 @@
                   "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
                   "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0}
                 }
-              }
+              },
+              "openings": [
+                {
+                  "plane": {
+                    "origin": {"x": 1000.0, "y": 0.0, "z": 0.0},
+                    "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0}
+                  },
+                  "width": 900.0,
+                  "height": 2100.0,
+                  "doors": [
+                    {
+                      "overall_width": 900.0,
+                      "overall_height": 2100.0,
+                      "type_ref": "DT-900x2100"
+                    }
+                  ]
+                },
+                {
+                  "plane": {
+                    "origin": {"x": 4000.0, "y": 0.0, "z": 800.0},
+                    "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0}
+                  },
+                  "width": 1500.0,
+                  "height": 1200.0,
+                  "windows": [
+                    {
+                      "overall_width": 1500.0,
+                      "overall_height": 1200.0,
+                      "type_ref": "WT-1500x1200"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "type": "basic_wall",

@@ -9,17 +9,18 @@ gh_create_beam_any.py  —  GH Script component: "ifckit Beam (Any Path)"
 @input  profile_json : str     item — Profile JSON from ifckit Profile node
 @input  name         : str     item — Optional element name
 @input  properties   : str     item — JSON dict of user properties e.g. {"Supplier": "Voortman"}
-@input  start_clip   : plane   item — Optional clipping plane at beam start (line beams only)
-@input  end_clip     : plane   item — Optional clipping plane at beam end (line beams only)
+@input  clips        : plane   list — Optional clipping planes (line beams only; z_axis toward material to keep)
 @output out       : str     item — Status message
 @output path_type : str     item — Detected path type
-@output json_out  : str     list — List of element JSON strings
+@output json_out  : str     list — Envelope JSON strings: {"elements":[{...}]}
+@output ids       : str     list — UUID assigned to each beam
 
 Stateless: auto-detects path type (line → ExtrudedAreaSolid, arc → RevolvedAreaSolid).
 """
 
 import math
 import json
+import uuid
 
 from ifckit import PendingBeam, PendingRevolvedBeam, Vec
 from ifckit.profiles import Profile
@@ -28,7 +29,6 @@ from ifckit.builders.beam_factory import PathType, classify_path
 
 
 def _get_profile():
-    """Get profile from profile_json (Profile.to_dict() format) or profile_pts."""
     if profile_json:
         try:
             data = json.loads(profile_json)
@@ -36,24 +36,15 @@ def _get_profile():
                 return Profile.dispatch_from_dict(data)
         except Exception:
             pass
-
     if profile_pts:
         return rk.pts_to_vecs(profile_pts)
-
     return None
-
-
-def _get_properties():
-    if properties:
-        try:
-            return json.loads(properties)
-        except Exception:
-            pass
-    return {}
 
 
 messages = []
 json_outputs = []
+ids = []
+detected_path_type = ""
 
 if path_curve:
     line = rk.curves_to_path(path_curve)
@@ -76,24 +67,28 @@ if path_curve:
         else:
             try:
                 el_name = name or "Beam"
+                el_id = str(uuid.uuid4())
 
                 if detected_path_type == PathType.SINGLE_LINE:
                     beam = PendingBeam(axis=path, profile=prof, name=el_name,
-                                      start_clip=rk.rhino_plane_to_plane(start_clip) if start_clip else None,
-                                      end_clip=rk.rhino_plane_to_plane(end_clip) if end_clip else None,
-                                      properties=_get_properties())
+                                      clips=rk.parse_clips(clips),
+                                      properties=rk.parse_user_properties(properties))
                     solid_type = "ExtrudedAreaSolid"
                 else:
                     beam = PendingRevolvedBeam(arc=path, profile=prof, name=el_name,
-                                              properties=_get_properties())
+                                              properties=rk.parse_user_properties(properties))
                     solid_type = "RevolvedAreaSolid"
                     angle_deg = math.degrees(abs(path.angle))
 
-                json_outputs.append(beam.to_json())
+                d = json.loads(beam.to_json())
+                d["id"] = el_id
+                json_outputs.append(json.dumps({"elements": [d]}))
+                ids.append(el_id)
+
                 if detected_path_type == PathType.SINGLE_LINE:
-                    messages.append(f"OK  {el_name} ({solid_type})")
+                    messages.append(f"OK  {el_name} ({solid_type})  id={el_id[:8]}")
                 else:
-                    messages.append(f"OK  {el_name} ({solid_type}, {angle_deg:.0f}° arc)")
+                    messages.append(f"OK  {el_name} ({solid_type}, {angle_deg:.0f}° arc)  id={el_id[:8]}")
             except Exception as exc:
                 messages.append(f"ERR {el_name}: {exc}")
     elif detected_path_type == PathType.MULTI_SEGMENT:
@@ -108,6 +103,5 @@ elif not path_curve:
     messages.append("No path curve")
 
 out = "\n".join(messages) if messages else "No beams processed."
-print(out)
-path_type = detected_path_type if 'detected_path_type' in dir() else ""
+path_type = detected_path_type
 json_out = json_outputs if json_outputs else []

@@ -54,7 +54,6 @@ from ifckit.builders._geom import (
 from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
-from ifckit.elements.structural import PendingBeam, PendingColumn
 from ifckit.geometry import Plane, Vec
 
 
@@ -181,12 +180,9 @@ class ExtrudedElementBuilder(BaseBuilder):
 # ---------------------------------------------------------------------------
 
 
-def _iter_clips(pending: PendingBeam | PendingColumn):
-    """Yield (start_clip, end_clip) planes that are not None."""
-    if pending.start_clip is not None:
-        yield pending.start_clip
-    if pending.end_clip is not None:
-        yield pending.end_clip
+def _iter_clips(pending):
+    """Yield clip planes from pending.clips (list[Plane])."""
+    return iter(getattr(pending, "clips", []) or [])
 
 
 def _apply_clip(
