@@ -407,31 +407,6 @@ def _find_proxy(name: str):
     return None
 
 
-def _reopen(path: str):
-    errors = []
-    try:
-        io = GH.GH_DocumentIO()
-        io.Open(path)
-        new_doc = io.Document
-        if new_doc is None:
-            raise RuntimeError("Document is None after Open()")
-        GH.Instances.DocumentEditor.SetActiveDocument(new_doc, True)
-        new_doc.NewSolution(False)
-        print(f"  Reopened: {path}")
-        return
-    except Exception as e:
-        errors.append(f"GH_DocumentIO: {e}")
-    try:
-        GH.Instances.DocumentEditor.ScriptAccess_OpenDocument(path)
-        print(f"  Reopened: {path}")
-        return
-    except Exception as e:
-        errors.append(f"ScriptAccess_OpenDocument: {e}")
-    print(f"  WARN: auto-reopen failed — open {path} manually")
-    for err in errors:
-        print(f"    {err}")
-
-
 # ---------------------------------------------------------------------------
 # Add one component
 # ---------------------------------------------------------------------------
@@ -576,7 +551,6 @@ def build():
         except Exception:
             traceback.print_exc()
 
-    doc.ExpireSolution()
     archive = GHSerial.GH_Archive()
     archive.AppendObject(doc, "Definition")
     ok = archive.WriteToFile(_OUT_GH, True, False)
@@ -585,7 +559,6 @@ def build():
     print(f"Placed {placed}/{len(src_files)} components")
     if ok:
         print(f"Saved: {_OUT_GH}")
-        _reopen(_OUT_GH)
     else:
         print(f"ERROR: could not save to {_OUT_GH}")
     print(f"{'='*50}")
