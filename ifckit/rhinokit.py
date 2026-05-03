@@ -178,6 +178,24 @@ def curves_to_path(curves: Any) -> Path:
     return p
 
 
+def rhino_plane_to_plane(rh_plane: Any) -> Any:
+    """Convert a Rhino Plane to an ifckit Plane.
+
+    Args:
+        rh_plane: ``Rhino.Geometry.Plane``
+
+    Returns:
+        ``ifckit.geometry.Plane``
+    """
+    _require_rhino("rhino_plane_to_plane")
+    from ifckit.geometry import Plane, Vec
+
+    origin = Vec(rh_plane.Origin.X, rh_plane.Origin.Y, rh_plane.Origin.Z)
+    x_axis = Vec(rh_plane.XAxis.X, rh_plane.XAxis.Y, rh_plane.XAxis.Z)
+    y_axis = Vec(rh_plane.YAxis.X, rh_plane.YAxis.Y, rh_plane.YAxis.Z)
+    return Plane(origin, x_axis, y_axis)
+
+
 def path_to_rhino_curve(geom: Any) -> Any:
     """Convert a Line, Arc, Path, or Profile to a Rhino PolyCurve.
 

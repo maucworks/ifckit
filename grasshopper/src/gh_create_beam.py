@@ -9,6 +9,8 @@ gh_create_beam.py  —  GH Script component: "ifckit Beam"
 @input  profile_json : str   item — Profile JSON from ifckit Profile node
 @input  name         : str   item — Optional element name
 @input  properties   : str   item — JSON dict of user properties e.g. {"Supplier": "Voortman"}
+@input  start_clip   : plane item — Optional clipping plane at beam start
+@input  end_clip     : plane item — Optional clipping plane at beam end
 @output out      : str item — Status message
 @output json_out : str  list — List of element JSON strings
 
@@ -67,6 +69,8 @@ if line_curve:
                 try:
                     el_name = name or "Beam"
                     beam = PendingBeam(axis=line, profile=prof, name=el_name,
+                                      start_clip=rk.rhino_plane_to_plane(start_clip) if start_clip else None,
+                                      end_clip=rk.rhino_plane_to_plane(end_clip) if end_clip else None,
                                       properties=_get_properties())
                     json_outputs.append(beam.to_json())
                     messages.append(f"OK  {el_name}")
