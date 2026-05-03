@@ -18,7 +18,7 @@ import traceback
 # Reload (picks up live code changes without restarting Rhino)
 # ---------------------------------------------------------------------------
 try:
-    import os, sys, importlib
+    import os, sys
     _root = os.environ.get("IFCKIT_PATH", r"/Users/Mauc/L140-py-ifckit")
     if _root not in sys.path:
         sys.path.insert(0, _root)
