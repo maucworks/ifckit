@@ -35,7 +35,7 @@ from ifckit import (
     Arc,
     validate,
 )
-from ifckit.builders import default_registry
+from ifckit.builders.bridge import AlignmentBuilder
 
 
 # ---------------------------------------------------------------------------
@@ -144,10 +144,9 @@ def main(output_path: str = "output/simple_bridge.ifc") -> None:
     bridge.add_bridge_part("Substructure", BridgePartType.SUBSTRUCTURE.value)
     align_handle = site.add_alignment("BridgeAlignment")
 
-    # Alignment geometry has no spatial container — use low-level builder directly
-    reg = default_registry()
+    # Alignment geometry has no spatial container — use AlignmentBuilder directly
     alignment = build_alignment()
-    reg.get("alignment").build(model.ifc_file, alignment, align_handle.entity, None)
+    AlignmentBuilder().build(model.ifc_file, alignment, align_handle.entity, None)
 
     # Add deck beams via handle chaining
     build_deck_beams(deck)

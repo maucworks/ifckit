@@ -2,80 +2,101 @@
 
 Framework-agnostic IFC builder library for architecture and infrastructure.
 
-## What it is
+![Tests](https://github.com/maucworks/ifckit/actions/workflows/tests.yml/badge.svg)
+![PyPI](https://img.shields.io/pypi/v/ifckit)
 
-`ifckit` lets you construct IFC files in pure Python.
-It has one external dependency: `ifcopenshell`.
-It knows nothing about Rhino, Grasshopper, FastAPI, or any other host.
+Build valid IFC files in pure Python — no CAD host required.
+Works standalone, from Grasshopper, or via the JSON/CLI interface.
 
-Frontends (Grasshopper Python, FastAPI, CLI) are thin adapters that convert
-their geometry types to `ifckit` primitives and call the library API.
+## Install
 
-## Supported schemas
+```bash
+pip install ifckit[ifc]    # with ifcopenshell (full functionality)
+pip install ifckit         # without ifcopenshell (JSON/schema tools only)
+```
 
-- **IFC4** — buildings: walls, slabs, beams, columns
-- **IFC4x3** — infrastructure: bridges, bridge parts, alignments
+Requires Python 3.10+.
 
-## Quick start
+## Quick start: building
 
 ```python
-from ifckit import IfcModel, IfcSchema, PendingWall, Vec, Plane, validate
-from ifckit.builders import default_registry
-from ifckit.builders._geom import get_body_context
+from ifckit import IfcModel, IfcSchema, PendingWall, Vec, Plane
 
-# Build the spatial hierarchy
 model = IfcModel(name="My Project", schema=IfcSchema.IFC4, author="you")
-site  = model.add_site("Site A")
-bldg  = model.add_building(site, "Building 1")
-floor = model.add_storey(bldg, "Ground Floor", elevation=0.0)
+floor = model.add_site("Site A").add_building("Building 1").add_storey("Ground Floor", elevation=0.0)
 
-# Define the element
 wall = PendingWall(
     footprint=[Vec(0, 0, 0), Vec(10, 0, 0), Vec(10, 0.3, 0), Vec(0, 0.3, 0)],
     plane=Plane.world_xy(),
     height=3.0,
     name="North Facade",
 )
-
-# Validate, then build into the IFC file
-result = validate(wall)
-assert result.ok, result.errors
-
-reg = default_registry()
-ctx = get_body_context(model.ifc_file)
-reg.get("basic_wall").build(model.ifc_file, wall, floor.entity, ctx)
-
-model.save("output/project.ifc")
+floor.add(wall)
+model.save("project.ifc")
 ```
 
-See `examples/quickstart.py` for the full runnable version.
+See `examples/quickstart.py` and `examples/simple_building.py` for fuller examples.
 
-## Installation
+## Quick start: bridge
+
+```python
+from ifckit import IfcModel, IfcSchema, LengthUnit, PendingBeam, Vec, Line, BridgePartType, IBeamProfile
+
+model = IfcModel(name="Bridge", schema=IfcSchema.IFC4X3, author="you", unit=LengthUnit.MILLIMETRE)
+deck = model.add_site("Site A").add_bridge("Main Bridge").add_bridge_part("Deck", BridgePartType.DECK.value)
+
+profile = IBeamProfile(height=600, width=300, web_thickness=10, flange_thickness=10)
+beam = PendingBeam(axis=Line(Vec(0, 0, 0), Vec(3000, 0, 0)), profile=profile, name="Main Girder")
+deck.add(beam)
+
+model.save("bridge.ifc")
+```
+
+See `examples/quickstart_bridge.py` and `examples/simple_bridge.py` for fuller examples including alignments.
+
+## Supported schemas and element types
+
+| Element | Class | IFC4 | IFC4X3 |
+|---|---|:---:|:---:|
+| Wall | `PendingWall` | ✓ | |
+| Slab | `PendingSlab` | ✓ | |
+| Column | `PendingColumn` | ✓ | |
+| Beam | `PendingBeam` | ✓ | ✓ |
+| Space | `PendingSpace` | ✓ | |
+| Alignment | `PendingAlignment` | | ✓ |
+
+Profiles: `IBeamProfile`, `LBeamProfile`, `SteelProfile`, and arbitrary polygon profiles.
+
+## JSON build
+
+Build an IFC file from a JSON description — useful for CLI pipelines and REST APIs:
+
+```python
+from ifckit.json_build import build
+
+build("model.json", "output.ifc")
+```
+
+Or from the command line:
 
 ```bash
-pip install ifckit          # once published
-# or locally:
-pip install -e ".[dev,api]"
+python -m ifckit model.json output.ifc
 ```
+
+The JSON schema mirrors the Python API. See `examples/example_building.json` for a full example.
+
+## Grasshopper
+
+Grasshopper Script components are in `grasshopper/src/`. Each component is a
+standalone Python file with `@component` / `@input` / `@output` annotations.
+
+To regenerate the `.gh` file from source, run `grasshopper/script/build_gh.py`
+inside the Rhino ScriptEditor with Grasshopper open.
 
 ## Development
 
 ```bash
-make env          # create .venv + install all extras
-make test         # run tests with coverage
-make test-fast    # run tests, stop on first failure
-make api          # start FastAPI dev server  →  http://127.0.0.1:8000/docs
-make lint         # ruff check
-make fmt          # ruff format + auto-fix
-make help         # list all targets
+pip install -e ".[dev]"
+pytest tests/          # run tests
+ruff check ifckit/     # lint
 ```
-
-Or directly with pytest / ruff:
-
-```bash
-pytest                                          # run tests
-pytest --cov=ifckit --cov-report=term-missing  # with coverage
-ruff check ifckit/                              # lint
-```
-
-See `PLAN.md` for the full milestone implementation plan.
