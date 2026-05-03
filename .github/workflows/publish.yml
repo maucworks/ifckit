@@ -2,14 +2,39 @@ name: Publish to PyPI
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ master ]
 
 permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should-publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # full history so we can see all tags
+
+    - name: Check if version is new
+      id: check
+      run: |
+        VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+        echo "Current version: $VERSION  Latest tag: $LATEST_TAG"
+        if [ "v$VERSION" != "$LATEST_TAG" ]; then
+          echo "should_publish=true" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "should_publish=false" >> $GITHUB_OUTPUT
+        fi
+
   build:
+    needs: check-version
+    if: needs.check-version.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -36,13 +61,13 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    needs: build
+    needs: [check-version, build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/ifckit
     permissions:
-      id-token: write  # required for Trusted Publishing
+      id-token: write
 
     steps:
     - name: Download distribution packages
@@ -56,7 +81,7 @@ jobs:
 
   create-github-release:
     name: Create GitHub Release
-    needs: publish-to-pypi
+    needs: [check-version, publish-to-pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -64,10 +89,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Create GitHub Release
+    - name: Create git tag and GitHub Release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh release create "${{ github.ref_name }}" \
-          --title "${{ github.ref_name }}" \
+        VERSION="${{ needs.check-version.outputs.version }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "v${VERSION}" -m "Release v${VERSION}"
+        git push origin "v${VERSION}"
+        gh release create "v${VERSION}" \
+          --title "v${VERSION}" \
           --generate-notes
