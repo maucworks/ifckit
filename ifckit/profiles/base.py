@@ -250,3 +250,22 @@ class Profile(ABC, metaclass=RegisterProfileType):
         raise NotImplementedError(
             f"{type(self).__name__} does not implement get_profile_points(). Use to_ifc() directly."
         )
+
+    def to_path(self) -> Any:
+        """Return the profile outline as a closed ``ifckit.geometry.Path`` in the XY plane (Z=0).
+
+        Converts ``get_profile_points()`` → a ``Path`` of ``Line`` segments,
+        closed by connecting the last point back to the first.  The result can
+        be passed directly to ``rhinokit.path_to_rhino_curve()``.
+        """
+        from ifckit.geometry import Path, Vec
+
+        pts = self.get_profile_points()  # [(x, y), ...]
+        if not pts:
+            raise ValueError(f"{type(self).__name__}.get_profile_points() returned no points")
+
+        vecs = [Vec(x, y, 0.0) for x, y in pts]
+        path = Path()
+        for i in range(len(vecs)):
+            path.add_line(vecs[i], vecs[(i + 1) % len(vecs)])
+        return path

@@ -179,12 +179,13 @@ def curves_to_path(curves: Any) -> Path:
 
 
 def path_to_rhino_curve(geom: Any) -> Any:
-    """Convert a Line, Arc, or Path to a Rhino PolyCurve.
+    """Convert a Line, Arc, Path, or Profile to a Rhino PolyCurve.
 
     Accepts any of:
-    - ``ifckit.geometry.Line``  — single straight segment
-    - ``ifckit.geometry.Arc``   — single circular arc
-    - ``ifckit.geometry.Path``  — ordered sequence of Line/Arc segments
+    - ``ifckit.geometry.Line``    — single straight segment
+    - ``ifckit.geometry.Arc``     — single circular arc
+    - ``ifckit.geometry.Path``    — ordered sequence of Line/Arc segments
+    - ``ifckit.profiles.Profile`` — profile outline via ``to_path()``
 
     Returns a ``Rhino.Geometry.PolyCurve`` in all cases (even for a single
     segment).  All coordinates are taken as-is — no unit conversion.
@@ -192,6 +193,10 @@ def path_to_rhino_curve(geom: Any) -> Any:
     _require_rhino("path_to_rhino_curve")
 
     from ifckit.geometry import Arc, Line, Path
+    from ifckit.profiles.base import Profile
+
+    if isinstance(geom, Profile):
+        geom = geom.to_path()
 
     if isinstance(geom, Line):
         segments = [geom]
