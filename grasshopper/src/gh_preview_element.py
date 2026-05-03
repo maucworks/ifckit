@@ -15,10 +15,15 @@ from __future__ import annotations
 import traceback
 
 # ---------------------------------------------------------------------------
-# Reload (import shim picks up live code changes without restarting Rhino)
+# Reload (picks up live code changes without restarting Rhino)
 # ---------------------------------------------------------------------------
 try:
-    import ifckit_reload  # noqa: F401
+    import os, sys, importlib
+    _root = os.environ.get("IFCKIT_PATH", r"/Users/Mauc/L140-py-ifckit")
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    import ifckit.rhinokit as _rk
+    _rk.reload_all(_root)
 except Exception:
     pass
 
