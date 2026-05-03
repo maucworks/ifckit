@@ -178,6 +178,53 @@ def curves_to_path(curves: Any) -> Path:
     return p
 
 
+def path_to_rhino_curve(geom: Any) -> Any:
+    """Convert a Line, Arc, or Path to a Rhino PolyCurve.
+
+    Accepts any of:
+    - ``ifckit.geometry.Line``  — single straight segment
+    - ``ifckit.geometry.Arc``   — single circular arc
+    - ``ifckit.geometry.Path``  — ordered sequence of Line/Arc segments
+
+    Returns a ``Rhino.Geometry.PolyCurve`` in all cases (even for a single
+    segment).  All coordinates are taken as-is — no unit conversion.
+    """
+    _require_rhino("path_to_rhino_curve")
+
+    from ifckit.geometry import Arc, Line, Path
+
+    if isinstance(geom, Line):
+        segments = [geom]
+    elif isinstance(geom, Arc):
+        segments = [geom]
+    elif isinstance(geom, Path):
+        segments = geom.segments
+    else:
+        raise TypeError(
+            f"path_to_rhino_curve() expects Line, Arc or Path, got {type(geom).__name__}"
+        )
+
+    rg = Rhino.Geometry
+    polycurve = rg.PolyCurve()
+
+    for seg in segments:
+        if isinstance(seg, Line):
+            start = rg.Point3d(seg.start.x, seg.start.y, seg.start.z)
+            end = rg.Point3d(seg.end.x, seg.end.y, seg.end.z)
+            polycurve.Append(rg.LineCurve(start, end))
+
+        elif isinstance(seg, Arc):
+            center = rg.Point3d(seg.center.x, seg.center.y, seg.center.z)
+            normal = rg.Vector3d(seg.normal.x, seg.normal.y, seg.normal.z)
+            radial = seg.start - seg.center
+            x_axis = rg.Vector3d(radial.x, radial.y, radial.z)
+            plane = rg.Plane(center, x_axis, rg.Vector3d.CrossProduct(normal, x_axis))
+            rhino_arc = rg.Arc(plane, seg.radius, seg.angle)
+            polycurve.Append(rg.ArcCurve(rhino_arc))
+
+    return polycurve
+
+
 def profile_to_rhino_curve(profile: Any) -> Any:
     """Convert an ifckit Profile to a closed Rhino PolylineCurve in WorldXY.
 
