@@ -12,6 +12,7 @@ gh_profile.py  —  GH Script component: "ifckit Profile"
 @input  radius           : float item — Radius (m) — circle / hollow_circle
 @input  wall_thickness   : float item — Wall thickness (m) — hollow_circle
 @input  steel_name       : str   item — Steel section name, e.g. "HEA200"
+@input  anchor           : str   item — Anchor point: "c" centroid, "s" mid-bottom, "sw" bottom-left (default "c")
 @input  unit             : str   item — Unit for steel dims: "m" (default) or "mm"
 @input  name             : str   item — Optional profile label
 @output out      : str item — Status message
@@ -31,6 +32,7 @@ from ifckit.profiles import (
 from ifckit.schema import LengthUnit
 
 _pt = (profile_type or "").strip().lower()
+_anchor = (anchor or "c").strip().lower()
 messages = []
 json_out = ""
 
@@ -44,7 +46,7 @@ try:
         ft = float(flange_thickness or 0)
         if h <= 0 or w <= 0 or wt <= 0 or ft <= 0:
             raise ValueError("height, width, web_thickness, flange_thickness all required for I-beam")
-        profile = IBeamProfile(height=h, width=w, web_thickness=wt, flange_thickness=ft, name=name or "I-Profile")
+        profile = IBeamProfile(height=h, width=w, web_thickness=wt, flange_thickness=ft, anchor=_anchor, name=name or "I-Profile")
 
     elif _pt == "l":
         h  = float(height or 0)
@@ -52,7 +54,7 @@ try:
         ft = float(flange_thickness or 0)
         if h <= 0 or w <= 0 or ft <= 0:
             raise ValueError("height, width, flange_thickness all required for L-beam")
-        profile = LBeamProfile(height=h, width=w, flange_thickness=ft, name=name or "L-Profile")
+        profile = LBeamProfile(height=h, width=w, flange_thickness=ft, anchor=_anchor, name=name or "L-Profile")
 
     elif _pt == "rect":
         w = float(width or 0)
@@ -80,7 +82,7 @@ try:
             raise ValueError("steel_name required for steel profile")
         u_str = (unit or "m").strip().lower()
         lu = LengthUnit.MILLIMETRE if u_str == "mm" else LengthUnit.METRE
-        profile = SteelProfile.from_name(sname, unit=lu)
+        profile = SteelProfile.from_name(sname, anchor=_anchor, unit=lu)
         if name:
             profile.name = name
 

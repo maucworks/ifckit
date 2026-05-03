@@ -52,6 +52,7 @@ from ifckit.builders._geom import (
     storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
+from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 from ifckit.elements.structural import PendingBeam, PendingColumn
 from ifckit.geometry import Plane, Vec
@@ -79,7 +80,7 @@ class ExtrudedElementBuilder(BaseBuilder):
     ) -> ifcopenshell.entity_instance:
         # Use element_type string comparison instead of isinstance() to handle
         # class identity mismatches from module reloading in Rhino/Grasshopper.
-        if not hasattr(pending, 'element_type') or pending.element_type != self.entity_type:
+        if not hasattr(pending, "element_type") or pending.element_type != self.entity_type:
             raise TypeError(
                 f"ExtrudedElementBuilder({self.entity_type!r}) expects a matching element, "
                 f"got element_type={getattr(pending, 'element_type', None)!r}"
@@ -121,6 +122,7 @@ class ExtrudedElementBuilder(BaseBuilder):
         # Fall back to the already-projected 2D point list for plain Vec lists.
         profile_source = getattr(pending, "_profile_source", None)
         from ifckit.profiles.base import Profile as _Profile
+
         if isinstance(profile_source, _Profile):
             profile = profile_to_ifc(ifc_file, profile_source)
         else:
@@ -160,6 +162,7 @@ class ExtrudedElementBuilder(BaseBuilder):
             relating_structure=container,
         )
 
+        write_psets(ifc_file, element, pending)
         return element
 
     def _apply_clips(

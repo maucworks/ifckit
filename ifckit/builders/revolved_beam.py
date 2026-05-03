@@ -26,6 +26,7 @@ from ifckit.builders._geom import (
     storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
+from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 
 
@@ -137,4 +138,5 @@ class RevolvedBeamBuilder(BaseBuilder):
             relating_structure=container,
         )
 
+        write_psets(ifc_file, beam, pending)
         return beam

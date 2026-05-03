@@ -94,9 +94,15 @@ def polyline_to_vecs(crv: Any) -> List[Vec]:
 
 
 def line_to_line(rhino_line: Any) -> Line:
-    """Rhino LineCurve → ifckit Line."""
-    pt_a = rhino_line.PointAtStart
-    pt_b = rhino_line.PointAtEnd
+    """Rhino LineCurve or Line → ifckit Line."""
+    if hasattr(rhino_line, "PointAtStart"):
+        # LineCurve
+        pt_a = rhino_line.PointAtStart
+        pt_b = rhino_line.PointAtEnd
+    else:
+        # Rhino.Geometry.Line struct
+        pt_a = rhino_line.From
+        pt_b = rhino_line.To
     return Line(pt_to_vec(pt_a), pt_to_vec(pt_b))
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ifckit.elements.base import ClipData, PendingElement
+from ifckit.elements.base import ClipData, PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Plane, Vec
 
@@ -38,8 +38,9 @@ class PendingWall(PendingElement):
         name: str = "",
         clip_data: Optional[ClipData] = None,
         style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, clip_data=clip_data, style=style)
+        super().__init__(name=name, clip_data=clip_data, style=style, properties=properties)
         self.footprint = list(footprint)
         self.plane = plane
         self.height = float(height)
@@ -63,6 +64,7 @@ class PendingWall(PendingElement):
             name=d.get("name", ""),
             clip_data=d.get("clip_data"),
             style=cls._style_from_dict(d),
+            properties=d.get("properties") or {},
         )
 
 

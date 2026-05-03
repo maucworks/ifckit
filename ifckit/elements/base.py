@@ -16,6 +16,7 @@ from ifckit.elements.registry import ElementRegistry, RegisterElementType
 from ifckit.elements.style import RenderStyle
 
 ClipData = Dict[str, Any]
+UserProperties = Dict[str, Any]
 
 
 class PendingElement(metaclass=RegisterElementType):
@@ -27,6 +28,10 @@ class PendingElement(metaclass=RegisterElementType):
 
     Each subclass must define ``element_type`` as a class variable (str).
     When the class is defined, it's automatically registered in ElementRegistry.
+
+    ``properties`` is an optional free-form dict of user-supplied key/value
+    pairs written to ``EPset_IfcKit`` in the IFC output.  Values may be
+    str, float, int or bool; other types are coerced to str.
     """
 
     element_type: str  # must be set by each subclass
@@ -37,11 +42,13 @@ class PendingElement(metaclass=RegisterElementType):
         clip_data: Optional[ClipData] = None,
         style: Optional[RenderStyle] = None,
         hatch_pattern: str = "",
+        properties: Optional[UserProperties] = None,
     ) -> None:
         self.name = name
         self.clip_data = clip_data
         self.style = style
         self.hatch_pattern = hatch_pattern
+        self.properties: UserProperties = properties or {}
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict (useful for JSON transport / debugging)."""
@@ -52,6 +59,8 @@ class PendingElement(metaclass=RegisterElementType):
             d["style"] = self.style.to_dict()
         if self.hatch_pattern:
             d["hatch_pattern"] = self.hatch_pattern
+        if self.properties:
+            d["properties"] = self.properties
         return d
 
     def to_json(self, **kwargs) -> str:
@@ -111,6 +120,11 @@ class PendingElement(metaclass=RegisterElementType):
     def _hatch_pattern_from_dict(cls, d: Dict[str, Any]) -> str:
         """Helper: deserialise optional hatch_pattern from dict."""
         return d.get("hatch_pattern", "")
+
+    @classmethod
+    def _properties_from_dict(cls, d: Dict[str, Any]) -> UserProperties:
+        """Helper: deserialise optional user properties from dict."""
+        return d.get("properties") or {}
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"

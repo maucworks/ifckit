@@ -22,6 +22,7 @@ from ifckit.builders._geom import (
     storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
+from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 
 
@@ -85,4 +86,5 @@ class WallBuilder(BaseBuilder):
             relating_structure=container,
         )
 
+        write_psets(ifc_file, wall, pending)
         return wall

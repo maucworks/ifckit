@@ -8,6 +8,7 @@ gh_create_beam.py  —  GH Script component: "ifckit Beam"
 @input  profile_pts  : point list — Cross-section polygon as Point3d list (fallback)
 @input  profile_json : str   item — Profile JSON from ifckit Profile node
 @input  name         : str   item — Optional element name
+@input  properties   : str   item — JSON dict of user properties e.g. {"Supplier": "Voortman"}
 @output out      : str item — Status message
 @output json_out : str  list — List of element JSON strings
 
@@ -38,11 +39,20 @@ def _get_profile():
     return None
 
 
+def _get_properties():
+    if properties:
+        try:
+            return json.loads(properties)
+        except Exception:
+            pass
+    return {}
+
+
 messages = []
 json_outputs = []
 
 if line_curve:
-    line = rk.curve_to_line(line_curve)
+    line = rk.curves_to_path(line_curve)
     if not line:
         messages.append("ERR: invalid line curve")
     else:
@@ -56,7 +66,8 @@ if line_curve:
             else:
                 try:
                     el_name = name or "Beam"
-                    beam = PendingBeam(axis=line, profile=prof, name=el_name)
+                    beam = PendingBeam(axis=line, profile=prof, name=el_name,
+                                      properties=_get_properties())
                     json_outputs.append(beam.to_json())
                     messages.append(f"OK  {el_name}")
                 except Exception as exc:

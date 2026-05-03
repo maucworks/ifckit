@@ -164,7 +164,7 @@ def parse_annotations(src: str):
 # ---------------------------------------------------------------------------
 
 def _read_body(filepath: str) -> str:
-    """Return the script body, stripping the module docstring (annotations only)."""
+    """Return the script body with the module docstring converted to a comment block."""
     with open(filepath, "r", encoding="utf-8") as f:
         src = f.read()
     try:
@@ -172,9 +172,12 @@ def _read_body(filepath: str) -> str:
         if (tree.body
                 and isinstance(tree.body[0], ast.Expr)
                 and isinstance(tree.body[0].value, ast.Constant)):
-            end_line = tree.body[0].end_lineno
-            lines = src.splitlines(keepends=True)
-            return "".join(lines[end_line:]).lstrip("\n")
+            docstring  = tree.body[0].value.value
+            end_line   = tree.body[0].end_lineno
+            lines      = src.splitlines(keepends=True)
+            body       = "".join(lines[end_line:]).lstrip("\n")
+            comment    = "\n".join(f"# {l}" if l.strip() else "#" for l in docstring.splitlines())
+            return comment + "\n\n" + body
     except Exception:
         pass
     return src

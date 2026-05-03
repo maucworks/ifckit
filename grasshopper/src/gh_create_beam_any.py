@@ -8,6 +8,7 @@ gh_create_beam_any.py  —  GH Script component: "ifckit Beam (Any Path)"
 @input  profile_pts  : point   list — Cross-section polygon as Point3d list (fallback)
 @input  profile_json : str     item — Profile JSON from ifckit Profile node
 @input  name         : str     item — Optional element name
+@input  properties   : str     item — JSON dict of user properties e.g. {"Supplier": "Voortman"}
 @output out       : str     item — Status message
 @output path_type : str     item — Detected path type
 @output json_out  : str     list — List of element JSON strings
@@ -40,11 +41,20 @@ def _get_profile():
     return None
 
 
+def _get_properties():
+    if properties:
+        try:
+            return json.loads(properties)
+        except Exception:
+            pass
+    return {}
+
+
 messages = []
 json_outputs = []
 
 if path_curve:
-    line = rk.curve_to_line(path_curve)
+    line = rk.curves_to_path(path_curve)
     if line:
         path = line
         detected_path_type = classify_path(path)
@@ -66,10 +76,12 @@ if path_curve:
                 el_name = name or "Beam"
 
                 if detected_path_type == PathType.SINGLE_LINE:
-                    beam = PendingBeam(axis=path, profile=prof, name=el_name)
+                    beam = PendingBeam(axis=path, profile=prof, name=el_name,
+                                      properties=_get_properties())
                     solid_type = "ExtrudedAreaSolid"
                 else:
-                    beam = PendingRevolvedBeam(arc=path, profile=prof, name=el_name)
+                    beam = PendingRevolvedBeam(arc=path, profile=prof, name=el_name,
+                                              properties=_get_properties())
                     solid_type = "RevolvedAreaSolid"
                     angle_deg = math.degrees(abs(path.angle))
 

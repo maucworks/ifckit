@@ -19,6 +19,7 @@ from ifckit.builders._geom import (
     storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
+from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 
 
@@ -147,4 +148,5 @@ class SpaceBuilder(BaseBuilder):
             relating_object=container,
         )
 
+        write_psets(ifc_file, space, pending)
         return space

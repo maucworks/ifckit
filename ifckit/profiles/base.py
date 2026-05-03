@@ -78,6 +78,17 @@ class Profile(ABC, metaclass=RegisterProfileType):
         """Reconstruct a profile from a dict produced by ``to_dict()``."""
         raise NotImplementedError
 
+    @property
+    def area(self) -> Optional[float]:
+        """
+        Return the cross-sectional area in m² (or whatever unit the profile uses).
+
+        Returns ``None`` if the profile type does not support area calculation
+        (e.g. PolygonProfile without explicit geometry).  Concrete subclasses
+        should override this.
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Polymorphic entry-point
     # ------------------------------------------------------------------
@@ -98,8 +109,7 @@ class Profile(ABC, metaclass=RegisterProfileType):
         registry = RegisterProfileType._registry
         if key not in registry:
             raise ValueError(
-                f"Unknown profile_type {key!r}. "
-                f"Registered types: {sorted(registry.keys())}"
+                f"Unknown profile_type {key!r}. Registered types: {sorted(registry.keys())}"
             )
         return registry[key].from_dict(d)
 
@@ -117,6 +127,5 @@ class Profile(ABC, metaclass=RegisterProfileType):
         pipeline until full IFC-native output is wired through.
         """
         raise NotImplementedError(
-            f"{type(self).__name__} does not implement get_profile_points(). "
-            "Use to_ifc() directly."
+            f"{type(self).__name__} does not implement get_profile_points(). Use to_ifc() directly."
         )

@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from ifckit.elements.base import PendingElement
+from ifckit.elements.base import PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Arc, Line, Plane, Vec
 
@@ -86,8 +86,9 @@ class PendingExtrudedElement(PendingElement):
         end_clip: Optional[Plane] = None,
         name: str = "",
         style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, style=style)
+        super().__init__(name=name, style=style, properties=properties)
         self.axis = axis
         self._profile_source = profile  # preserve original Profile object if given
         self.profile = _coerce_profile(profile)
@@ -162,6 +163,7 @@ class PendingExtrudedElement(PendingElement):
             end_clip=_plane_from_dict(d["end_clip"]) if "end_clip" in d else None,
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
+            properties=d.get("properties") or {},
         )
 
 
@@ -198,6 +200,7 @@ class PendingBeam(PendingExtrudedElement):
         name: str = "",
         ref_line: Optional[Line] = None,
         style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
     ) -> None:
         super().__init__(
             axis=axis,
@@ -207,6 +210,7 @@ class PendingBeam(PendingExtrudedElement):
             end_clip=end_clip,
             name=name,
             style=style,
+            properties=properties,
         )
         self.ref_line = ref_line
 
@@ -298,8 +302,9 @@ class PendingRevolvedBeam(PendingElement):
         ref_line: Optional[Line] = None,
         cp_normal: Optional[Vec] = None,
         style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, style=style)
+        super().__init__(name=name, style=style, properties=properties)
         self.arc = arc
         self._profile_source = profile
         self.profile = _coerce_profile(profile)
@@ -336,4 +341,5 @@ class PendingRevolvedBeam(PendingElement):
             name=d.get("name", ""),
             cp_normal=cp_normal,
             style=cls._style_from_dict(d),
+            properties=d.get("properties") or {},
         )
