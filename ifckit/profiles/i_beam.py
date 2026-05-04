@@ -30,13 +30,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
+from ifckit.profiles.anchor import VALID_ANCHORS
 from ifckit.profiles.base import Profile
 
 if TYPE_CHECKING:
     import ifcopenshell
 
-# Anchor → (x_fraction_of_width, y_fraction_of_height)
-# Applied as: offset = (-fraction * width, -fraction * height)
+# Anchor → extra (dx, dy) shift applied on top of the inherent x-centring
+# of the I-section profile points.  (0, 0) = bottom-centre of bounding box.
 _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
     "sw": (-0.5, 0.0),
     "s": (0.0, 0.0),
@@ -93,10 +94,8 @@ class IBeamProfile(Profile):
             raise ValueError("web_thickness must be > 0 and < width")
         if self.flange_thickness <= 0 or self.flange_thickness * 2 >= self.height:
             raise ValueError("flange_thickness must be > 0 and < height/2")
-        if self.anchor not in _ANCHOR_OFFSETS:
-            raise ValueError(
-                f"anchor must be one of {list(_ANCHOR_OFFSETS.keys())}, got '{self.anchor}'"
-            )
+        if self.anchor not in VALID_ANCHORS:
+            raise ValueError(f"anchor must be one of {sorted(VALID_ANCHORS)}, got '{self.anchor}'")
 
     def _origin_offset(self) -> Tuple[float, float]:
         fx, fy = _ANCHOR_OFFSETS[self.anchor]

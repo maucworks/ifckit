@@ -328,6 +328,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                             opening=opening_handle,
                             container=storey,
                             door_type=door_type_handle,
+                            opening_anchor=pending_op.anchor,
                         )
 
                     for wk, win_data in enumerate(op_data.get("windows", [])):
@@ -345,6 +346,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                             opening=opening_handle,
                             container=storey,
                             window_type=win_type_handle,
+                            opening_anchor=pending_op.anchor,
                         )
 
             # elements without an id can still have openings — walk again

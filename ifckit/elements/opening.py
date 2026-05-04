@@ -43,6 +43,7 @@ from typing import Any, Dict, List, Optional
 from ifckit.elements.base import PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Plane
+from ifckit.profiles.anchor import VALID_ANCHORS
 
 # ---------------------------------------------------------------------------
 # Allowed enum subsets (v1)
@@ -110,6 +111,7 @@ class PendingOpening(PendingElement):
         height: float,
         opening_depth: float | None = None,
         name: str = "",
+        anchor: str = "s",
         clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
@@ -123,10 +125,16 @@ class PendingOpening(PendingElement):
             raise ValueError(
                 f"PendingOpening: opening_depth must be positive, got {opening_depth!r}"
             )
+        anchor = anchor.lower()
+        if anchor not in VALID_ANCHORS:
+            raise ValueError(
+                f"PendingOpening: anchor must be one of {sorted(VALID_ANCHORS)}, got {anchor!r}"
+            )
         self.plane = plane
         self.width = float(width)
         self.height = float(height)
-        self.opening_depth = opening_depth  # None means "use default 10m in project units"
+        self.opening_depth = opening_depth
+        self.anchor = anchor
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -139,6 +147,8 @@ class PendingOpening(PendingElement):
         d["height"] = self.height
         if self.opening_depth is not None:
             d["opening_depth"] = self.opening_depth
+        if self.anchor != "s":
+            d["anchor"] = self.anchor
         return d
 
     @classmethod
@@ -150,7 +160,8 @@ class PendingOpening(PendingElement):
             plane=Plane.from_dict(plane_raw),
             width=width,
             height=height,
-            opening_depth=d.get("opening_depth"),  # None if not specified - builder converts 10m
+            opening_depth=d.get("opening_depth"),
+            anchor=d.get("anchor", "s"),
             name=d.get("name", ""),
             clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),

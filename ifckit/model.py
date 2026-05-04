@@ -706,16 +706,18 @@ class IfcModel:
         opening: "EntityHandle",
         container: "StoreyHandle",
         door_type: "Optional[EntityHandle]" = None,
+        opening_anchor: str = "s",
     ) -> "EntityHandle":
         """
         Create an ``IfcDoor`` filling *opening* and place it in *container*.
 
         Args:
-            pending:   A ``PendingDoor`` instance.
-            opening:   ``EntityHandle`` wrapping the ``IfcOpeningElement``.
-            container: ``StoreyHandle`` for spatial containment.
-            door_type: Optional ``EntityHandle`` wrapping an ``IfcDoorType``
-                       entity to assign via ``IfcRelDefinesByType``.
+            pending:        A ``PendingDoor`` instance.
+            opening:        ``EntityHandle`` wrapping the ``IfcOpeningElement``.
+            container:      ``StoreyHandle`` for spatial containment.
+            door_type:      Optional ``EntityHandle`` wrapping an ``IfcDoorType``
+                            entity to assign via ``IfcRelDefinesByType``.
+            opening_anchor: Anchor of the parent ``PendingOpening`` (default ``"s"``).
 
         Returns:
             ``EntityHandle`` wrapping the created ``IfcDoor``.
@@ -741,7 +743,13 @@ class IfcModel:
         ctx = get_body_context(self._file)
         type_entity = door_type.entity if door_type is not None else None
         door_entity = build_door(
-            self._file, pending, opening.entity, container.entity, ctx, type_entity
+            self._file,
+            pending,
+            opening.entity,
+            container.entity,
+            ctx,
+            type_entity,
+            opening_anchor=opening_anchor,
         )
         return EntityHandle(door_entity, self)
 
@@ -751,15 +759,17 @@ class IfcModel:
         opening: "EntityHandle",
         container: "StoreyHandle",
         window_type: "Optional[EntityHandle]" = None,
+        opening_anchor: str = "s",
     ) -> "EntityHandle":
         """
         Create an ``IfcWindow`` filling *opening* and place it in *container*.
 
         Args:
-            pending:     A ``PendingWindow`` instance.
-            opening:     ``EntityHandle`` wrapping the ``IfcOpeningElement``.
-            container:   ``StoreyHandle`` for spatial containment.
-            window_type: Optional ``EntityHandle`` wrapping an ``IfcWindowType``.
+            pending:        A ``PendingWindow`` instance.
+            opening:        ``EntityHandle`` wrapping the ``IfcOpeningElement``.
+            container:      ``StoreyHandle`` for spatial containment.
+            window_type:    Optional ``EntityHandle`` wrapping an ``IfcWindowType``.
+            opening_anchor: Anchor of the parent ``PendingOpening`` (default ``"s"``).
 
         Returns:
             ``EntityHandle`` wrapping the created ``IfcWindow``.
@@ -786,7 +796,13 @@ class IfcModel:
         ctx = get_body_context(self._file)
         type_entity = window_type.entity if window_type is not None else None
         window_entity = build_window(
-            self._file, pending, opening.entity, container.entity, ctx, type_entity
+            self._file,
+            pending,
+            opening.entity,
+            container.entity,
+            ctx,
+            type_entity,
+            opening_anchor=opening_anchor,
         )
         return EntityHandle(window_entity, self)
 

@@ -143,3 +143,46 @@ class TestBuildOpening:
             if rel.RelatedObjects and op in rel.RelatedObjects
         }
         assert "EPset_IfcKit" in pset_names
+
+
+class TestAnchor:
+    """Tests for PendingOpening anchor field and anchor_offset integration."""
+
+    def test_default_anchor_is_s(self):
+        op = _opening()
+        assert op.anchor == "s"
+
+    def test_anchor_stored(self):
+        op = _opening(anchor="sw")
+        assert op.anchor == "sw"
+
+    def test_anchor_roundtrip(self):
+        op = _opening(anchor="c")
+        assert PendingOpening.from_dict(op.to_dict()).anchor == "c"
+
+    def test_default_anchor_not_in_dict(self):
+        """Default anchor 's' should be omitted from the serialised dict."""
+        d = _opening(anchor="s").to_dict()
+        assert "anchor" not in d
+
+    def test_non_default_anchor_in_dict(self):
+        d = _opening(anchor="sw").to_dict()
+        assert d["anchor"] == "sw"
+
+    def test_invalid_anchor_raises(self):
+        with pytest.raises(ValueError, match="anchor"):
+            _opening(anchor="xx")
+
+    def test_build_opening_with_anchor_sw(self, ifc4_file, wall_entity):
+        """Opening with anchor='sw' still creates a valid IfcOpeningElement."""
+        f, storey = ifc4_file
+        ctx = get_body_context(f)
+        op = build_opening(f, _opening(anchor="sw"), wall_entity, storey, ctx)
+        assert op.is_a("IfcOpeningElement")
+
+    def test_build_opening_with_anchor_c(self, ifc4_file, wall_entity):
+        """Opening with anchor='c' (centred) still creates a valid IfcOpeningElement."""
+        f, storey = ifc4_file
+        ctx = get_body_context(f)
+        op = build_opening(f, _opening(anchor="c"), wall_entity, storey, ctx)
+        assert op.is_a("IfcOpeningElement")

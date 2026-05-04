@@ -5,14 +5,17 @@ ifckit.builders.door_window
 build_door / build_window: create fill elements inside an opening.
 
 Each function:
-  1. Creates IfcDoor / IfcWindow with geometry (flat rectangular solid).
+  1. Creates IfcDoor / IfcWindow with geometry (rectangular solid or hollow frame).
   2. Creates IfcRelFillsElement linking opening → fill.
   3. Assigns spatial containment in the storey.
   4. Optionally assigns IfcRelDefinesByType (occurrence → type entity).
 
-Geometry: the door/window solid inherits the opening's placement plane.
-The fill occupies the full opening width/height with a minimal depth
-(FILL_DEPTH) so it is geometrically present but non-intrusive.
+Geometry convention (matching the opening builder):
+  - Profile drawn in the wall-face plane: local X = width, local Y = height.
+  - Extrusion along local Z = lining_depth (or FILL_DEPTH for the fallback).
+  - The fill inherits the opening's local frame via an identity relative placement.
+  - Anchor shift from the opening is applied to the profile rectangle so that
+    the fill sits flush inside the opening void.
 """
 
 from __future__ import annotations
@@ -29,14 +32,15 @@ from ifckit.builders._geom import (
     shape_representation,
 )
 from ifckit.builders.psets import write_psets
+from ifckit.profiles.anchor import anchor_offset
 
-# Depth of the fill solid (thin panel occupying the opening).
-_FILL_DEPTH = 0.1  # metres
+# Depth of the fallback fill solid (thin panel, in metres).
+_FILL_DEPTH = 0.1
 
-# Default window properties (used when no type entity provided).
-_DEFAULT_WINDOW_LINING_DEPTH = 0.070  # 70mm
-_DEFAULT_WINDOW_LINING_THICKNESS = 0.055  # 55mm
-_DEFAULT_WINDOW_PANEL_DEPTH = 0.006  # 6mm
+# Default window lining fallback values (used when no type entity provided).
+_DEFAULT_WINDOW_LINING_DEPTH = 0.070  # 70 mm
+_DEFAULT_WINDOW_LINING_THICKNESS = 0.055  # 55 mm
+_DEFAULT_WINDOW_PANEL_DEPTH = 0.006  # 6 mm
 
 
 def _extract_window_lining_properties(
@@ -45,29 +49,29 @@ def _extract_window_lining_properties(
     """
     Extract lining properties from IfcWindowType or IfcWindowStyle.
 
-    The properties are stored in an IfcPropertySet linked via IfcRelDefinesByProperties.
+    The properties are stored in an IfcPropertySet linked via
+    IfcRelDefinesByProperties with name ``"IfcWindowLiningProperties"``.
 
     Returns:
-        (lining_depth, lining_thickness, panel_depth) in metres, or None if not found.
+        ``(lining_depth, lining_thickness, panel_depth)`` in project units,
+        or ``None`` if not found / dimensions are invalid.
     """
     if type_entity is None:
         return None
 
-    # Search for IfcRelDefinesByProperties relationships for this type
     ifc_file = type_entity.file
     for rel in ifc_file.by_type("IfcRelDefinesByProperties"):
         if type_entity in rel.RelatedObjects:
             pset = rel.RelatingPropertyDefinition
             if pset.is_a("IfcPropertySet") and pset.Name == "IfcWindowLiningProperties":
-                # Extract properties from the pset
                 props = {p.Name: p for p in pset.HasProperties}
-                lining_depth = props.get("LiningDepth")
-                lining_thickness = props.get("LiningThickness")
-                if lining_depth and lining_thickness:
-                    lining_depth = lining_depth.NominalValue.wrappedValue
-                    lining_thickness = lining_thickness.NominalValue.wrappedValue
-                    return (lining_depth, lining_thickness, _DEFAULT_WINDOW_PANEL_DEPTH)
-
+                ld = props.get("LiningDepth")
+                lt = props.get("LiningThickness")
+                if ld and lt:
+                    ld = ld.NominalValue.wrappedValue
+                    lt = lt.NominalValue.wrappedValue
+                    if lt < ld / 2.0:  # sanity check: must leave room for inner void
+                        return (ld, lt, _DEFAULT_WINDOW_PANEL_DEPTH)
     return None
 
 
@@ -82,92 +86,88 @@ def _build_fill(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,  # Optional IfcDoorType / IfcWindowType
+    opening_anchor: str = "s",  # anchor from the parent PendingOpening
 ) -> ifcopenshell.entity_instance:
     """
     Shared implementation for door and window fill creation.
-    """
-    # Derive placement from the opening's own placement.
-    # The fill shares the opening's local frame exactly — same origin,
-    # same axes — so the door/window sits flush inside the void.
-    opening_placement = opening_entity.ObjectPlacement
 
-    # Determine geometry based on type entity properties.
-    w2 = overall_width / 2.0
+    Profile convention:
+      - local X = width direction, local Y = height (UP), local Z = extrusion through wall.
+      - ``opening_anchor`` shifts the profile rectangle so the origin sits at the
+        correct anchor point (matching the opening void geometry).
+    """
     from ifckit.geometry import Vec
 
-    _o = Vec(0, 0, 0)
-    _z = Vec(0, 0, 1)
-    _x = Vec(1, 0, 0)
-    identity_placement = axis2placement3d(ifc_file, _o, _z, _x)
+    # Identity placement: fill shares the opening's local frame exactly.
+    identity_placement = axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
 
-    # Check for window with lining properties.
-    lining_props = None
+    # Anchor shift (same as the opening void profile).
+    w = overall_width
+    h = overall_height
+    dx, dy = anchor_offset(opening_anchor, w, h)
+
     is_window = ifc_class == "IfcWindow"
-
+    lining_props = None
     if is_window and type_entity is not None:
         lining_props = _extract_window_lining_properties(type_entity)
 
     if is_window and lining_props:
-        lining_depth, lining_thickness, panel_depth = lining_props
+        lining_depth, lining_thickness, _panel_depth = lining_props
+        t = lining_thickness
 
-        outer_pts_2d = [
-            (-w2, 0.0),
-            (w2, 0.0),
-            (w2, lining_depth),
-            (-w2, lining_depth),
+        # Outer rectangle: full opening width × height, extruded lining_depth.
+        outer_pts = [
+            (dx, dy),
+            (dx + w, dy),
+            (dx + w, dy + h),
+            (dx, dy + h),
         ]
-        outer_profile = profile_from_points(ifc_file, outer_pts_2d)
+        outer_profile = profile_from_points(ifc_file, outer_pts)
         outer_solid = extrude_profile(
             ifc_file,
             outer_profile,
-            overall_height,
+            lining_depth,
             position=identity_placement,
             extrude_direction=(0.0, 0.0, 1.0),
         )
 
-        # Calculate inner void dimensions.
-        inner_w2 = w2 - lining_thickness
-        inner_depth = lining_depth - 2 * lining_thickness
-
-        if inner_w2 > 0 and inner_depth > 0:
-            inner_pts_2d = [
-                (-inner_w2, lining_thickness),
-                (inner_w2, lining_thickness),
-                (inner_w2, lining_depth - lining_thickness),
-                (-inner_w2, lining_depth - lining_thickness),
-            ]
-            inner_profile = profile_from_points(ifc_file, inner_pts_2d)
-            inner_void = extrude_profile(
-                ifc_file,
-                inner_profile,
-                overall_height,
-                position=identity_placement,
-                extrude_direction=(0.0, 0.0, 1.0),
-            )
-
-            # Boolean difference: outer - inner = hollow frame.
-            solid = ifc_file.create_entity(
-                "IfcBooleanResult",
-                Operator="DIFFERENCE",
-                FirstOperand=outer_solid,
-                SecondOperand=inner_void,
-            )
-        else:
-            # Not enough room for void — fall back to solid.
-            solid = outer_solid
-    else:
-        # Default: simple rectangular slab (door or window without type).
-        pts_2d = [
-            (-w2, 0.0),
-            (w2, 0.0),
-            (w2, _FILL_DEPTH),
-            (-w2, _FILL_DEPTH),
+        # Inner void: inset by lining_thickness on all four sides.
+        inner_pts = [
+            (dx + t, dy + t),
+            (dx + w - t, dy + t),
+            (dx + w - t, dy + h - t),
+            (dx + t, dy + h - t),
         ]
-        profile = profile_from_points(ifc_file, pts_2d)
+        inner_profile = profile_from_points(ifc_file, inner_pts)
+        inner_void = extrude_profile(
+            ifc_file,
+            inner_profile,
+            lining_depth,
+            position=identity_placement,
+            extrude_direction=(0.0, 0.0, 1.0),
+        )
+
+        # Boolean difference → hollow frame.
+        solid = ifc_file.create_entity(
+            "IfcBooleanResult",
+            Operator="DIFFERENCE",
+            FirstOperand=outer_solid,
+            SecondOperand=inner_void,
+        )
+    else:
+        # Fallback: simple thin slab (door, or window without valid lining props).
+        fill_depth = _FILL_DEPTH
+        pts = [
+            (dx, dy),
+            (dx + w, dy),
+            (dx + w, dy + h),
+            (dx, dy + h),
+        ]
+        profile = profile_from_points(ifc_file, pts)
         solid = extrude_profile(
             ifc_file,
             profile,
-            overall_height,
+            fill_depth,
             position=identity_placement,
             extrude_direction=(0.0, 0.0, 1.0),
         )
@@ -182,23 +182,11 @@ def _build_fill(
         name=name,
     )
     fill.Representation = prod_rep
-
-    # IFC requires OverallWidth / OverallHeight attributes on IfcDoor / IfcWindow.
     fill.OverallWidth = overall_width
     fill.OverallHeight = overall_height
 
-    # Fill placement is relative to the opening placement (which is already
-    # storey-relative), so chain: fill → opening placement.
-    # We use the identity relative placement so the fill coincides with the opening.
-    fill.ObjectPlacement = (
-        ifcopenshell.api.run(
-            "geometry.edit_object_placement",
-            ifc_file,
-            product=fill,
-        )
-        if False
-        else _relative_to_opening(ifc_file, opening_placement)
-    )
+    # Placement relative to opening (identity — same local frame).
+    fill.ObjectPlacement = _relative_to_opening(ifc_file, opening_entity.ObjectPlacement)
 
     # Spatial containment.
     ifcopenshell.api.run(
@@ -216,7 +204,6 @@ def _build_fill(
         RelatedBuildingElement=fill,
     )
 
-    # Optionally assign type.
     if type_entity is not None:
         _assign_type(ifc_file, fill, type_entity)
 
@@ -283,17 +270,19 @@ def build_door(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,
+    opening_anchor: str = "s",
 ) -> ifcopenshell.entity_instance:
     """
     Create an IfcDoor fill element inside *opening_entity*.
 
     Args:
-        ifc_file:       Open ifcopenshell file.
-        pending:        A ``PendingDoor`` instance.
-        opening_entity: The IfcOpeningElement this door fills.
-        container:      The IfcBuildingStorey for containment.
-        context:        The Body sub-context.
-        type_entity:    Optional IfcDoorType entity to assign.
+        ifc_file:        Open ifcopenshell file.
+        pending:         A ``PendingDoor`` instance.
+        opening_entity:  The IfcOpeningElement this door fills.
+        container:       The IfcBuildingStorey for containment.
+        context:         The Body sub-context.
+        type_entity:     Optional IfcDoorType entity to assign.
+        opening_anchor:  Anchor of the parent ``PendingOpening`` (default ``"s"``).
 
     Returns:
         The created ``IfcDoor`` entity.
@@ -309,8 +298,8 @@ def build_door(
         container=container,
         context=context,
         type_entity=type_entity,
+        opening_anchor=opening_anchor,
     )
-    # Set PredefinedType / OperationType where the schema supports it.
     _set_door_operation(ifc_file, door, pending.operation_type)
     return door
 
@@ -322,17 +311,19 @@ def build_window(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,
+    opening_anchor: str = "s",
 ) -> ifcopenshell.entity_instance:
     """
     Create an IfcWindow fill element inside *opening_entity*.
 
     Args:
-        ifc_file:       Open ifcopenshell file.
-        pending:        A ``PendingWindow`` instance.
-        opening_entity: The IfcOpeningElement this window fills.
-        container:      The IfcBuildingStorey for containment.
-        context:        The Body sub-context.
-        type_entity:    Optional IfcWindowType entity to assign.
+        ifc_file:        Open ifcopenshell file.
+        pending:         A ``PendingWindow`` instance.
+        opening_entity:  The IfcOpeningElement this window fills.
+        container:       The IfcBuildingStorey for containment.
+        context:         The Body sub-context.
+        type_entity:     Optional IfcWindowType entity to assign.
+        opening_anchor:  Anchor of the parent ``PendingOpening`` (default ``"s"``).
 
     Returns:
         The created ``IfcWindow`` entity.
@@ -348,6 +339,7 @@ def build_window(
         container=container,
         context=context,
         type_entity=type_entity,
+        opening_anchor=opening_anchor,
     )
     _set_window_type_attr(ifc_file, window, pending.window_type)
     return window

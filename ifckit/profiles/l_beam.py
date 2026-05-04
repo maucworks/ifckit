@@ -32,12 +32,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
+from ifckit.profiles.anchor import VALID_ANCHORS
 from ifckit.profiles.base import Profile
 
 if TYPE_CHECKING:
     import ifcopenshell
 
-# Anchor → (x_fraction_of_width, y_fraction_of_height)
+# Anchor → (dx_fraction_of_width, dy_fraction_of_height)
+# Applied as: offset = (fraction * width, fraction * height) — note: l_beam
+# has its natural origin at sw (bottom-left), so fractions shift *away* from sw.
 _ANCHOR_OFFSETS: dict[str, Tuple[float, float]] = {
     "sw": (0.0, 0.0),
     "s": (-0.5, 0.0),
@@ -89,10 +92,8 @@ class LBeamProfile(Profile):
             raise ValueError("width must be positive")
         if self.thickness <= 0 or self.thickness >= self.height or self.thickness >= self.width:
             raise ValueError("thickness must be > 0 and < both height and width")
-        if self.anchor not in _ANCHOR_OFFSETS:
-            raise ValueError(
-                f"anchor must be one of {list(_ANCHOR_OFFSETS.keys())}, got '{self.anchor}'"
-            )
+        if self.anchor not in VALID_ANCHORS:
+            raise ValueError(f"anchor must be one of {sorted(VALID_ANCHORS)}, got '{self.anchor}'")
 
     def _origin_offset(self) -> Tuple[float, float]:
         fx, fy = _ANCHOR_OFFSETS[self.anchor]

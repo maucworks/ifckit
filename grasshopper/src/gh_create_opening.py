@@ -4,7 +4,10 @@ gh_create_opening.py  —  GH Script component: "ifckit Opening"
 
 @component  nickname:"ifckit Opening"
 @group "Elements"
-@input  insert_plane : plane item — Insert plane: origin = bottom-centre, X = width direction, Z = outward normal
+@input  insert_plane : plane item — Insert plane: origin = anchor point (default bottom-centre),
+                                    X = width direction (horizontal along wall face),
+                                    Y = UP (height direction),
+                                    Z = outward normal of wall face (extrusion through wall).
 @input  width        : float item — Opening width (m)
 @input  height       : float item — Opening height (m)
 @input  host_json    : str   item — Envelope JSON from wall/slab node (element must have an "id")
@@ -16,6 +19,14 @@ gh_create_opening.py  —  GH Script component: "ifckit Opening"
 
 Opening is nested inside the host element. Fills (doors/windows) are nested inside the opening.
 IFC chain: element → openings[] → doors[]/windows[]
+
+Plane convention (IFC spec):
+  - plane.X = width direction (horizontal along the wall face)
+  - plane.Y = UP (height direction)
+  - plane.Z = outward normal of the wall face (the extrusion direction through the wall)
+  The opening solid is extruded along Z and centred on the wall face (±depth/2).
+  Default anchor "s" means the origin sits at the bottom-centre of the opening;
+  the door/window frame is built in the same local XY plane.
 """
 
 import json
