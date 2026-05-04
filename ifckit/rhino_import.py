@@ -411,9 +411,22 @@ class IfcMeshImporter:
         """
         Traverse up from element to find its spatial container.
 
+        For ``IfcOpeningElement`` (which has no spatial containment), the
+        hierarchy is resolved via the host element it voids
+        (``IfcRelVoidsElement.RelatingBuildingElement``).
+
         Returns:
             (site_name, building_name, storey_name) or None
         """
+        # IfcOpeningElement has no ContainedInStructure — resolve via host.
+        if element.is_a("IfcOpeningElement"):
+            for rel in ifc_file.by_type("IfcRelVoidsElement"):
+                if rel.RelatedOpeningElement == element:
+                    return self._get_element_spatial_hierarchy(
+                        rel.RelatingBuildingElement, ifc_file
+                    )
+            return None  # no host found
+
         visited = set()
         current = element
 
