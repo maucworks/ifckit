@@ -210,6 +210,7 @@ class IfcMeshImporter:
         clear_on_import: If True, clear existing IFC meshes before import
         delete_removed: If True, delete meshes no longer present in IFC
         mesh_quality: Tessellation quality preset (superfine/fine/default/coarse/supercoarse)
+        skip_voids: If True, skip IfcOpeningElement geometry (voids)
     """
 
     def __init__(
@@ -219,6 +220,7 @@ class IfcMeshImporter:
         clear_on_import: bool = False,
         delete_removed: bool = False,
         mesh_quality: str = "default",
+        skip_voids: bool = False,
     ) -> None:
         import Rhino
 
@@ -230,6 +232,7 @@ class IfcMeshImporter:
         if mesh_quality not in MESH_QUALITY:
             raise ValueError(f"mesh_quality must be one of {list(MESH_QUALITY)}")
         self.linear_deflection, self.angular_deflection = MESH_QUALITY[mesh_quality]
+        self.skip_voids = skip_voids
 
         self._guid_to_rhino_guid: dict[str, Any] = {}
         self._layer_cache: dict[str, int] = {}
@@ -311,6 +314,12 @@ class IfcMeshImporter:
                 continue
 
             ifc_class = element.is_a()
+
+            # Skip opening elements if requested.
+            if self.skip_voids and ifc_class == "IfcOpeningElement":
+                if not iterator.next():
+                    break
+                continue
 
             guid = shape.guid
             if guid in self._seen_guids:

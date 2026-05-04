@@ -49,7 +49,6 @@ from ifckit.builders._geom import (
     profile_to_ifc,
     pt3,
     shape_representation,
-    storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
@@ -88,9 +87,8 @@ class ExtrudedElementBuilder(BaseBuilder):
         axis = pending.axis
         length = axis.length
 
-        # Translate start to storey-local Z
-        elev = storey_elevation(container)
-        local_start = Vec(axis.start.x, axis.start.y, axis.start.z - elev)
+        # Use axis start directly (world-space) — storey elevation is in storey placement
+        local_start = Vec(axis.start.x, axis.start.y, axis.start.z)
 
         # Cross-section frame (right-handed, Plane.z_axis = t = extrusion dir):
         #   vert  = up guide projected perpendicular to t  (profile Y = up)
@@ -137,7 +135,7 @@ class ExtrudedElementBuilder(BaseBuilder):
         # Apply clips — each clip plane is in world space; transform to OP local.
         geometry = solid
         for clip_plane in _iter_clips(pending):
-            geometry = _apply_clip(ifc_file, geometry, clip_plane, op_plane, elev)
+            geometry = _apply_clip(ifc_file, geometry, clip_plane, op_plane, 0.0)
 
         rep_type = "SweptSolid" if geometry is solid else "Clipping"
         shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)

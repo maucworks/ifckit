@@ -106,17 +106,8 @@ class TestBuildOpening:
         op = build_opening(f, _opening(), wall_entity, storey, ctx)
         assert op.ObjectPlacement is not None
 
-    def test_opening_contained_in_storey(self, ifc4_file, wall_entity):
-        f, storey = ifc4_file
-        ctx = get_body_context(f)
-        op = build_opening(f, _opening(), wall_entity, storey, ctx)
-        containments = f.by_type("IfcRelContainedInSpatialStructure")
-        contained_entities = [
-            product
-            for rel in containments
-            for product in rel.RelatedElements
-        ]
-        assert op in contained_entities
+    # Removed test - IfcOpeningElement does not require spatial containment per IFC spec.
+    # It is voided into the host element via IfcRelVoidsElement.
 
     def test_opening_name_preserved(self, ifc4_file, wall_entity):
         f, storey = ifc4_file

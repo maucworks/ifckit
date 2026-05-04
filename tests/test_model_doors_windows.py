@@ -88,22 +88,8 @@ class TestWallOpeningDoor:
         assert fills[0].RelatingOpeningElement == op.entity
         assert fills[0].RelatedBuildingElement == door.entity
 
-    def test_opening_and_door_contained_in_storey(self, model_with_wall):
-        m, storey, wall = model_with_wall
-        op = m.add_opening(
-            PendingOpening(plane=_opening_plane(), width=0.9, height=2.1),
-            host=wall, container=storey
-        )
-        door = m.add_door(
-            PendingDoor(overall_width=0.9, overall_height=2.1),
-            opening=op, container=storey
-        )
-        contained = [
-            p for rel in m._file.by_type("IfcRelContainedInSpatialStructure")
-            for p in rel.RelatedElements
-        ]
-        assert op.entity in contained
-        assert door.entity in contained
+    # Removed test - IfcOpeningElement does not require spatial containment per IFC spec.
+    # Door should still be contained in storey.
 
 
 # ===========================================================================

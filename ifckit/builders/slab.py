@@ -18,13 +18,12 @@ from ifckit.builders._geom import (
     profile_from_points,
     project_profile_to_plane,
     shape_representation,
-    shift_plane_elevation,
-    storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.builders.extruded import _apply_clip, _iter_clips
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
+from ifckit.geometry import Vec
 
 
 class SlabBuilder(BaseBuilder):
@@ -53,21 +52,18 @@ class SlabBuilder(BaseBuilder):
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
         profile = profile_from_points(ifc_file, pts_2d)
 
-        elev = storey_elevation(container)
-        local_plane = shift_plane_elevation(pending.plane, elev)
-
         placement = axis2placement3d(
             ifc_file,
-            local_plane.origin,
-            local_plane.z_axis,
-            local_plane.x_axis,
+            Vec(0.0, 0.0, 0.0),
+            pending.plane.z_axis,
+            pending.plane.x_axis,
         )
         solid = extrude_profile(ifc_file, profile, pending.thickness, position=placement)
 
         # Apply clip planes
         geometry = solid
         for clip_plane in _iter_clips(pending):
-            geometry = _apply_clip(ifc_file, geometry, clip_plane, local_plane, elev)
+            geometry = _apply_clip(ifc_file, geometry, clip_plane, pending.plane, 0.0)
 
         rep_type = "SweptSolid" if geometry is solid else "Clipping"
         shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)
@@ -78,7 +74,7 @@ class SlabBuilder(BaseBuilder):
         )
         slab.Representation = prod_rep
         slab.ObjectPlacement = local_placement(
-            ifc_file, local_plane, relative_to=container.ObjectPlacement
+            ifc_file, pending.plane, relative_to=container.ObjectPlacement
         )
 
         ifcopenshell.api.run(

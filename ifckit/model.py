@@ -1143,7 +1143,9 @@ class IfcModel:
             importer.clear()
         return importer.import_model(self, hlr_poly=hlr_poly, mesher_deflection=mesher_deflection)
 
-    def preview_rhino(self, mesh_quality: str = "default", clear: bool = True) -> int:
+    def preview_rhino(
+        self, mesh_quality: str = "default", clear: bool = True, skip_voids: bool = False
+    ) -> int:
         """Import the model into the active Rhino document as meshes.
 
         Requires Rhino 8+ with ifcopenshell installed. Intended for use
@@ -1153,6 +1155,7 @@ class IfcModel:
             mesh_quality: Tessellation quality preset
                           (superfine/fine/default/coarse/supercoarse).
             clear: If True, clear existing IFC meshes before import.
+            skip_voids: If True, skip IfcOpeningElement geometry (voids).
 
         Returns:
             Number of elements imported.
@@ -1162,5 +1165,6 @@ class IfcModel:
         importer = IfcMeshImporter(
             clear_on_import=clear,
             mesh_quality=mesh_quality,
+            skip_voids=skip_voids,
         )
         return importer.import_model(self)

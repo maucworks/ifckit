@@ -183,12 +183,15 @@ def _storey_bundle_to_project(bundle: Dict[str, Any], unit: str) -> Dict[str, An
 # ---------------------------------------------------------------------------
 
 
-def build_preview_meshes(json_str: str, unit: str = "MILLIMETRE") -> List[Any]:
+def build_preview_meshes(
+    json_str: str, unit: str = "MILLIMETRE", skip_voids: bool = False
+) -> List[Any]:
     """Build ephemeral Rhino meshes from any ifckit JSON format.
 
     Args:
-        json_str: JSON string — envelope, storey bundle, or full project JSON.
-        unit:     ``"MILLIMETRE"`` (default) or ``"METRE"``.
+        json_str:       JSON string — envelope, storey bundle, or full project JSON.
+        unit:           ``"MILLIMETRE"`` (default) or ``"METRE"``.
+        skip_voids:  If True, skip IfcOpeningElement geometry (voids).
 
     Returns:
         List of ``Rhino.Geometry.Mesh`` objects.
@@ -220,10 +223,17 @@ def build_preview_meshes(json_str: str, unit: str = "MILLIMETRE") -> List[Any]:
     if iterator.initialize():
         while True:
             shape = iterator.get()
+            entity = model.ifc_file.by_guid(shape.guid)
+            entity_type = entity.is_a() if entity else None
+            # Skip opening elements if requested.
+            if skip_voids and entity_type == "IfcOpeningElement":
+                if not iterator.next():
+                    break
+                continue
             geom = shape.geometry
             if geom.verts and geom.faces:
-                meshes.append(_verts_faces_to_mesh(geom.verts, geom.faces, scale))
+                mesh = _verts_faces_to_mesh(geom.verts, geom.faces, scale)
+                meshes.append(mesh)
             if not iterator.next():
                 break
-
     return meshes

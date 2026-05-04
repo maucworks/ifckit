@@ -89,15 +89,16 @@ class PendingOpening(PendingElement):
     An opening voided into a host element.
 
     Args:
-        plane:      Insert plane.  Origin = insert point (bottom-centre of
-                    opening).  X-axis = width direction.  Z-axis = outward
-                    normal of the host face (points away from the host).
-        width:      Opening width (metres, positive).
-        height:     Opening height (metres, positive).
-        name:       Element name (used as ``IfcOpeningElement.Name``).
-        clips:      Optional boolean clip planes (inherits base convention).
-        style:      Optional render style.
-        properties: Free-form user properties → ``EPset_IfcKit``.
+        plane:        Insert plane.  Origin = insert point (bottom-centre of
+                     opening).  X-axis = width direction.  Z-axis = outward
+                     normal of the host face (points away from the host).
+        width:       Opening width (metres, positive).
+        height:      Opening height (metres, positive).
+        opening_depth: Depth of the opening in metres (default: 10.0).
+        name:        Element name (used as ``IfcOpeningElement.Name``).
+        clips:       Optional boolean clip planes (inherits base convention).
+        style:       Optional render style.
+        properties:  Free-form user properties → ``EPset_IfcKit``.
     """
 
     element_type = "basic_opening"
@@ -107,6 +108,7 @@ class PendingOpening(PendingElement):
         plane: Plane,
         width: float,
         height: float,
+        opening_depth: float | None = None,
         name: str = "",
         clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
@@ -117,9 +119,14 @@ class PendingOpening(PendingElement):
             raise ValueError(f"PendingOpening: width must be positive, got {width!r}")
         if height <= 0:
             raise ValueError(f"PendingOpening: height must be positive, got {height!r}")
+        if opening_depth is not None and opening_depth <= 0:
+            raise ValueError(
+                f"PendingOpening: opening_depth must be positive, got {opening_depth!r}"
+            )
         self.plane = plane
         self.width = float(width)
         self.height = float(height)
+        self.opening_depth = opening_depth  # None means "use default 10m in project units"
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -130,6 +137,8 @@ class PendingOpening(PendingElement):
         d["plane"] = self.plane.to_dict()
         d["width"] = self.width
         d["height"] = self.height
+        if self.opening_depth is not None:
+            d["opening_depth"] = self.opening_depth
         return d
 
     @classmethod
@@ -141,6 +150,7 @@ class PendingOpening(PendingElement):
             plane=Plane.from_dict(plane_raw),
             width=width,
             height=height,
+            opening_depth=d.get("opening_depth"),  # None if not specified - builder converts 10m
             name=d.get("name", ""),
             clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),

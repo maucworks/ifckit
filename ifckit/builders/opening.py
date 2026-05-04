@@ -8,13 +8,13 @@ The opening geometry is a box defined by the insert plane's axes:
   - Width  along plane.x_axis
   - Height along plane.z_axis  (= outward normal of host face, repurposed here
     as the opening's height direction)
-  - Depth  along plane.y_axis  (into the host body; fixed at OPENING_DEPTH)
+  - Depth  along plane.y_axis  (into the host body; default 10, overridable)
 
-The opening entity is placed with ObjectPlacement relative to its storey
-container, centred on the insert plane origin.
+The opening entity is placed with ObjectPlacement relative to the host
+element (wall/slab), centred on the insert plane origin. It is NOT
+assigned to the storey via spatial containment (not required by IFC spec).
 
 IfcRelVoidsElement links the host entity to the opening element.
-IfcRelContainedInSpatialStructure assigns the opening to the storey.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from __future__ import annotations
 import ifcopenshell
 import ifcopenshell.api
 import ifcopenshell.guid
+import ifcopenshell.util.unit
 
 from ifckit.builders._geom import (
     axis2placement3d,
@@ -30,14 +31,9 @@ from ifckit.builders._geom import (
     product_definition_shape,
     profile_from_points,
     shape_representation,
-    shift_plane_elevation,
-    storey_elevation,
 )
 from ifckit.builders.psets import write_psets
-
-# Fixed depth for the opening solid (extruded into the host body).
-# Large enough to fully penetrate any typical wall/slab thickness.
-_OPENING_DEPTH = 10.0  # metres – effectively infinite for practical use
+from ifckit.geometry import Vec
 
 
 def build_opening(
@@ -52,27 +48,31 @@ def build_opening(
     IfcRelVoidsElement, and assign spatial containment.
 
     Args:
-        ifc_file:     Open ifcopenshell file.
-        pending:      A ``PendingOpening`` instance.
-        host_entity:  The IfcWall / IfcSlab / IfcRoof entity to void.
-        container:    The IfcBuildingStorey entity for spatial containment.
-        context:      The Body sub-context.
+        ifc_file:    Open ifcopenshell file.
+        pending:    A ``PendingOpening`` instance. Uses ``pending.opening_depth``
+                    (in project units, default 10.0).
+        host_entity: The IfcWall / IfcSlab / IfcRoof entity to void.
+        container:  The IfcBuildingStorey entity for spatial containment.
+        context:     The Body sub-context.
 
     Returns:
         The created ``IfcOpeningElement`` entity instance.
     """
-    elev = storey_elevation(container)
-    local_plane = shift_plane_elevation(pending.plane, elev)
+    # opening_depth: if None, convert 10m default to project units; otherwise use as-is.
+    if pending.opening_depth is None:
+        scale = ifcopenshell.util.unit.calculate_unit_scale(ifc_file)
+        depth = 10.0 / scale  # 10 metres -> project units
+    else:
+        depth = pending.opening_depth
 
     # Opening footprint: rectangle centred on origin in local XY.
     # X = width axis, Y = depth axis (into the host).
     # The extrusion is along local Z (= plane.z_axis = outward normal).
     # We offset the profile so origin is at bottom-centre of the opening,
-    # and extrude _OPENING_DEPTH in -Y (into the host) starting from
-    # -OPENING_DEPTH/2 behind the face, so the opening penetrates both sides.
+    # and extrude `depth` in -Y (into the host) starting from
+    # -depth/2 behind the face, so the opening penetrates both sides.
 
     w2 = pending.width / 2.0
-    depth = _OPENING_DEPTH
     pts_2d = [
         (-w2, -depth / 2.0),
         (w2, -depth / 2.0),
@@ -95,9 +95,9 @@ def build_opening(
 
     placement = axis2placement3d(
         ifc_file,
-        local_plane.origin,
-        local_plane.z_axis,  # solid Z = height direction
-        local_plane.x_axis,  # solid X = width direction
+        Vec(0.0, 0.0, 0.0),
+        pending.plane.z_axis,  # solid Z = height direction
+        pending.plane.x_axis,  # solid X = width direction
     )
     solid = extrude_profile(
         ifc_file,
@@ -118,16 +118,12 @@ def build_opening(
     )
     opening.Representation = prod_rep
     opening.ObjectPlacement = local_placement(
-        ifc_file, local_plane, relative_to=container.ObjectPlacement
+        ifc_file, pending.plane, relative_to=host_entity.ObjectPlacement
     )
 
-    # Spatial containment — IFC spec requires IfcOpeningElement to be contained.
-    ifcopenshell.api.run(
-        "spatial.assign_container",
-        ifc_file,
-        products=[opening],
-        relating_structure=container,
-    )
+    # Don't assign spatial container to opening elements.
+    # IfcOpeningElement is voided into the host via IfcRelVoidsElement,
+    # and doesn't need spatial containment per IFC spec.
 
     # Void the host element.
     ifc_file.create_entity(
