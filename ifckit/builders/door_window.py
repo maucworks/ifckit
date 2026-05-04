@@ -33,6 +33,43 @@ from ifckit.builders.psets import write_psets
 # Depth of the fill solid (thin panel occupying the opening).
 _FILL_DEPTH = 0.1  # metres
 
+# Default window properties (used when no type entity provided).
+_DEFAULT_WINDOW_LINING_DEPTH = 0.070  # 70mm
+_DEFAULT_WINDOW_LINING_THICKNESS = 0.055  # 55mm
+_DEFAULT_WINDOW_PANEL_DEPTH = 0.006  # 6mm
+
+
+def _extract_window_lining_properties(
+    type_entity,
+) -> tuple[float, float, float] | None:
+    """
+    Extract lining properties from IfcWindowType or IfcWindowStyle.
+
+    The properties are stored in an IfcPropertySet linked via IfcRelDefinesByProperties.
+
+    Returns:
+        (lining_depth, lining_thickness, panel_depth) in metres, or None if not found.
+    """
+    if type_entity is None:
+        return None
+
+    # Search for IfcRelDefinesByProperties relationships for this type
+    ifc_file = type_entity.file
+    for rel in ifc_file.by_type("IfcRelDefinesByProperties"):
+        if type_entity in rel.RelatedObjects:
+            pset = rel.RelatingPropertyDefinition
+            if pset.is_a("IfcPropertySet") and pset.Name == "IfcWindowLiningProperties":
+                # Extract properties from the pset
+                props = {p.Name: p for p in pset.HasProperties}
+                lining_depth = props.get("LiningDepth")
+                lining_thickness = props.get("LiningThickness")
+                if lining_depth and lining_thickness:
+                    lining_depth = lining_depth.NominalValue.wrappedValue
+                    lining_thickness = lining_thickness.NominalValue.wrappedValue
+                    return (lining_depth, lining_thickness, _DEFAULT_WINDOW_PANEL_DEPTH)
+
+    return None
+
 
 def _build_fill(
     ifc_file: ifcopenshell.file,
@@ -54,30 +91,86 @@ def _build_fill(
     # same axes — so the door/window sits flush inside the void.
     opening_placement = opening_entity.ObjectPlacement
 
-    # Build a thin rectangular profile for the fill solid.
+    # Determine geometry based on type entity properties.
     w2 = overall_width / 2.0
-    pts_2d = [
-        (-w2, 0.0),
-        (w2, 0.0),
-        (w2, _FILL_DEPTH),
-        (-w2, _FILL_DEPTH),
-    ]
-    profile = profile_from_points(ifc_file, pts_2d)
-
-    # Extrude upward (solid local Z = opening Z = height direction).
     from ifckit.geometry import Vec
 
     _o = Vec(0, 0, 0)
     _z = Vec(0, 0, 1)
     _x = Vec(1, 0, 0)
     identity_placement = axis2placement3d(ifc_file, _o, _z, _x)
-    solid = extrude_profile(
-        ifc_file,
-        profile,
-        overall_height,
-        position=identity_placement,
-        extrude_direction=(0.0, 0.0, 1.0),
-    )
+
+    # Check for window with lining properties.
+    lining_props = None
+    is_window = ifc_class == "IfcWindow"
+
+    if is_window and type_entity is not None:
+        lining_props = _extract_window_lining_properties(type_entity)
+
+    if is_window and lining_props:
+        lining_depth, lining_thickness, panel_depth = lining_props
+
+        outer_pts_2d = [
+            (-w2, 0.0),
+            (w2, 0.0),
+            (w2, lining_depth),
+            (-w2, lining_depth),
+        ]
+        outer_profile = profile_from_points(ifc_file, outer_pts_2d)
+        outer_solid = extrude_profile(
+            ifc_file,
+            outer_profile,
+            overall_height,
+            position=identity_placement,
+            extrude_direction=(0.0, 0.0, 1.0),
+        )
+
+        # Calculate inner void dimensions.
+        inner_w2 = w2 - lining_thickness
+        inner_depth = lining_depth - 2 * lining_thickness
+
+        if inner_w2 > 0 and inner_depth > 0:
+            inner_pts_2d = [
+                (-inner_w2, lining_thickness),
+                (inner_w2, lining_thickness),
+                (inner_w2, lining_depth - lining_thickness),
+                (-inner_w2, lining_depth - lining_thickness),
+            ]
+            inner_profile = profile_from_points(ifc_file, inner_pts_2d)
+            inner_void = extrude_profile(
+                ifc_file,
+                inner_profile,
+                overall_height,
+                position=identity_placement,
+                extrude_direction=(0.0, 0.0, 1.0),
+            )
+
+            # Boolean difference: outer - inner = hollow frame.
+            solid = ifc_file.create_entity(
+                "IfcBooleanResult",
+                Operator="DIFFERENCE",
+                FirstOperand=outer_solid,
+                SecondOperand=inner_void,
+            )
+        else:
+            # Not enough room for void — fall back to solid.
+            solid = outer_solid
+    else:
+        # Default: simple rectangular slab (door or window without type).
+        pts_2d = [
+            (-w2, 0.0),
+            (w2, 0.0),
+            (w2, _FILL_DEPTH),
+            (-w2, _FILL_DEPTH),
+        ]
+        profile = profile_from_points(ifc_file, pts_2d)
+        solid = extrude_profile(
+            ifc_file,
+            profile,
+            overall_height,
+            position=identity_placement,
+            extrude_direction=(0.0, 0.0, 1.0),
+        )
 
     shape_rep = shape_representation(ifc_file, context, solid, rep_type="SweptSolid")
     prod_rep = product_definition_shape(ifc_file, shape_rep)
