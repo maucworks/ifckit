@@ -189,9 +189,31 @@ def build_preview_meshes(
     """Build ephemeral Rhino meshes from any ifckit JSON format.
 
     Args:
-        json_str:       JSON string — envelope, storey bundle, or full project JSON.
-        unit:           ``"MILLIMETRE"`` (default) or ``"METRE"``.
-        skip_voids:  If True, skip IfcOpeningElement geometry (voids).
+        json_str:    JSON string — envelope, storey bundle, or full project JSON.
+        unit:        ``"MILLIMETRE"`` (default) or ``"METRE"``.
+        skip_voids:  If True, skip IfcOpeningElement geometry.
+
+    Returns:
+        List of ``Rhino.Geometry.Mesh`` objects.
+    """
+    return build_preview_meshes_merged([json_str], unit=unit, skip_voids=skip_voids)
+
+
+def build_preview_meshes_merged(
+    json_strs: List[str], unit: str = "MILLIMETRE", skip_voids: bool = False
+) -> List[Any]:
+    """Build ephemeral Rhino meshes from multiple ifckit JSON strings.
+
+    All inputs are merged via ``rhinokit.merge_envelopes`` before building,
+    so that ``window_types`` / ``door_types`` defined in a storey bundle are
+    visible to openings that reference them via ``type_ref``, regardless of
+    input order.
+
+    Args:
+        json_strs:   List of JSON strings (envelopes, storey bundles, or
+                     full project JSONs).  A single string is also accepted.
+        unit:        ``"MILLIMETRE"`` (default) or ``"METRE"``.
+        skip_voids:  If True, skip IfcOpeningElement geometry.
 
     Returns:
         List of ``Rhino.Geometry.Mesh`` objects.
@@ -205,9 +227,35 @@ def build_preview_meshes(
     import ifcopenshell.geom
 
     from ifckit.json_build import build
+    from ifckit.rhinokit import merge_envelopes
 
-    d = json.loads(json_str)
-    project_dict = _to_project_dict(d, unit.upper())
+    # Normalise to list of strings.
+    if isinstance(json_strs, str):
+        json_strs = [json_strs]
+
+    # Separate full project JSONs from envelopes/bundles.
+    # A full project JSON goes straight to build(); everything else is merged.
+    project_dict = None
+    envelope_strs: List[str] = []
+
+    for s in json_strs:
+        if not s:
+            continue
+        d = json.loads(s)
+        if "buildings" in d and "ifc_version" in d:
+            # Already a full project — use as-is (last one wins).
+            project_dict = d
+        else:
+            envelope_strs.append(s)
+
+    if project_dict is None:
+        if not envelope_strs:
+            return []
+        merged = merge_envelopes(envelope_strs)
+        project_dict = _to_project_dict(merged, unit.upper())
+    elif envelope_strs:
+        # Envelopes alongside a full project dict — rare, ignore envelopes.
+        pass
 
     # Run 3-pass build — no output path → in-memory only.
     model = build(project_dict)
@@ -225,7 +273,6 @@ def build_preview_meshes(
             shape = iterator.get()
             entity = model.ifc_file.by_guid(shape.guid)
             entity_type = entity.is_a() if entity else None
-            # Skip opening elements if requested.
             if skip_voids and entity_type == "IfcOpeningElement":
                 if not iterator.next():
                     break
