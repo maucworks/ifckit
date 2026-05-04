@@ -587,7 +587,12 @@ def parse_json_list(lst: Any) -> list:
 def merge_envelopes(inputs: Any) -> dict:
     """Merge any number of keyed envelope JSON strings into one dict.
 
-    Lists under the same key are extended (no deduplication).
+    Lists under the same key are extended (no deduplication), **except**
+    for ``elements``: if two element dicts share the same ``id``, their
+    ``openings`` lists are merged into the first occurrence rather than
+    creating a duplicate element entry.  This is the normal Grasshopper
+    pattern where one wall envelope is reused for N opening components.
+
     Non-list values: last write wins.
 
     Supported keys: ``elements``, ``openings``, ``doors``, ``windows``,
@@ -606,6 +611,9 @@ def merge_envelopes(inputs: Any) -> dict:
     import json
 
     merged: dict = {}
+    # Index of already-seen element ids → position in merged["elements"]
+    elem_id_index: dict = {}
+
     items = inputs if hasattr(inputs, "__iter__") and not isinstance(inputs, str) else [inputs]
     for raw in items:
         if raw is None:
@@ -615,7 +623,21 @@ def merge_envelopes(inputs: Any) -> dict:
             continue
         d = json.loads(s)
         for key, value in d.items():
-            if isinstance(value, list):
+            if key == "elements" and isinstance(value, list):
+                merged.setdefault("elements", [])
+                for elem in value:
+                    eid = elem.get("id") if isinstance(elem, dict) else None
+                    if eid and eid in elem_id_index:
+                        # Merge openings into the existing element entry.
+                        existing = merged["elements"][elem_id_index[eid]]
+                        existing.setdefault("openings", [])
+                        for op in elem.get("openings", []):
+                            existing["openings"].append(op)
+                    else:
+                        if eid:
+                            elem_id_index[eid] = len(merged["elements"])
+                        merged["elements"].append(elem)
+            elif isinstance(value, list):
                 merged.setdefault(key, []).extend(value)
             else:
                 merged[key] = value
