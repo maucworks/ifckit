@@ -219,6 +219,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             )
             storey_map[(bi, si)] = storey
 
+            storey_ids: set = set()  # ids seen within this storey — duplicates are an error
             for elem_data in storey_data.get("elements", []):
                 elem_type = elem_data.get("type")
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
@@ -244,9 +245,17 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
 
                 elem_id = elem_data.get("id") or elem_dict.get("id")
                 if elem_id:
-                    if elem_id in id_map:
+                    if elem_id in storey_ids:
                         raise ValueError(f"Duplicate element id {elem_id!r} in JSON")
-                    id_map[elem_id] = handle
+                    storey_ids.add(elem_id)
+                    if elem_id in id_map:
+                        # Same id reused in a different storey (common GH pattern: one
+                        # wall component feeding N storey nodes).  Scope by storey index
+                        # so downstream opening lookups still resolve within each storey.
+                        scoped_id = f"{elem_id}__s{si}"
+                    else:
+                        scoped_id = elem_id
+                    id_map[scoped_id] = handle
 
             # spaces[]
             from ifckit.elements.space import PendingSpace
@@ -259,9 +268,14 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                 handle = storey.add(pending_space)
                 space_id = space_data.get("id")
                 if space_id:
-                    if space_id in id_map:
+                    if space_id in storey_ids:
                         raise ValueError(f"Duplicate element id {space_id!r} in JSON")
-                    id_map[space_id] = handle
+                    storey_ids.add(space_id)
+                    if space_id in id_map:
+                        scoped_id = f"{space_id}__s{si}"
+                    else:
+                        scoped_id = space_id
+                    id_map[scoped_id] = handle
 
     # -----------------------------------------------------------------------
     # Pass 2a — door/window types (root-level)
@@ -299,10 +313,13 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             for ei, elem_data in enumerate(storey_data.get("elements", [])):
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
                 elem_id = elem_data.get("id") or elem_dict.get("id")
-                if elem_id not in id_map:
-                    continue  # element had no id or no openings, skip
+                # id may have been scoped to storey when duplicate across storeys
+                scoped = f"{elem_id}__s{si}" if elem_id else None
+                lookup_id = scoped if scoped in id_map else elem_id
+                if lookup_id not in id_map:
+                    continue  # element had no id, skip
 
-                host_handle = id_map[elem_id]
+                host_handle = id_map[lookup_id]
                 eprefix = f"buildings[{bi}].storeys[{si}].elements[{ei}]"
 
                 for ki, op_data in enumerate(elem_data.get("openings", [])):
