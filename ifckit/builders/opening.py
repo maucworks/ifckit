@@ -94,19 +94,18 @@ def build_opening(
     profile = profile_from_points(ifc_file, pts_2d)
 
     # ------------------------------------------------------------------
-    # Solid orientation:
-    #   local X = plane.x_axis  (width)
-    #   local Y = plane.y_axis  (height / UP)
-    #   local Z = plane.z_axis  (outward normal → extrusion through wall)
-    # Extrude along local +Z for `depth`.
-    # Placement: shift origin by -depth/2 along z_axis so the solid
+    # Solid placement — expressed in the opening's LOCAL frame.
+    # The opening's ObjectPlacement already encodes the wall-face
+    # orientation (X=width, Y=height, Z=outward normal).  Inside that
+    # frame the solid axes are therefore identity: X=(1,0,0), Z=(0,0,1).
+    # We only shift the origin by -depth/2 along local Z so the solid
     # straddles the wall face symmetrically.
     # ------------------------------------------------------------------
     placement = axis2placement3d(
         ifc_file,
-        Vec(0.0, 0.0, -depth / 2.0),  # centred on face
-        pending.plane.z_axis,  # local Z = extrusion direction
-        pending.plane.x_axis,  # local X = width
+        Vec(0.0, 0.0, -depth / 2.0),  # centred on face in local coords
+        Vec(0.0, 0.0, 1.0),  # local Z (identity)
+        Vec(1.0, 0.0, 0.0),  # local X (identity)
     )
     solid = extrude_profile(
         ifc_file,
