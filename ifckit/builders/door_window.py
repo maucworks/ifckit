@@ -515,18 +515,18 @@ def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
     1. Look for IfcExtrudedAreaSolid in the host representation.
        For a wall with a rectangular footprint, the profile is
        IfcRectangleProfileDef with YDim = thickness.
-    2. Fallback: return 0.2 (200 mm, a common default).
+    2. Fallback: return 200 (200 mm, a common default).
 
     Args:
         host_entity: An IfcWall, IfcWallStandardCase, or IfcSlab entity.
 
     Returns:
-        Thickness in project units (metres if SI).
+        Thickness in millimeters (IFC metres are converted to mm for component_graph).
     """
     try:
         rep = host_entity.Representation
         if rep is None:
-            return 0.2
+            return 200.0  # 200 mm default
         for shape_rep in rep.Representations:
             for item in shape_rep.Items:
                 # Direct IfcExtrudedAreaSolid
@@ -534,17 +534,18 @@ def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
                     area = item.SweptArea
                     if area.is_a("IfcRectangleProfileDef"):
                         # For a wall: XDim = length, YDim = thickness
-                        return float(area.YDim)
+                        # IFC stores in metres, convert to mm for component_graph
+                        return float(area.YDim) * 1000.0
                 # IfcBooleanClippingResult wraps a solid
                 if item.is_a("IfcBooleanClippingResult"):
                     first_op = item.FirstOperand
                     if first_op.is_a("IfcExtrudedAreaSolid"):
                         area = first_op.SweptArea
                         if area.is_a("IfcRectangleProfileDef"):
-                            return float(area.YDim)
+                            return float(area.YDim) * 1000.0
     except Exception:  # noqa: BLE001
         pass
-    return 0.2
+    return 200.0  # 200 mm default
 
 
 def build_window_model_b(
