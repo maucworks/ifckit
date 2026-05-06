@@ -126,6 +126,24 @@ def _build_fill_from_graph(
         oz = old_origin.Coordinates[2]
         new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
         solid.Position = new_placement
+
+        # Apply material if defined in component or overridden by pending
+        material = comp.material
+        if pending.material_overrides and comp.role in pending.material_overrides:
+            # Occurrence-level material override takes precedence
+            material_override = pending.material_overrides[comp.role]
+            if material and material_override:
+                # Merge: override fills in missing keys from component default
+                merged_material = material.copy()
+                merged_material.update(material_override)
+                material = merged_material
+            elif material_override:
+                material = material_override
+
+        # Apply styling to solid if material is defined
+        if material:
+            solid = _apply_material_to_solid(ifc_file, solid, material)
+
         solids.append(solid)
 
     # Build shape representation with all component solids.
@@ -551,6 +569,33 @@ def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
     return 200.0  # 200 mm default
 
 
+def _apply_material_to_solid(
+    ifc_file: ifcopenshell.file,
+    solid: ifcopenshell.entity_instance,
+    material_def: Optional[dict],
+) -> ifcopenshell.entity_instance:
+    """
+    Apply material styling to a solid (currently a no-op).
+
+    NOTE: Proper IFC material styling via IfcMaterial or IfcSurfaceStyle is complex.
+    For now, this is a placeholder that returns the solid unchanged.
+    Material definitions can be stored in the component graph for future use.
+
+    Args:
+        ifc_file: IFC file object
+        solid: IfcExtrudedAreaSolid or similar representation item
+        material_def: Dict with keys:
+            - color: {"r": 0.0-1.0, "g": 0.0-1.0, "b": 0.0-1.0}
+            - transparency: 0.0-1.0 (0=transparent, 1=opaque)
+            - name: optional material name
+
+    Returns:
+        The solid unchanged for now.
+    """
+    # TODO: Implement proper IFC material styling via IfcSurfaceStyle or IfcMaterial
+    return solid
+
+
 def build_window_model_b(
     ifc_file: ifcopenshell.file,
     pending,  # PendingWindow with .plane and .component_graph set
@@ -604,14 +649,15 @@ def build_window_model_b(
         params.update(pending.parameters)
 
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
-    opening_solids = [c.solid for c in opening_components]
 
-    # Apply anchor offset to opening solids (same anchor as fill)
+    # Apply anchor offset to opening solids and apply materials
     from ifckit.geometry import Vec
 
     opening_anchor = "s"
     dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
-    for solid in opening_solids:
+    opening_solids = []
+    for comp in opening_components:
+        solid = comp.solid
         existing_pos = solid.Position
         old_origin = existing_pos.Location
         ox = old_origin.Coordinates[0] + dx
@@ -619,6 +665,25 @@ def build_window_model_b(
         oz = old_origin.Coordinates[2]
         new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
         solid.Position = new_placement
+
+        # Apply material if defined in component or overridden by pending
+        material = comp.material
+        if pending.material_overrides and comp.role in pending.material_overrides:
+            # Occurrence-level material override takes precedence
+            material_override = pending.material_overrides[comp.role]
+            if material and material_override:
+                # Merge: override fills in missing keys from component default
+                merged_material = material.copy()
+                merged_material.update(material_override)
+                material = merged_material
+            elif material_override:
+                material = material_override
+
+        # Apply styling to solid if material is defined
+        if material:
+            solid = _apply_material_to_solid(ifc_file, solid, material)
+
+        opening_solids.append(solid)
 
     opening_entity = build_opening_from_solids(
         ifc_file,
@@ -701,14 +766,15 @@ def build_door_model_b(
         params.update(pending.parameters)
 
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
-    opening_solids = [c.solid for c in opening_components]
 
-    # Apply anchor offset to opening solids (same anchor as fill)
+    # Apply anchor offset to opening solids and apply materials
     from ifckit.geometry import Vec
 
     opening_anchor = "s"
     dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
-    for solid in opening_solids:
+    opening_solids = []
+    for comp in opening_components:
+        solid = comp.solid
         existing_pos = solid.Position
         old_origin = existing_pos.Location
         ox = old_origin.Coordinates[0] + dx
@@ -716,6 +782,25 @@ def build_door_model_b(
         oz = old_origin.Coordinates[2]
         new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
         solid.Position = new_placement
+
+        # Apply material if defined in component or overridden by pending
+        material = comp.material
+        if pending.material_overrides and comp.role in pending.material_overrides:
+            # Occurrence-level material override takes precedence
+            material_override = pending.material_overrides[comp.role]
+            if material and material_override:
+                # Merge: override fills in missing keys from component default
+                merged_material = material.copy()
+                merged_material.update(material_override)
+                material = merged_material
+            elif material_override:
+                material = material_override
+
+        # Apply styling to solid if material is defined
+        if material:
+            solid = _apply_material_to_solid(ifc_file, solid, material)
+
+        opening_solids.append(solid)
 
     opening_entity = build_opening_from_solids(
         ifc_file,

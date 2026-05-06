@@ -182,6 +182,64 @@ class TestEvalNodeRect:
 
 
 # ---------------------------------------------------------------------------
+# _eval_node_rect — inline offset hole
+# ---------------------------------------------------------------------------
+
+
+class TestEvalNodeRectOffsetHole:
+    def _outer_node(self):
+        return {"id": "outer", "op": "rect", "p0": [0, 0], "p1": [1000, 1000]}
+
+    def test_offset_hole_creates_one_hole(self):
+        node = {**self._outer_node(), "holes": [{"op": "offset", "dist": 55}]}
+        result = _eval_node_rect(node, {})
+        assert len(result.holes) == 1
+
+    def test_offset_hole_is_path(self):
+        node = {**self._outer_node(), "holes": [{"op": "offset", "dist": 55}]}
+        result = _eval_node_rect(node, {})
+        assert isinstance(result.holes[0], Path)
+
+    def test_offset_hole_param_substitution(self):
+        node = {
+            **self._outer_node(),
+            "holes": [{"op": "offset", "dist": "$lining_thickness"}],
+        }
+        result = _eval_node_rect(node, {"lining_thickness": 55})
+        pts = result.holes[0].to_profile_points()
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        assert min(xs) == pytest.approx(55.0)
+        assert min(ys) == pytest.approx(55.0)
+        assert max(xs) == pytest.approx(945.0)
+        assert max(ys) == pytest.approx(945.0)
+
+    def test_offset_hole_with_scale(self):
+        # scale_x=2, scale_y=2 → outer rect [0,0] to [1000,1000] is scaled to [0,0] to [2000,2000]
+        # Literal "dist": 55 (in ref-frame units) is NOT scaled → offset is 55
+        # So hole points are [55, 55] to [1945, 1945]
+        node = {
+            **self._outer_node(),
+            "holes": [{"op": "offset", "dist": 55}],
+        }
+        result = _eval_node_rect(node, {}, scale_x=2.0, scale_y=2.0)
+        pts = result.holes[0].to_profile_points()
+        xs = [p[0] for p in pts]
+        assert min(xs) == pytest.approx(55.0)
+        assert max(xs) == pytest.approx(1945.0)
+
+    def test_offset_hole_missing_dist_raises(self):
+        node = {**self._outer_node(), "holes": [{"op": "offset"}]}
+        with pytest.raises(ValueError, match="dist"):
+            _eval_node_rect(node, {})
+
+    def test_unsupported_hole_op_still_raises(self):
+        node = {**self._outer_node(), "holes": [{"op": "circle", "r": 10}]}
+        with pytest.raises(ValueError, match="circle"):
+            _eval_node_rect(node, {})
+
+
+# ---------------------------------------------------------------------------
 # _eval_node_difference
 # ---------------------------------------------------------------------------
 
@@ -313,13 +371,13 @@ class TestEvaluateFixedCasement:
         f, ctx = _make_ifc()
         comps = evaluate_component_graph("fixed_casement", f, ctx, {"w": 1.0, "h": 1.2})
         lining = next(c for c in comps if c.role == "Lining")
-        assert lining.solid.Depth == pytest.approx(0.070)
+        assert lining.solid.Depth == pytest.approx(70.0)  # 70 mm
 
     def test_glazing_depth(self):
         f, ctx = _make_ifc()
         comps = evaluate_component_graph("fixed_casement", f, ctx, {"w": 1.0, "h": 1.2})
         glazing = next(c for c in comps if c.role == "Glazing")
-        assert glazing.solid.Depth == pytest.approx(0.006)
+        assert glazing.solid.Depth == pytest.approx(6.0)  # 6 mm
 
     def test_missing_required_param(self):
         """h now has a default (1000), so only test when really required."""

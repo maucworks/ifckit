@@ -208,6 +208,7 @@ class PendingDoor(PendingElement):
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
         parameters: Optional[Dict[str, float]] = None,
+        material_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
         if overall_width <= 0:
@@ -229,6 +230,7 @@ class PendingDoor(PendingElement):
         self.plane = plane
         self.component_graph = component_graph
         self.parameters = parameters or {}
+        self.material_overrides = material_overrides or {}
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -247,6 +249,8 @@ class PendingDoor(PendingElement):
             d["component_graph"] = self.component_graph
         if self.parameters:
             d["parameters"] = self.parameters
+        if self.material_overrides:
+            d["material_overrides"] = self.material_overrides
         return d
 
     @classmethod
@@ -261,6 +265,8 @@ class PendingDoor(PendingElement):
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
             properties=cls._properties_from_dict(d),
+            parameters=d.get("parameters"),
+            material_overrides=d.get("material_overrides"),
         )
 
 
@@ -302,6 +308,7 @@ class PendingWindow(PendingElement):
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
         parameters: Optional[Dict[str, float]] = None,
+        material_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
         if overall_width <= 0:
@@ -325,6 +332,7 @@ class PendingWindow(PendingElement):
         self.plane = plane
         self.component_graph = component_graph
         self.parameters = parameters or {}
+        self.material_overrides = material_overrides or {}
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -343,6 +351,8 @@ class PendingWindow(PendingElement):
             d["component_graph"] = self.component_graph
         if self.parameters:
             d["parameters"] = self.parameters
+        if self.material_overrides:
+            d["material_overrides"] = self.material_overrides
         return d
 
     @classmethod
@@ -357,4 +367,6 @@ class PendingWindow(PendingElement):
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
             properties=cls._properties_from_dict(d),
+            parameters=d.get("parameters"),
+            material_overrides=d.get("material_overrides"),
         )

@@ -3,9 +3,9 @@
   "parameters": {
     "w": 1000,
     "h": 1000,
-    "lining_depth": 0.070,
+    "lining_depth": 70,
     "lining_thickness": 55,
-    "panel_depth": 0.006,
+    "panel_depth": 6,
     "glazing_inset": 20
   },
   "opening_nodes": [
@@ -19,30 +19,29 @@
       "id": "opening_void",
       "op": "extrude",
       "profile": "opening_rect",
-      "depth": "$wall_thickness",
+      "depth": "2 * $wall_thickness",
       "z_offset": 0,
       "output": true,
-      "role": "Opening"
+      "role": "Opening",
+      "material": {
+        "color": {"r": 0.5, "g": 0.5, "b": 0.5},
+        "transparency": 1.0,
+        "name": "Opening void"
+      }
     }
   ],
   "nodes": [
     {
-      "id": "outer_rect",
+      "id": "lining_profile",
       "op": "rect",
       "p0": [0, 0],
-      "p1": ["$w", "$h"]
-    },
-    {
-      "id": "inner_rect",
-      "op": "rect",
-      "p0": ["$lining_thickness", "$lining_thickness"],
-      "p1": ["$w - $lining_thickness", "$h - $lining_thickness"]
-    },
-    {
-      "id": "lining_profile",
-      "op": "difference",
-      "a": "outer_rect",
-      "b": "inner_rect"
+      "p1": ["$w", "$h"],
+      "holes": [
+        {
+          "op": "offset",
+          "dist": "$lining_thickness"
+        }
+      ]
     },
     {
       "id": "lining",
@@ -51,13 +50,18 @@
       "depth": "$lining_depth",
       "z_offset": 0,
       "output": true,
-      "role": "Lining"
+      "role": "Lining",
+      "material": {
+        "color": {"r": 0.8, "g": 0.8, "b": 0.8},
+        "transparency": 0.95,
+        "name": "Aluminum frame"
+      }
     },
     {
       "id": "glazing_rect",
       "op": "rect",
-      "p0": ["$lining_thickness + $glazing_inset", "$lining_thickness + $glazing_inset"],
-      "p1": ["$w - $lining_thickness - $glazing_inset", "$h - $lining_thickness - $glazing_inset"]
+      "p0": ["$lining_thickness", "$lining_thickness"],
+      "p1": ["$w - $lining_thickness", "$h - $lining_thickness"]
     },
     {
       "id": "glazing",
@@ -66,7 +70,12 @@
       "depth": "$panel_depth",
       "z_offset": "$lining_depth / 2 - $panel_depth / 2",
       "output": true,
-      "role": "Glazing"
+      "role": "Glazing",
+      "material": {
+        "color": {"r": 0.9, "g": 0.95, "b": 1.0},
+        "transparency": 0.1,
+        "name": "Clear glass"
+      }
     }
   ]
 }

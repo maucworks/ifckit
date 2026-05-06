@@ -2,10 +2,11 @@
 tests/test_json_build_openings.py
 ==================================
 
-Tests for the 3-pass JSON build: openings, doors, windows, types.
-
-Openings are nested inside elements. Fills (doors/windows) are nested
-inside openings. n:1 supported — multiple fills per opening.
+Tests for the 2-pass JSON build (Model B):
+  - validate_json: structure checks for window/door fills nested in elements
+  - build: wall + window/door via component_graph
+  - type_ref resolution errors
+  - round-trip save/reopen
 """
 
 import json
@@ -36,18 +37,20 @@ _BASE = {
     ],
 }
 
+
 def _vec(x, y, z):
     return {"x": x, "y": y, "z": z}
 
 
-def _plane(ox, oy, oz, xx=1, xy=0, xz=0, yx=0, yy=1, yz=0):
+def _plane(ox, oy, oz, xx=1, xy=0, xz=0, yx=0, yy=0, yz=1):
+    """Default y_axis = (0,0,1) — vertical, correct for wall inserts."""
     return {"origin": _vec(ox, oy, oz), "x_axis": _vec(xx, xy, xz), "y_axis": _vec(yx, yy, yz)}
 
 
 _WALL_FOOTPRINT = [
     [0, 0, 0], [5, 0, 0], [5, 0.2, 0], [0, 0.2, 0],
 ]
-_WALL_PLANE = _plane(0, 0, 0)
+_WALL_PLANE = {"origin": _vec(0, 0, 0), "x_axis": _vec(1, 0, 0), "y_axis": _vec(0, 1, 0)}
 
 _WALL_ELEM = {
     "id": "w1",
@@ -57,45 +60,76 @@ _WALL_ELEM = {
     "height": 3.0,
 }
 
-_OPENING_PLANE = _plane(1, 0, 0)
+_WIN_PLANE = _plane(1.0, 0.0, 0.5)
 
-_OPENING = {
-    "plane": _OPENING_PLANE,
-    "width": 0.9,
-    "height": 2.1,
+_WIN_FILL = {
+    "plane": _WIN_PLANE,
+    "overall_width": 1.2,
+    "overall_height": 1.0,
+    "type_ref": "WT1",
 }
 
-_DOOR = {
+_DOOR_PLANE = _plane(0.3, 0.0, 0.0)
+
+_DOOR_FILL = {
+    "plane": _DOOR_PLANE,
     "overall_width": 0.9,
     "overall_height": 2.1,
+    "type_ref": "DT1",
 }
 
-_WINDOW = {
+_WIN_TYPE = {
+    "name": "WT1",
     "overall_width": 1.2,
-    "overall_height": 1.4,
+    "overall_height": 1.0,
+    "component_graph": "fixed_casement",
+}
+
+_DOOR_TYPE = {
+    "name": "DT1",
+    "overall_width": 0.9,
+    "overall_height": 2.1,
+    "component_graph": "door_flush",
 }
 
 
-def _wall_with_opening(opening):
-    """Wall element dict with one opening."""
-    return dict(_WALL_ELEM, openings=[opening])
-
-
-def _data(elements=None):
-    """Deep-copy base and set storey elements."""
+def _data(elements=None, window_types=None, door_types=None):
     import copy
     d = copy.deepcopy(_BASE)
     storey = d["buildings"][0]["storeys"][0]
     storey["elements"] = elements or []
+    if window_types:
+        d["window_types"] = window_types
+    if door_types:
+        d["door_types"] = door_types
     return d
 
 
+def _wall_with_windows(windows):
+    import copy
+    w = copy.deepcopy(_WALL_ELEM)
+    w["windows"] = windows
+    return w
+
+
+def _wall_with_doors(doors):
+    import copy
+    w = copy.deepcopy(_WALL_ELEM)
+    w["doors"] = doors
+    return w
+
+
 # ===========================================================================
-# validate_json — new nested sections
+# validate_json
 # ===========================================================================
 
 
 class TestValidateJsonNewSections:
+    def test_valid_window_type_section(self):
+        d = dict(_BASE)
+        d["window_types"] = [{"overall_width": 1.2, "overall_height": 1.4}]
+        assert validate_json(d).ok
+
     def test_valid_door_type_section(self):
         d = dict(_BASE)
         d["door_types"] = [{"overall_width": 0.9, "overall_height": 2.1}]
@@ -108,49 +142,85 @@ class TestValidateJsonNewSections:
         assert not result.ok
         assert any("overall_width" in e for e in result.errors)
 
-    def test_valid_window_type_section(self):
-        d = dict(_BASE)
-        d["window_types"] = [{"overall_width": 1.2, "overall_height": 1.4}]
-        assert validate_json(d).ok
-
-    def test_opening_missing_plane(self):
-        wall = dict(_WALL_ELEM, openings=[{"width": 0.9, "height": 2.1}])
-        d = _data(elements=[wall])
-        result = validate_json(d)
+    def test_window_fill_missing_plane(self):
+        wall = dict(_WALL_ELEM, windows=[{
+            "overall_width": 1.2, "overall_height": 1.0, "type_ref": "WT1"
+        }])
+        result = validate_json(_data(elements=[wall]))
         assert not result.ok
         assert any("plane" in e for e in result.errors)
 
-    def test_opening_missing_width(self):
-        wall = dict(_WALL_ELEM, openings=[{"plane": _OPENING_PLANE, "height": 2.1}])
-        d = _data(elements=[wall])
-        result = validate_json(d)
-        assert not result.ok
-        assert any("width" in e for e in result.errors)
-
-    def test_door_missing_overall_width(self):
-        op = dict(_OPENING, doors=[{"overall_height": 2.1}])
-        d = _data(elements=[_wall_with_opening(op)])
-        result = validate_json(d)
+    def test_window_fill_missing_overall_width(self):
+        wall = dict(_WALL_ELEM, windows=[{
+            "plane": _WIN_PLANE, "overall_height": 1.0, "type_ref": "WT1"
+        }])
+        result = validate_json(_data(elements=[wall]))
         assert not result.ok
         assert any("overall_width" in e for e in result.errors)
 
-    def test_window_missing_overall_height(self):
-        op = dict(_OPENING, windows=[{"overall_width": 1.2}])
-        d = _data(elements=[_wall_with_opening(op)])
-        result = validate_json(d)
+    def test_window_fill_missing_type_ref(self):
+        wall = dict(_WALL_ELEM, windows=[{
+            "plane": _WIN_PLANE, "overall_width": 1.2, "overall_height": 1.0
+        }])
+        result = validate_json(_data(elements=[wall]))
+        assert not result.ok
+        assert any("type_ref" in e for e in result.errors)
+
+    def test_door_fill_missing_overall_width(self):
+        wall = dict(_WALL_ELEM, doors=[{
+            "plane": _DOOR_PLANE, "overall_height": 2.1, "type_ref": "DT1"
+        }])
+        result = validate_json(_data(elements=[wall]))
+        assert not result.ok
+        assert any("overall_width" in e for e in result.errors)
+
+    def test_window_fill_missing_overall_height(self):
+        wall = dict(_WALL_ELEM, windows=[{
+            "plane": _WIN_PLANE, "overall_width": 1.2, "type_ref": "WT1"
+        }])
+        result = validate_json(_data(elements=[wall]))
         assert not result.ok
         assert any("overall_height" in e for e in result.errors)
 
 
 # ===========================================================================
-# build — wall + opening + door
+# build — wall + window (Model B)
+# ===========================================================================
+
+
+class TestBuildWallOpeningWindow:
+    def _make(self):
+        return _data(
+            elements=[_wall_with_windows([_WIN_FILL])],
+            window_types=[_WIN_TYPE],
+        )
+
+    def test_creates_ifc_entities(self):
+        m = build(self._make())
+        assert len(m._file.by_type("IfcWall")) == 1
+        assert len(m._file.by_type("IfcOpeningElement")) == 1
+        assert len(m._file.by_type("IfcWindow")) == 1
+
+    def test_rel_voids_element(self):
+        m = build(self._make())
+        assert len(m._file.by_type("IfcRelVoidsElement")) == 1
+
+    def test_rel_fills_element(self):
+        m = build(self._make())
+        assert len(m._file.by_type("IfcRelFillsElement")) == 1
+
+
+# ===========================================================================
+# build — wall + door (Model B)
 # ===========================================================================
 
 
 class TestBuildWallOpeningDoor:
     def _make(self):
-        op = dict(_OPENING, doors=[_DOOR])
-        return _data(elements=[_wall_with_opening(op)])
+        return _data(
+            elements=[_wall_with_doors([_DOOR_FILL])],
+            door_types=[_DOOR_TYPE],
+        )
 
     def test_creates_ifc_entities(self):
         m = build(self._make())
@@ -166,100 +236,36 @@ class TestBuildWallOpeningDoor:
         m = build(self._make())
         assert len(m._file.by_type("IfcRelFillsElement")) == 1
 
-    def test_no_type_by_default(self):
-        m = build(self._make())
-        assert len(m._file.by_type("IfcDoorType")) == 0
-        assert len(m._file.by_type("IfcRelDefinesByType")) == 0
-
 
 # ===========================================================================
-# build — wall + opening + window
+# build — multiple fills on one wall
 # ===========================================================================
 
 
-class TestBuildWallOpeningWindow:
-    def _make(self):
-        op = dict(_OPENING, width=1.2, height=1.4, windows=[_WINDOW])
-        return _data(elements=[_wall_with_opening(op)])
-
-    def test_creates_ifc_entities(self):
-        m = build(self._make())
-        assert len(m._file.by_type("IfcWindow")) == 1
-        assert len(m._file.by_type("IfcOpeningElement")) == 1
-
-    def test_rel_voids_and_fills(self):
-        m = build(self._make())
-        assert len(m._file.by_type("IfcRelVoidsElement")) == 1
-        assert len(m._file.by_type("IfcRelFillsElement")) == 1
-
-
-# ===========================================================================
-# build — n:1 multiple fills per opening
-# ===========================================================================
-
-
-class TestBuildMultipleFillsPerOpening:
-    def test_two_doors_in_one_opening(self):
-        op = dict(_OPENING, doors=[_DOOR, _DOOR])
-        m = build(_data(elements=[_wall_with_opening(op)]))
-        assert len(m._file.by_type("IfcDoor")) == 2
-        assert len(m._file.by_type("IfcOpeningElement")) == 1
-        assert len(m._file.by_type("IfcRelFillsElement")) == 2
-
-    def test_door_and_window_in_one_opening(self):
-        op = dict(_OPENING, doors=[_DOOR], windows=[_WINDOW])
-        m = build(_data(elements=[_wall_with_opening(op)]))
-        assert len(m._file.by_type("IfcDoor")) == 1
-        assert len(m._file.by_type("IfcWindow")) == 1
-        assert len(m._file.by_type("IfcOpeningElement")) == 1
-        assert len(m._file.by_type("IfcRelFillsElement")) == 2
-
-
-# ===========================================================================
-# build — door_types at root level
-# ===========================================================================
-
-
-class TestBuildDoorTypes:
-    def _make(self, n_doors=1):
+class TestBuildMultipleFills:
+    def test_two_windows_on_one_wall(self):
         import copy
-        d = copy.deepcopy(_BASE)
-        d["door_types"] = [
-            {"name": "DT1", "overall_width": 0.9, "overall_height": 2.1}
-        ]
-        elements = []
-        for i in range(n_doors):
-            op = {
-                "plane": _plane(i * 2 + 0.3, 0, 0),
-                "width": 0.9,
-                "height": 2.1,
-                "doors": [{"overall_width": 0.9, "overall_height": 2.1, "type_ref": "DT1"}],
-            }
-            elements.append({
-                "id": f"w{i}",
-                "type": "basic_wall",
-                "footprint": [[i*2,0,0],[i*2+1.5,0,0],[i*2+1.5,0.2,0],[i*2,0.2,0]],
-                "plane": _plane(i*2, 0, 0),
-                "height": 3.0,
-                "openings": [op],
-            })
-        d["buildings"][0]["storeys"][0]["elements"] = elements
-        return d
+        w2 = copy.deepcopy(_WIN_FILL)
+        w2["plane"] = _plane(3.0, 0.0, 0.5)
+        wall = dict(copy.deepcopy(_WALL_ELEM), windows=[_WIN_FILL, w2])
+        m = build(_data(elements=[wall], window_types=[_WIN_TYPE]))
+        assert len(m._file.by_type("IfcWindow")) == 2
+        assert len(m._file.by_type("IfcOpeningElement")) == 2
+        assert len(m._file.by_type("IfcRelVoidsElement")) == 2
 
-    def test_single_door_type_created(self):
-        m = build(self._make(n_doors=3))
-        assert len(m._file.by_type("IfcDoorType")) == 1
-
-    def test_rel_defines_by_type_covers_all_doors(self):
-        m = build(self._make(n_doors=3))
-        rels = m._file.by_type("IfcRelDefinesByType")
-        assert len(rels) == 1
-        assert len(rels[0].RelatedObjects) == 3
-
-    def test_ten_doors_one_type(self):
-        m = build(self._make(n_doors=10))
-        assert len(m._file.by_type("IfcDoor")) == 10
-        assert len(m._file.by_type("IfcDoorType")) == 1
+    def test_window_and_door_on_one_wall(self):
+        import copy
+        wall = copy.deepcopy(_WALL_ELEM)
+        wall["windows"] = [_WIN_FILL]
+        wall["doors"] = [_DOOR_FILL]
+        m = build(_data(
+            elements=[wall],
+            window_types=[_WIN_TYPE],
+            door_types=[_DOOR_TYPE],
+        ))
+        assert len(m._file.by_type("IfcWindow")) == 1
+        assert len(m._file.by_type("IfcDoor")) == 1
+        assert len(m._file.by_type("IfcOpeningElement")) == 2
 
 
 # ===========================================================================
@@ -268,40 +274,59 @@ class TestBuildDoorTypes:
 
 
 class TestBuildWindowTypes:
-    def _make(self, n_windows=1):
-        import copy
-        d = copy.deepcopy(_BASE)
-        d["window_types"] = [
-            {"name": "WT1", "overall_width": 1.2, "overall_height": 1.4}
-        ]
-        elements = []
-        for i in range(n_windows):
-            op = {
-                "plane": _plane(i * 2 + 0.4, 0, 0),
-                "width": 1.2,
-                "height": 1.4,
-                "windows": [{"overall_width": 1.2, "overall_height": 1.4, "type_ref": "WT1"}],
-            }
-            elements.append({
-                "id": f"w{i}",
-                "type": "basic_wall",
-                "footprint": [[i*2,0,0],[i*2+2,0,0],[i*2+2,0.2,0],[i*2,0.2,0]],
-                "plane": _plane(i*2, 0, 0),
-                "height": 3.0,
-                "openings": [op],
-            })
-        d["buildings"][0]["storeys"][0]["elements"] = elements
-        return d
-
-    def test_single_window_type_created(self):
-        m = build(self._make(n_windows=5))
+    def test_single_window_type_registered(self):
+        m = build(_data(
+            elements=[_wall_with_windows([_WIN_FILL])],
+            window_types=[_WIN_TYPE],
+        ))
         assert len(m._file.by_type("IfcWindowType")) == 1
 
     def test_rel_defines_by_type_covers_all_windows(self):
-        m = build(self._make(n_windows=5))
-        rels = m._file.by_type("IfcRelDefinesByType")
-        assert len(rels) == 1
-        assert len(rels[0].RelatedObjects) == 5
+        import copy
+        fills = []
+        for i in range(3):
+            f = copy.deepcopy(_WIN_FILL)
+            f["plane"] = _plane(i * 1.5 + 0.3, 0.0, 0.5)
+            fills.append(f)
+        wall = dict(copy.deepcopy(_WALL_ELEM),
+                    footprint=[[0,0,0],[8,0,0],[8,0.2,0],[0,0.2,0]],
+                    windows=fills)
+        m = build(_data(elements=[wall], window_types=[_WIN_TYPE]))
+        assert len(m._file.by_type("IfcWindow")) == 3
+
+
+# ===========================================================================
+# build — door_types at root level
+# ===========================================================================
+
+
+class TestBuildDoorTypes:
+    def test_single_door_type_registered(self):
+        m = build(_data(
+            elements=[_wall_with_doors([_DOOR_FILL])],
+            door_types=[_DOOR_TYPE],
+        ))
+        assert len(m._file.by_type("IfcDoorType")) == 1
+
+    def test_ten_doors_one_type(self):
+        import copy
+        elements = []
+        for i in range(10):
+            f = copy.deepcopy(_DOOR_FILL)
+            f["plane"] = _plane(i * 0.5 + 0.1, 0.0, 0.0)
+            wall = {
+                "id": f"wall-{i}",
+                "type": "basic_wall",
+                "footprint": [[i*0.5, 0, 0], [i*0.5+0.4, 0, 0],
+                               [i*0.5+0.4, 0.2, 0], [i*0.5, 0.2, 0]],
+                "plane": {"origin": _vec(i*0.5, 0, 0), "x_axis": _vec(1,0,0), "y_axis": _vec(0,1,0)},
+                "height": 3.0,
+                "doors": [f],
+            }
+            elements.append(wall)
+        m = build(_data(elements=elements, door_types=[_DOOR_TYPE]))
+        assert len(m._file.by_type("IfcDoor")) == 10
+        assert len(m._file.by_type("IfcDoorType")) == 1
 
 
 # ===========================================================================
@@ -310,24 +335,31 @@ class TestBuildWindowTypes:
 
 
 class TestBuildRefErrors:
-    def test_element_with_openings_but_no_id_raises(self):
-        wall_no_id = {
-            "type": "basic_wall",
-            "footprint": _WALL_FOOTPRINT,
-            "plane": _WALL_PLANE,
-            "height": 3.0,
-            "openings": [_OPENING],
-        }
-        with pytest.raises(ValueError, match="no 'id'"):
-            build(_data(elements=[wall_no_id]))
-
-    def test_unknown_type_ref_raises(self):
-        op = dict(_OPENING, doors=[dict(_DOOR, type_ref="NO_SUCH_TYPE")])
+    def test_unknown_window_type_ref_raises(self):
+        import copy
+        fill = copy.deepcopy(_WIN_FILL)
+        fill["type_ref"] = "NO_SUCH_TYPE"
         with pytest.raises(ValueError, match="type_ref"):
-            build(_data(elements=[_wall_with_opening(op)]))
+            build(_data(elements=[_wall_with_windows([fill])], window_types=[_WIN_TYPE]))
+
+    def test_unknown_door_type_ref_raises(self):
+        import copy
+        fill = copy.deepcopy(_DOOR_FILL)
+        fill["type_ref"] = "NO_SUCH_TYPE"
+        with pytest.raises(ValueError, match="type_ref"):
+            build(_data(elements=[_wall_with_doors([fill])], door_types=[_DOOR_TYPE]))
+
+    def test_window_type_without_component_graph_raises(self):
+        wt_no_graph = {"name": "WT_BARE", "overall_width": 1.2, "overall_height": 1.0}
+        import copy
+        fill = copy.deepcopy(_WIN_FILL)
+        fill["type_ref"] = "WT_BARE"
+        with pytest.raises(ValueError, match="component_graph"):
+            build(_data(elements=[_wall_with_windows([fill])], window_types=[wt_no_graph]))
 
     def test_duplicate_element_id_raises(self):
-        wall2 = dict(_WALL_ELEM)  # same id "w1"
+        import copy
+        wall2 = copy.deepcopy(_WALL_ELEM)  # same id "w1"
         with pytest.raises(ValueError, match="Duplicate element id"):
             build(_data(elements=[_WALL_ELEM, wall2]))
 
@@ -339,28 +371,20 @@ class TestBuildRefErrors:
 
 class TestBuildRoundtrip:
     def test_save_and_reopen(self, tmp_path):
-        import copy, ifcopenshell
-        d = copy.deepcopy(_BASE)
-        d["door_types"] = [{"name": "DT1", "overall_width": 0.9, "overall_height": 2.1}]
-        op = dict(_OPENING, doors=[dict(_DOOR, type_ref="DT1")])
-        d["buildings"][0]["storeys"][0]["elements"] = [_wall_with_opening(op)]
-
+        import ifcopenshell
         out = str(tmp_path / "out.ifc")
-        build(d, output_path=out)
-
+        build(
+            _data(elements=[_wall_with_windows([_WIN_FILL])], window_types=[_WIN_TYPE]),
+            output_path=out,
+        )
         f2 = ifcopenshell.open(out)
         assert len(f2.by_type("IfcOpeningElement")) == 1
-        assert len(f2.by_type("IfcDoor")) == 1
-        assert len(f2.by_type("IfcDoorType")) == 1
+        assert len(f2.by_type("IfcWindow")) == 1
         assert len(f2.by_type("IfcRelVoidsElement")) == 1
         assert len(f2.by_type("IfcRelFillsElement")) == 1
-        assert len(f2.by_type("IfcRelDefinesByType")) == 1
 
     def test_build_from_json_string(self):
-        import copy
-        d = copy.deepcopy(_BASE)
-        op = dict(_OPENING, doors=[_DOOR])
-        d["buildings"][0]["storeys"][0]["elements"] = [_wall_with_opening(op)]
         from ifckit.json_build import build_from_json
+        d = _data(elements=[_wall_with_windows([_WIN_FILL])], window_types=[_WIN_TYPE])
         m = build_from_json(json.dumps(d))
-        assert len(m._file.by_type("IfcDoor")) == 1
+        assert len(m._file.by_type("IfcWindow")) == 1

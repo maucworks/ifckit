@@ -14,7 +14,7 @@
          "name": "WT-2000x500",
          "overall_width": 2000.0,
          "overall_height": 500.0,
-         "lining_thickness": 100.0,
+         "lining_thickness": 10.0,
          "lining_depth": 100.0,
          "component_graph": "fixed_casement"
      }
@@ -47,21 +47,27 @@
                 }
               },
                "windows": [
-                 {
-                   "name": "W-1",
-                   "plane": {
-                     "origin": {"x": 1500.0, "y": 0.0, "z": 1000.0},
-                     "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
-                     "y_axis": {"x": 0.0, "y": 0.0, "z": 1.0}
-                   },
-                   "overall_width": 2000.0,
-                   "overall_height": 500.0,
-                    "type_ref": "WT-2000x500",
-                    "parameters": {
-                      "lining_thickness": 10.0,
-                      "lining_depth": 50.0
-                    }
-                 }
+                  {
+                    "name": "W-1",
+                    "plane": {
+                      "origin": {"x": 1500.0, "y": 0.0, "z": 1000.0},
+                      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                      "y_axis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                    },
+                    "overall_width": 2000.0,
+                    "overall_height": 500.0,
+                     "type_ref": "WT-2000x500",
+                     "parameters": {
+                       "lining_depth": 300.0
+                     },
+                     "material_overrides": {
+                       "Glazing": {
+                         "color": {"r": 0.7, "g": 0.85, "b": 1.0},
+                         "transparency": 0.2,
+                         "name": "Custom Blue Glass"
+                       }
+                     }
+                  }
                ]
             }
           ]

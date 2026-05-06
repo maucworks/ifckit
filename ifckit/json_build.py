@@ -343,6 +343,22 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     if win_data.get("parameters"):
                         merged_params.update(win_data["parameters"])
 
+                    # Merge material overrides: type-level + occurrence-level
+                    # (occurrence-level overrides type-level per role)
+                    merged_materials = {}
+                    if pending_wt.material_overrides:
+                        merged_materials.update(pending_wt.material_overrides)
+                    if win_data.get("material_overrides"):
+                        # Occurrence materials override/extend type materials per role
+                        for role, material_def in win_data["material_overrides"].items():
+                            if role in merged_materials and isinstance(
+                                merged_materials[role], dict
+                            ):
+                                # Merge material defs per role
+                                merged_materials[role] = {**merged_materials[role], **material_def}
+                            else:
+                                merged_materials[role] = material_def
+
                     pending_win = PendingWindow(
                         overall_width=float(win_data["overall_width"]),
                         overall_height=float(win_data["overall_height"]),
@@ -350,6 +366,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         component_graph=pending_wt.component_graph,
                         name=win_data.get("name", ""),
                         parameters=merged_params if merged_params else None,
+                        material_overrides=merged_materials if merged_materials else None,
                     )
                     model.add(pending_win, host_handle)
 
@@ -390,6 +407,22 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     if door_data.get("parameters"):
                         merged_params.update(door_data["parameters"])
 
+                    # Merge material overrides: type-level + occurrence-level
+                    # (occurrence-level overrides type-level per role)
+                    merged_materials = {}
+                    if pending_dt.material_overrides:
+                        merged_materials.update(pending_dt.material_overrides)
+                    if door_data.get("material_overrides"):
+                        # Occurrence materials override/extend type materials per role
+                        for role, material_def in door_data["material_overrides"].items():
+                            if role in merged_materials and isinstance(
+                                merged_materials[role], dict
+                            ):
+                                # Merge material defs per role
+                                merged_materials[role] = {**merged_materials[role], **material_def}
+                            else:
+                                merged_materials[role] = material_def
+
                     pending_door = PendingDoor(
                         overall_width=float(door_data["overall_width"]),
                         overall_height=float(door_data["overall_height"]),
@@ -397,6 +430,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         component_graph=pending_dt.component_graph,
                         name=door_data.get("name", ""),
                         parameters=merged_params if merged_params else None,
+                        material_overrides=merged_materials if merged_materials else None,
                     )
                     model.add(pending_door, host_handle)
 

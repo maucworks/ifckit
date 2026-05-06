@@ -180,6 +180,8 @@ class PendingDoorType(PendingTypeObject):
         panel_operation: Optional[str] = None,
         # JSON component graph for geometry (optional)
         component_graph: Optional[str] = None,
+        # Material overrides per role (optional)
+        material_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
         # Extra user properties
         properties: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -220,6 +222,8 @@ class PendingDoorType(PendingTypeObject):
         self.panel_operation = panel_operation
         # Component graph
         self.component_graph: Optional[str] = component_graph
+        # Material overrides
+        self.material_overrides: Dict[str, Dict[str, Any]] = material_overrides or {}
         # Extra
         self.properties: Dict[str, Any] = properties or {}
         # Resolve key now that all fields are set
@@ -383,6 +387,8 @@ class PendingWindowType(PendingTypeObject):
         panel_operation: Optional[str] = None,
         # JSON component graph for geometry (optional)
         component_graph: Optional[str] = None,
+        # Material overrides per role (optional)
+        material_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
         # Extra user properties
         properties: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -423,6 +429,8 @@ class PendingWindowType(PendingTypeObject):
         self.panel_operation = panel_operation
         # Component graph
         self.component_graph: Optional[str] = component_graph
+        # Material overrides
+        self.material_overrides: Dict[str, Dict[str, Any]] = material_overrides or {}
         # Extra
         self.properties: Dict[str, Any] = properties or {}
         # Resolve key now that all fields are set
