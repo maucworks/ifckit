@@ -598,6 +598,21 @@ def build_window_model_b(
 
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
     opening_solids = [c.solid for c in opening_components]
+
+    # Apply anchor offset to opening solids (same anchor as fill)
+    from ifckit.geometry import Vec
+
+    opening_anchor = "s"
+    dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
+    for solid in opening_solids:
+        existing_pos = solid.Position
+        old_origin = existing_pos.Location
+        ox = old_origin.Coordinates[0] + dx
+        oy = old_origin.Coordinates[1] + dy
+        oz = old_origin.Coordinates[2]
+        new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
+        solid.Position = new_placement
+
     opening_entity = build_opening_from_solids(
         ifc_file,
         pending.plane,
@@ -677,6 +692,21 @@ def build_door_model_b(
 
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
     opening_solids = [c.solid for c in opening_components]
+
+    # Apply anchor offset to opening solids (same anchor as fill)
+    from ifckit.geometry import Vec
+
+    opening_anchor = "s"
+    dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
+    for solid in opening_solids:
+        existing_pos = solid.Position
+        old_origin = existing_pos.Location
+        ox = old_origin.Coordinates[0] + dx
+        oy = old_origin.Coordinates[1] + dy
+        oz = old_origin.Coordinates[2]
+        new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
+        solid.Position = new_placement
+
     opening_entity = build_opening_from_solids(
         ifc_file,
         pending.plane,
