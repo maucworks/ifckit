@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "parameters": {
+    "w": 1000,
+    "h": 1000,
+    "lining_depth": 0.070,
+    "lining_thickness": 55,
+    "panel_depth": 0.006,
+    "glazing_inset": 20
+  },
+  "opening_nodes": [
+    {
+      "id": "opening_rect",
+      "op": "rect",
+      "p0": [0, 0],
+      "p1": ["$w", "$h"]
+    },
+    {
+      "id": "opening_void",
+      "op": "extrude",
+      "profile": "opening_rect",
+      "depth": "$wall_thickness",
+      "z_offset": 0,
+      "output": true,
+      "role": "Opening"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "outer_rect",
+      "op": "rect",
+      "p0": [0, 0],
+      "p1": ["$w", "$h"]
+    },
+    {
+      "id": "inner_rect",
+      "op": "rect",
+      "p0": ["$lining_thickness", "$lining_thickness"],
+      "p1": ["$w - $lining_thickness", "$h - $lining_thickness"]
+    },
+    {
+      "id": "lining_profile",
+      "op": "difference",
+      "a": "outer_rect",
+      "b": "inner_rect"
+    },
+    {
+      "id": "lining",
+      "op": "extrude",
+      "profile": "lining_profile",
+      "depth": "$lining_depth",
+      "z_offset": 0,
+      "output": true,
+      "role": "Lining"
+    },
+    {
+      "id": "glazing_rect",
+      "op": "rect",
+      "p0": ["$lining_thickness + $glazing_inset", "$lining_thickness + $glazing_inset"],
+      "p1": ["$w - $lining_thickness - $glazing_inset", "$h - $lining_thickness - $glazing_inset"]
+    },
+    {
+      "id": "glazing",
+      "op": "extrude",
+      "profile": "glazing_rect",
+      "depth": "$panel_depth",
+      "z_offset": "$lining_depth / 2 - $panel_depth / 2",
+      "output": true,
+      "role": "Glazing"
+    }
+  ]
+}

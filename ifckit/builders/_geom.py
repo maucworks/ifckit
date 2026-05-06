@@ -131,33 +131,94 @@ def _signed_area_2d(points: Sequence[tuple[float, float]]) -> float:
     return area / 2.0
 
 
+def _pts_to_polyline(
+    f: ifcopenshell.file,
+    pts_2d: list,
+    ensure_ccw: bool,
+    reverse_for_hole: bool = False,
+) -> "ifcopenshell.entity_instance":
+    """Build a closed IfcPolyline from a list of (x,y) tuples.
+
+    Args:
+        f:               IFC file.
+        pts_2d:          List of (x, y) tuples (not yet closed).
+        ensure_ccw:      If True and the outer winding is CW, reverse to CCW.
+        reverse_for_hole: If True, reverse winding (IFC inner curves must be CW).
+    """
+    pts = list(pts_2d)
+    _EPS = 1e-9
+    if not (abs(pts[0][0] - pts[-1][0]) < _EPS and abs(pts[0][1] - pts[-1][1]) < _EPS):
+        pts.append(pts[0])
+    area = _signed_area_2d(pts)
+    if ensure_ccw and not reverse_for_hole and area < 0:
+        pts = list(reversed(pts[:-1]))
+        pts.append(pts[0])
+    elif reverse_for_hole and area > 0:
+        # Inner curves must be CW (negative area)
+        pts = list(reversed(pts[:-1]))
+        pts.append(pts[0])
+    ifc_pts = [pt2(f, x, y) for x, y in pts]
+    return f.create_entity("IfcPolyline", Points=ifc_pts)
+
+
 def profile_from_points(
     f: ifcopenshell.file,
-    points_2d: Sequence[tuple[float, float]],
+    points_2d_or_path: Any,
     profile_name: str | None = None,
     ensure_ccw: bool = True,
 ) -> ifcopenshell.entity_instance:
     """
-    Create IfcArbitraryClosedProfileDef from a list of (x, y) tuples.
+    Create an IFC profile from a list of (x, y) tuples or a Path.
+
+    - ``IfcArbitraryClosedProfileDef`` when the input has no holes.
+    - ``IfcArbitraryProfileDefWithVoids`` when the input is a ``Path``
+      that carries one or more holes (set via ``Path.with_hole()``).
+
+    Accepts:
+      - A list of (x, y) tuples.
+      - A Path instance (calls to_profile_points(); holes are also converted).
+      - Any object with to_profile_points() method.
     The list is automatically closed (first == last) if not already.
-    If ensure_ccw=True, reverses orientation for positive signed area (CCW).
+    If ensure_ccw=True, outer curve is forced CCW; inner curves are forced CW.
     """
-    pts = list(points_2d)
-    # Close the profile if not already closed (epsilon comparison for float safety).
-    _EPS = 1e-9
-    if not (abs(pts[0][0] - pts[-1][0]) < _EPS and abs(pts[0][1] - pts[-1][1]) < _EPS):
-        pts.append(pts[0])
-    # CCW normalization (C# approach for viewer compatibility)
-    if ensure_ccw and _signed_area_2d(pts) < 0:
-        pts = list(reversed(pts[:-1]))  # reverse, drop duplicate end point
-        pts.append(pts[0])  # re-close
-    ifc_pts = [pt2(f, x, y) for x, y in pts]
-    polyline = f.create_entity("IfcPolyline", Points=ifc_pts)
+    from ifckit.geometry import Path
+
+    holes: list = []
+    if isinstance(points_2d_or_path, Path):
+        holes = points_2d_or_path.holes  # list of Path
+        points_2d_or_path = points_2d_or_path.to_profile_points()
+    elif hasattr(points_2d_or_path, "to_profile_points"):
+        points_2d_or_path = points_2d_or_path.to_profile_points()
+
+    outer_polyline = _pts_to_polyline(f, list(points_2d_or_path), ensure_ccw=ensure_ccw)
+
+    if not holes:
+        return f.create_entity(
+            "IfcArbitraryClosedProfileDef",
+            ProfileType="AREA",
+            ProfileName=profile_name,
+            OuterCurve=outer_polyline,
+        )
+
+    # Build inner curve polylines (CW winding for IFC voids)
+    inner_polylines = []
+    for hole in holes:
+        if isinstance(hole, Path):
+            hole_pts = hole.to_profile_points()
+        elif hasattr(hole, "to_profile_points"):
+            hole_pts = hole.to_profile_points()
+        else:
+            hole_pts = list(hole)
+        inner_polylines.append(
+            _pts_to_polyline(f, hole_pts, ensure_ccw=False, reverse_for_hole=True)
+        )
+
     return f.create_entity(
-        "IfcArbitraryClosedProfileDef",
+        "IfcArbitraryProfileDefWithVoids",
         ProfileType="AREA",
         ProfileName=profile_name,
-        OuterCurve=polyline,
+        OuterCurve=outer_polyline,
+        InnerCurves=inner_polylines,
     )
 
 

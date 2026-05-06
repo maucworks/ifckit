@@ -185,6 +185,10 @@ class PendingDoor(PendingElement):
                           ``"NOTDEFINED"``.
         type_ref:         Optional stable string id / key of the
                           ``PendingDoorType`` to assign.
+        plane:            Optional insert plane for Model B (component_graph mode).
+                          Origin = insert point, X-axis = width direction,
+                          Z-axis = outward normal.
+        component_graph:  Optional component graph preset name (e.g., "door_flush").
         name:             Element name (``IfcDoor.Name``).
         style:            Optional render style.
         properties:       Free-form user properties.
@@ -198,6 +202,8 @@ class PendingDoor(PendingElement):
         overall_height: float,
         operation_type: str = "NOTDEFINED",
         type_ref: Optional[str] = None,
+        plane: Optional[Plane] = None,
+        component_graph: Optional[str] = None,
         name: str = "",
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
@@ -219,6 +225,8 @@ class PendingDoor(PendingElement):
         self.overall_height = float(overall_height)
         self.operation_type = op
         self.type_ref = type_ref
+        self.plane = plane
+        self.component_graph = component_graph
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -231,6 +239,10 @@ class PendingDoor(PendingElement):
         d["operation_type"] = self.operation_type
         if self.type_ref is not None:
             d["type_ref"] = self.type_ref
+        if self.plane is not None:
+            d["plane"] = self.plane.to_dict()
+        if self.component_graph is not None:
+            d["component_graph"] = self.component_graph
         return d
 
     @classmethod
@@ -240,6 +252,8 @@ class PendingDoor(PendingElement):
             overall_height=cls._require(d, "overall_height"),
             operation_type=d.get("operation_type", "NOTDEFINED"),
             type_ref=d.get("type_ref"),
+            plane=Plane.from_dict(d["plane"]) if "plane" in d else None,
+            component_graph=d.get("component_graph"),
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
             properties=cls._properties_from_dict(d),
@@ -261,6 +275,10 @@ class PendingWindow(PendingElement):
         window_type:    One of ``WINDOW_TYPES``.  Defaults to ``"NOTDEFINED"``.
         type_ref:       Optional stable string id / key of the
                         ``PendingWindowType`` to assign.
+        plane:          Optional insert plane for Model B (component_graph mode).
+                        Origin = insert point, X-axis = width direction,
+                        Z-axis = outward normal.
+        component_graph: Optional component graph preset name (e.g., "fixed_casement").
         name:           Element name (``IfcWindow.Name``).
         style:          Optional render style.
         properties:     Free-form user properties.
@@ -274,6 +292,8 @@ class PendingWindow(PendingElement):
         overall_height: float,
         window_type: str = "NOTDEFINED",
         type_ref: Optional[str] = None,
+        plane: Optional[Plane] = None,
+        component_graph: Optional[str] = None,
         name: str = "",
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
@@ -297,6 +317,8 @@ class PendingWindow(PendingElement):
         self.overall_height = float(overall_height)
         self.window_type = wt
         self.type_ref = type_ref
+        self.plane = plane
+        self.component_graph = component_graph
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -309,6 +331,10 @@ class PendingWindow(PendingElement):
         d["window_type"] = self.window_type
         if self.type_ref is not None:
             d["type_ref"] = self.type_ref
+        if self.plane is not None:
+            d["plane"] = self.plane.to_dict()
+        if self.component_graph is not None:
+            d["component_graph"] = self.component_graph
         return d
 
     @classmethod
@@ -318,6 +344,8 @@ class PendingWindow(PendingElement):
             overall_height=cls._require(d, "overall_height"),
             window_type=d.get("window_type", "NOTDEFINED"),
             type_ref=d.get("type_ref"),
+            plane=Plane.from_dict(d["plane"]) if "plane" in d else None,
+            component_graph=d.get("component_graph"),
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
             properties=cls._properties_from_dict(d),

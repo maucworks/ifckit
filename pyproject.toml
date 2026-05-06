@@ -58,6 +58,9 @@ ifckit = "ifckit.__main__:main"
 where   = ["."]
 include = ["ifckit*"]
 
+[tool.setuptools.package-data]
+ifckit = ["window_types/*.json"]
+
 [tool.ruff]
 line-length    = 100
 target-version = "py310"

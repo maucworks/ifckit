@@ -40,7 +40,7 @@ from ifckit.builders._geom import (
     shape_representation,
 )
 from ifckit.builders.psets import write_psets
-from ifckit.geometry import Vec
+from ifckit.geometry import Plane, Vec
 from ifckit.profiles.anchor import anchor_offset
 
 
@@ -139,4 +139,64 @@ def build_opening(
     )
 
     write_psets(ifc_file, opening, pending)
+    return opening
+
+
+def build_opening_from_solids(
+    ifc_file: ifcopenshell.file,
+    plane: Plane,
+    solids: list,
+    host_entity: ifcopenshell.entity_instance,
+    context: ifcopenshell.entity_instance,
+    name: str = "",
+) -> ifcopenshell.entity_instance | None:
+    """
+    Create an IfcOpeningElement from pre-built IFC solids.
+
+    Used by Model B when ``opening_nodes`` produces one or more solids.
+    If *solids* is empty (all opening nodes have ``output: false``), returns
+    ``None`` — no opening is created.
+
+    Args:
+        ifc_file:    Open ifcopenshell file.
+        plane:       Insert plane defining the opening's local coordinate frame.
+                     Origin = insert point, X = width direction, Z = outward normal.
+        solids:      List of IfcExtrudedAreaSolid (or similar) entities produced
+                     by ``evaluate_opening_nodes()``.
+        host_entity: IfcWall / IfcSlab / IfcRoof entity to void.
+        context:     Body sub-context.
+        name:        Optional name for the IfcOpeningElement.
+
+    Returns:
+        The created ``IfcOpeningElement``, or ``None`` if *solids* is empty.
+    """
+    if not solids:
+        return None
+
+    if len(solids) == 1:
+        shape_rep = shape_representation(ifc_file, context, solids[0], rep_type="SweptSolid")
+    else:
+        shape_rep = shape_representation(ifc_file, context, solids[0], rep_type="SweptSolid")
+        for solid in solids[1:]:
+            shape_rep.Items = list(shape_rep.Items) + [solid]
+
+    prod_rep = product_definition_shape(ifc_file, shape_rep)
+
+    opening = ifcopenshell.api.run(
+        "root.create_entity",
+        ifc_file,
+        ifc_class="IfcOpeningElement",
+        name=name,
+    )
+    opening.Representation = prod_rep
+    opening.ObjectPlacement = local_placement(
+        ifc_file, plane, relative_to=host_entity.ObjectPlacement
+    )
+
+    ifc_file.create_entity(
+        "IfcRelVoidsElement",
+        GlobalId=ifcopenshell.guid.new(),
+        RelatingBuildingElement=host_entity,
+        RelatedOpeningElement=opening,
+    )
     return opening

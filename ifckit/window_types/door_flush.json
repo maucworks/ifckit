@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "parameters": {
+    "w": 1000,
+    "h": 1000,
+    "door_depth": 0.044
+  },
+  "opening_nodes": [
+    {
+      "id": "opening_rect",
+      "op": "rect",
+      "p0": [0, 0],
+      "p1": ["$w", "$h"]
+    },
+    {
+      "id": "opening_void",
+      "op": "extrude",
+      "profile": "opening_rect",
+      "depth": "$wall_thickness",
+      "z_offset": 0,
+      "output": true,
+      "role": "Opening"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "door_rect",
+      "op": "rect",
+      "p0": [0, 0],
+      "p1": ["$w", "$h"]
+    },
+    {
+      "id": "door_leaf",
+      "op": "extrude",
+      "profile": "door_rect",
+      "depth": "$door_depth",
+      "z_offset": 0,
+      "output": true,
+      "role": "Door"
+    }
+  ]
+}

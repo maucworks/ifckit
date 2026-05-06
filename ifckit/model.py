@@ -163,19 +163,35 @@ class IfcModel:
         """
         Validate and build a pending element, placing it in *container*.
 
+        Model B shortcut: if *pending* is a PendingWindow or PendingDoor with
+        ``component_graph`` set and *container* is an EntityHandle wrapping a
+        wall/slab host, the opening is generated automatically from the preset's
+        ``opening_component`` section.
+
         Args:
             pending:   Any ``PendingElement`` subclass (PendingBeam, PendingWall, …).
-            container: The spatial container — a ``StoreyHandle`` (IFC4 building) or
-                       a ``BridgePartHandle`` (IFC4X3 bridge).
+            container: The spatial container — a ``StoreyHandle`` (IFC4 building),
+                       a ``BridgePartHandle`` (IFC4X3 bridge), or an
+                       ``EntityHandle`` wrapping a wall/slab host (Model B only).
 
         Returns:
             ``EntityHandle`` wrapping the created IFC entity.
 
         Raises:
-            TypeError:    If *container* is not a StoreyHandle or BridgePartHandle.
+            TypeError:    If *container* is not a recognised container type.
             LookupError:  If no builder is registered for the element type.
             ValueError:   If validation fails (message lists all errors).
         """
+        # ------------------------------------------------------------------
+        # Model B: PendingWindow/PendingDoor with component_graph + wall host
+        # ------------------------------------------------------------------
+        if (
+            isinstance(container, EntityHandle)
+            and getattr(pending, "component_graph", None) is not None
+            and type(pending).__name__ in ("PendingWindow", "PendingDoor")
+        ):
+            return self._add_fill_model_b(pending, container)
+
         if not isinstance(container, (StoreyHandle, BridgePartHandle)):
             raise TypeError(
                 f"model.add() expects a StoreyHandle or BridgePartHandle, "
@@ -197,6 +213,57 @@ class IfcModel:
         ctx = get_body_context(self._file)
         entity = builder.build(self._file, pending, container.entity, ctx)
         return EntityHandle(entity, self)
+
+    def _add_fill_model_b(
+        self,
+        pending: "PendingElement",
+        host: "EntityHandle",
+    ) -> "EntityHandle":
+        """
+        Model B internal: build opening + fill from a component_graph preset.
+
+        Args:
+            pending: PendingWindow or PendingDoor with plane + component_graph.
+            host:    EntityHandle wrapping the IfcWall/IfcSlab host.
+
+        Returns:
+            EntityHandle wrapping the created IfcWindow or IfcDoor.
+        """
+        from ifckit.builders._geom import get_body_context
+        from ifckit.builders.door_window import build_door_model_b, build_window_model_b
+
+        ctx = get_body_context(self._file)
+        storey = self._find_containing_storey(host.entity)
+
+        if type(pending).__name__ == "PendingWindow":
+            entity = build_window_model_b(self._file, pending, host.entity, storey, ctx)
+        else:
+            entity = build_door_model_b(self._file, pending, host.entity, storey, ctx)
+        return EntityHandle(entity, self)
+
+    def _find_containing_storey(
+        self,
+        entity: "ifcopenshell.entity_instance",
+    ) -> "ifcopenshell.entity_instance":
+        """
+        Walk IfcRelContainedInSpatialStructure to find the IfcBuildingStorey
+        that directly contains *entity*.
+
+        Returns:
+            IfcBuildingStorey entity.
+
+        Raises:
+            ValueError: If no containing storey is found.
+        """
+        for rel in self._file.by_type("IfcRelContainedInSpatialStructure"):
+            if entity in rel.RelatedElements:
+                structure = rel.RelatingStructure
+                if structure.is_a("IfcBuildingStorey"):
+                    return structure
+        raise ValueError(
+            f"_find_containing_storey: entity {entity!r} is not contained "
+            "in any IfcBuildingStorey in this file."
+        )
 
     # ------------------------------------------------------------------
     # IFC4 spatial hierarchy
@@ -803,6 +870,7 @@ class IfcModel:
             ctx,
             type_entity,
             opening_anchor=opening_anchor,
+            graph_name=getattr(pending, "component_graph", None),
         )
         return EntityHandle(window_entity, self)
 

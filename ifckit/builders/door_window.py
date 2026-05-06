@@ -20,9 +20,12 @@ Geometry convention (matching the opening builder):
 
 from __future__ import annotations
 
+from typing import Optional
+
 import ifcopenshell
 import ifcopenshell.api
 import ifcopenshell.guid
+import ifcopenshell.util.unit
 
 from ifckit.builders._geom import (
     axis2placement3d,
@@ -75,6 +78,95 @@ def _extract_window_lining_properties(
     return None
 
 
+def _build_fill_from_graph(
+    ifc_file: ifcopenshell.file,
+    ifc_class: str,
+    name: str,
+    overall_width: float,
+    overall_height: float,
+    graph_name: str,
+    pending,
+    opening_entity: ifcopenshell.entity_instance,
+    container: ifcopenshell.entity_instance,
+    context: ifcopenshell.entity_instance,
+    type_entity=None,
+    opening_anchor: str = "s",
+) -> ifcopenshell.entity_instance:
+    """Create a fill element whose geometry comes from a component-graph preset.
+
+    The graph is evaluated with ``w=overall_width``, ``h=overall_height`` plus
+    any extra parameters from the type entity's property sets.  The anchor
+    offset is applied as a translation on each component's solid placement so
+    that the fill sits flush inside the opening void.
+
+    Returns the created ``IfcDoor`` or ``IfcWindow`` entity.
+    """
+    from ifckit.builders.component_graph import evaluate_component_graph
+    from ifckit.geometry import Vec
+
+    dx, dy = anchor_offset(opening_anchor, overall_width, overall_height)
+
+    params: dict = {"w": overall_width, "h": overall_height}
+
+    components = evaluate_component_graph(graph_name, ifc_file, context, params)
+
+    # Each component solid has its own placement (z_offset from the graph).
+    # Apply the anchor (dx, dy) as an additional XY translation on each placement.
+    solids = []
+    for comp in components:
+        solid = comp.solid
+        # Shift the existing placement by (dx, dy, 0): rebuild the placement.
+        existing_pos = solid.Position
+        old_origin = existing_pos.Location
+        ox = old_origin.Coordinates[0] + dx
+        oy = old_origin.Coordinates[1] + dy
+        oz = old_origin.Coordinates[2]
+        new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
+        solid.Position = new_placement
+        solids.append(solid)
+
+    # Build shape representation with all component solids.
+    shape_rep = ifc_file.create_entity(
+        "IfcShapeRepresentation",
+        ContextOfItems=context,
+        RepresentationIdentifier="Body",
+        RepresentationType="SweptSolid",
+        Items=solids,
+    )
+    prod_rep = product_definition_shape(ifc_file, shape_rep)
+
+    fill = ifcopenshell.api.run(
+        "root.create_entity",
+        ifc_file,
+        ifc_class=ifc_class,
+        name=name,
+    )
+    fill.Representation = prod_rep
+    fill.OverallWidth = overall_width
+    fill.OverallHeight = overall_height
+    fill.ObjectPlacement = _relative_to_opening(ifc_file, opening_entity.ObjectPlacement)
+
+    ifcopenshell.api.run(
+        "spatial.assign_container",
+        ifc_file,
+        products=[fill],
+        relating_structure=container,
+    )
+
+    ifc_file.create_entity(
+        "IfcRelFillsElement",
+        GlobalId=ifcopenshell.guid.new(),
+        RelatingOpeningElement=opening_entity,
+        RelatedBuildingElement=fill,
+    )
+
+    if type_entity is not None:
+        _assign_type(ifc_file, fill, type_entity)
+
+    write_psets(ifc_file, fill, pending)
+    return fill
+
+
 def _build_fill(
     ifc_file: ifcopenshell.file,
     ifc_class: str,  # "IfcDoor" or "IfcWindow"
@@ -87,15 +179,36 @@ def _build_fill(
     context: ifcopenshell.entity_instance,
     type_entity=None,  # Optional IfcDoorType / IfcWindowType
     opening_anchor: str = "s",  # anchor from the parent PendingOpening
+    graph_name: "str | None" = None,
 ) -> ifcopenshell.entity_instance:
     """
     Shared implementation for door and window fill creation.
+
+    If *graph_name* is provided, geometry is produced by the component-graph
+    evaluator (``_build_fill_from_graph``) instead of the built-in lining logic.
 
     Profile convention:
       - local X = width direction, local Y = height (UP), local Z = extrusion through wall.
       - ``opening_anchor`` shifts the profile rectangle so the origin sits at the
         correct anchor point (matching the opening void geometry).
     """
+    # Graph path: delegate entirely to _build_fill_from_graph.
+    if graph_name is not None:
+        return _build_fill_from_graph(
+            ifc_file=ifc_file,
+            ifc_class=ifc_class,
+            name=name,
+            overall_width=overall_width,
+            overall_height=overall_height,
+            graph_name=graph_name,
+            pending=pending,
+            opening_entity=opening_entity,
+            container=container,
+            context=context,
+            type_entity=type_entity,
+            opening_anchor=opening_anchor,
+        )
+
     from ifckit.geometry import Vec
 
     # Identity placement: fill shares the opening's local frame exactly.
@@ -271,6 +384,7 @@ def build_door(
     context: ifcopenshell.entity_instance,
     type_entity=None,
     opening_anchor: str = "s",
+    graph_name: "Optional[str]" = None,
 ) -> ifcopenshell.entity_instance:
     """
     Create an IfcDoor fill element inside *opening_entity*.
@@ -283,6 +397,7 @@ def build_door(
         context:         The Body sub-context.
         type_entity:     Optional IfcDoorType entity to assign.
         opening_anchor:  Anchor of the parent ``PendingOpening`` (default ``"s"``).
+        graph_name:      Optional component graph preset name (overrides pending.component_graph).
 
     Returns:
         The created ``IfcDoor`` entity.
@@ -299,6 +414,7 @@ def build_door(
         context=context,
         type_entity=type_entity,
         opening_anchor=opening_anchor,
+        graph_name=graph_name or getattr(pending, "component_graph", None),
     )
     _set_door_operation(ifc_file, door, pending.operation_type)
     return door
@@ -312,6 +428,7 @@ def build_window(
     context: ifcopenshell.entity_instance,
     type_entity=None,
     opening_anchor: str = "s",
+    graph_name: "Optional[str]" = None,
 ) -> ifcopenshell.entity_instance:
     """
     Create an IfcWindow fill element inside *opening_entity*.
@@ -324,6 +441,7 @@ def build_window(
         context:         The Body sub-context.
         type_entity:     Optional IfcWindowType entity to assign.
         opening_anchor:  Anchor of the parent ``PendingOpening`` (default ``"s"``).
+        graph_name:      Optional component graph preset name (overrides pending.component_graph).
 
     Returns:
         The created ``IfcWindow`` entity.
@@ -340,6 +458,7 @@ def build_window(
         context=context,
         type_entity=type_entity,
         opening_anchor=opening_anchor,
+        graph_name=graph_name or getattr(pending, "component_graph", None),
     )
     _set_window_type_attr(ifc_file, window, pending.window_type)
     return window
@@ -381,3 +500,212 @@ def _set_window_type_attr(
         except (AttributeError, RuntimeError):
             # Attribute absent in this schema variant — safe to skip.
             pass
+
+
+# ---------------------------------------------------------------------------
+# Model B helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
+    """
+    Extract wall thickness from an IfcWall or IfcSlab entity.
+
+    Strategy:
+    1. Look for IfcExtrudedAreaSolid in the host representation.
+       For a wall with a rectangular footprint, the profile is
+       IfcRectangleProfileDef with YDim = thickness.
+    2. Fallback: return 0.2 (200 mm, a common default).
+
+    Args:
+        host_entity: An IfcWall, IfcWallStandardCase, or IfcSlab entity.
+
+    Returns:
+        Thickness in project units (metres if SI).
+    """
+    try:
+        rep = host_entity.Representation
+        if rep is None:
+            return 0.2
+        for shape_rep in rep.Representations:
+            for item in shape_rep.Items:
+                # Direct IfcExtrudedAreaSolid
+                if item.is_a("IfcExtrudedAreaSolid"):
+                    area = item.SweptArea
+                    if area.is_a("IfcRectangleProfileDef"):
+                        # For a wall: XDim = length, YDim = thickness
+                        return float(area.YDim)
+                # IfcBooleanClippingResult wraps a solid
+                if item.is_a("IfcBooleanClippingResult"):
+                    first_op = item.FirstOperand
+                    if first_op.is_a("IfcExtrudedAreaSolid"):
+                        area = first_op.SweptArea
+                        if area.is_a("IfcRectangleProfileDef"):
+                            return float(area.YDim)
+    except Exception:  # noqa: BLE001
+        pass
+    return 0.2
+
+
+def build_window_model_b(
+    ifc_file: ifcopenshell.file,
+    pending,  # PendingWindow with .plane and .component_graph set
+    host_entity: ifcopenshell.entity_instance,
+    container: ifcopenshell.entity_instance,  # IfcBuildingStorey
+    context: ifcopenshell.entity_instance,
+) -> ifcopenshell.entity_instance:
+    """
+    Model B: create an IfcOpeningElement + IfcWindow in one call.
+
+    The opening geometry is produced by evaluating the preset's
+    ``opening_nodes`` section. The fill geometry comes from ``nodes``.
+    Both node lists share the same reference-space scaling:
+    ``scale_x = actual_w / ref_w``, ``scale_y = actual_h / ref_h``.
+
+    If the preset has no ``opening_nodes``, or all opening nodes have
+    ``output: false``, no IfcOpeningElement is created (niche scenario).
+
+    Args:
+        ifc_file:    Open ifcopenshell file.
+        pending:     PendingWindow — must have ``plane`` and ``component_graph``.
+        host_entity: IfcWall or IfcSlab entity to void.
+        container:   IfcBuildingStorey for spatial containment of the window.
+        context:     Body sub-context.
+
+    Returns:
+        The created IfcWindow entity.
+
+    Raises:
+        ValueError: If pending.plane or pending.component_graph is not set.
+    """
+    from ifckit.builders.component_graph import evaluate_opening_nodes
+    from ifckit.builders.opening import build_opening_from_solids
+
+    if pending.plane is None:
+        raise ValueError(
+            "build_window_model_b: pending.plane must be set for Model B. "
+            "Provide a Plane that defines the insert position in the host wall."
+        )
+    if not pending.component_graph:
+        raise ValueError("build_window_model_b: pending.component_graph must be set for Model B.")
+
+    wall_thickness = _extract_wall_thickness(host_entity)
+    params = {
+        "w": pending.overall_width,
+        "h": pending.overall_height,
+        "wall_thickness": wall_thickness,
+    }
+
+    opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
+    opening_solids = [c.solid for c in opening_components]
+    opening_entity = build_opening_from_solids(
+        ifc_file,
+        pending.plane,
+        opening_solids,
+        host_entity,
+        context,
+        name=f"Opening-{pending.name}" if pending.name else "",
+    )
+
+    if opening_entity is None:
+        raise ValueError(
+            f"build_window_model_b: preset {pending.component_graph!r} "
+            "produced no opening solid (all opening_nodes have output: false "
+            "or opening_nodes is absent). Cannot create IfcOpeningElement."
+        )
+
+    window = _build_fill(
+        ifc_file=ifc_file,
+        ifc_class="IfcWindow",
+        name=pending.name,
+        overall_width=pending.overall_width,
+        overall_height=pending.overall_height,
+        pending=pending,
+        opening_entity=opening_entity,
+        container=container,
+        context=context,
+        type_entity=None,
+        opening_anchor="s",
+        graph_name=pending.component_graph,
+    )
+    _set_window_type_attr(ifc_file, window, pending.window_type)
+    return window
+
+
+def build_door_model_b(
+    ifc_file: ifcopenshell.file,
+    pending,  # PendingDoor with .plane and .component_graph set
+    host_entity: ifcopenshell.entity_instance,
+    container: ifcopenshell.entity_instance,  # IfcBuildingStorey
+    context: ifcopenshell.entity_instance,
+) -> ifcopenshell.entity_instance:
+    """
+    Model B: create an IfcOpeningElement + IfcDoor in one call.
+
+    See ``build_window_model_b`` for full documentation.
+
+    Args:
+        ifc_file:    Open ifcopenshell file.
+        pending:     PendingDoor — must have ``plane`` and ``component_graph``.
+        host_entity: IfcWall or IfcSlab entity to void.
+        container:   IfcBuildingStorey for spatial containment of the door.
+        context:     Body sub-context.
+
+    Returns:
+        The created IfcDoor entity.
+
+    Raises:
+        ValueError: If pending.plane or pending.component_graph is not set.
+    """
+    from ifckit.builders.component_graph import evaluate_opening_nodes
+    from ifckit.builders.opening import build_opening_from_solids
+
+    if pending.plane is None:
+        raise ValueError(
+            "build_door_model_b: pending.plane must be set for Model B. "
+            "Provide a Plane that defines the insert position in the host wall."
+        )
+    if not pending.component_graph:
+        raise ValueError("build_door_model_b: pending.component_graph must be set for Model B.")
+
+    wall_thickness = _extract_wall_thickness(host_entity)
+    params = {
+        "w": pending.overall_width,
+        "h": pending.overall_height,
+        "wall_thickness": wall_thickness,
+    }
+
+    opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
+    opening_solids = [c.solid for c in opening_components]
+    opening_entity = build_opening_from_solids(
+        ifc_file,
+        pending.plane,
+        opening_solids,
+        host_entity,
+        context,
+        name=f"Opening-{pending.name}" if pending.name else "",
+    )
+
+    if opening_entity is None:
+        raise ValueError(
+            f"build_door_model_b: preset {pending.component_graph!r} "
+            "produced no opening solid (all opening_nodes have output: false "
+            "or opening_nodes is absent). Cannot create IfcOpeningElement."
+        )
+
+    door = _build_fill(
+        ifc_file=ifc_file,
+        ifc_class="IfcDoor",
+        name=pending.name,
+        overall_width=pending.overall_width,
+        overall_height=pending.overall_height,
+        pending=pending,
+        opening_entity=opening_entity,
+        container=container,
+        context=context,
+        type_entity=None,
+        opening_anchor="s",
+        graph_name=pending.component_graph,
+    )
+    _set_door_operation(ifc_file, door, pending.operation_type)
+    return door

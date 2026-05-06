@@ -178,6 +178,8 @@ class PendingDoorType(PendingTypeObject):
         panel_depth: Optional[float] = None,
         panel_width: Optional[float] = None,
         panel_operation: Optional[str] = None,
+        # JSON component graph for geometry (optional)
+        component_graph: Optional[str] = None,
         # Extra user properties
         properties: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -216,6 +218,8 @@ class PendingDoorType(PendingTypeObject):
         self.panel_depth = panel_depth
         self.panel_width = panel_width
         self.panel_operation = panel_operation
+        # Component graph
+        self.component_graph: Optional[str] = component_graph
         # Extra
         self.properties: Dict[str, Any] = properties or {}
         # Resolve key now that all fields are set
@@ -242,6 +246,7 @@ class PendingDoorType(PendingTypeObject):
             "panel_depth": self.panel_depth,
             "panel_width": self.panel_width,
             "panel_operation": self.panel_operation,
+            "component_graph": self.component_graph,
         }
 
     # ------------------------------------------------------------------
@@ -276,6 +281,8 @@ class PendingDoorType(PendingTypeObject):
             val = getattr(self, field)
             if val is not None:
                 d[field] = val
+        if self.component_graph is not None:
+            d["component_graph"] = self.component_graph
         if self.properties:
             d["properties"] = self.properties
         return d
@@ -303,6 +310,7 @@ class PendingDoorType(PendingTypeObject):
             panel_depth=d.get("panel_depth"),
             panel_width=d.get("panel_width"),
             panel_operation=d.get("panel_operation"),
+            component_graph=d.get("component_graph"),
             properties=d.get("properties") or {},
         )
 
@@ -373,6 +381,8 @@ class PendingWindowType(PendingTypeObject):
         panel_width: Optional[float] = None,
         panel_height: Optional[float] = None,
         panel_operation: Optional[str] = None,
+        # JSON component graph for geometry (optional)
+        component_graph: Optional[str] = None,
         # Extra user properties
         properties: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -411,6 +421,8 @@ class PendingWindowType(PendingTypeObject):
         self.panel_width = panel_width
         self.panel_height = panel_height
         self.panel_operation = panel_operation
+        # Component graph
+        self.component_graph: Optional[str] = component_graph
         # Extra
         self.properties: Dict[str, Any] = properties or {}
         # Resolve key now that all fields are set
@@ -437,6 +449,7 @@ class PendingWindowType(PendingTypeObject):
             "panel_width": self.panel_width,
             "panel_height": self.panel_height,
             "panel_operation": self.panel_operation,
+            "component_graph": self.component_graph,
         }
 
     # ------------------------------------------------------------------
@@ -468,6 +481,8 @@ class PendingWindowType(PendingTypeObject):
             val = getattr(self, field)
             if val is not None:
                 d[field] = val
+        if self.component_graph is not None:
+            d["component_graph"] = self.component_graph
         if self.properties:
             d["properties"] = self.properties
         return d
@@ -495,5 +510,6 @@ class PendingWindowType(PendingTypeObject):
             panel_width=d.get("panel_width"),
             panel_height=d.get("panel_height"),
             panel_operation=d.get("panel_operation"),
+            component_graph=d.get("component_graph"),
             properties=d.get("properties") or {},
         )
