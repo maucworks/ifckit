@@ -272,18 +272,21 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     from ifckit.elements.types import PendingDoorType, PendingWindowType
 
     type_map: Dict[str, Any] = {}  # name → PendingWindowType / PendingDoorType
+    type_entity_map: Dict[str, Any] = {}  # name → EntityHandle with IfcWindowType/IfcDoorType
 
     for dt_data in data.get("door_types", []):
         pending_dt = PendingDoorType.from_dict(dt_data)
-        model.add_door_type(pending_dt)
+        dt_handle = model.add_door_type(pending_dt)
         if pending_dt.name:
             type_map[pending_dt.name] = pending_dt
+            type_entity_map[pending_dt.name] = dt_handle
 
     for wt_data in data.get("window_types", []):
         pending_wt = PendingWindowType.from_dict(wt_data)
-        model.add_window_type(pending_wt)
+        wt_handle = model.add_window_type(pending_wt)
         if pending_wt.name:
             type_map[pending_wt.name] = pending_wt
+            type_entity_map[pending_wt.name] = wt_handle
 
     # -----------------------------------------------------------------------
     # Pass 2b — fills (windows + doors nested directly in elements)
@@ -368,7 +371,14 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         parameters=merged_params if merged_params else None,
                         material_overrides=merged_materials if merged_materials else None,
                     )
-                    model.add(pending_win, host_handle)
+                    win_handle = model.add(pending_win, host_handle)
+
+                    # Assign type if defined
+                    if type_ref and type_ref in type_entity_map:
+                        from ifckit.builders.door_window import _assign_type
+
+                        wt_entity = type_entity_map[type_ref].entity
+                        _assign_type(model.ifc_file, win_handle.entity, wt_entity)
 
                 for dk, door_data in enumerate(elem_data.get("doors", [])):
                     type_ref = door_data.get("type_ref")
@@ -432,7 +442,14 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         parameters=merged_params if merged_params else None,
                         material_overrides=merged_materials if merged_materials else None,
                     )
-                    model.add(pending_door, host_handle)
+                    door_handle = model.add(pending_door, host_handle)
+
+                    # Assign type if defined
+                    if type_ref and type_ref in type_entity_map:
+                        from ifckit.builders.door_window import _assign_type
+
+                        dt_entity = type_entity_map[type_ref].entity
+                        _assign_type(model.ifc_file, door_handle.entity, dt_entity)
 
     # -----------------------------------------------------------------------
     # Drawings
