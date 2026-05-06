@@ -58,7 +58,8 @@
                    "overall_height": 500.0,
                     "type_ref": "WT-2000x500",
                     "parameters": {
-                      "lining_thickness": 10.0
+                      "lining_thickness": 10.0,
+                      "lining_depth": 50.0
                     }
                  }
                ]
