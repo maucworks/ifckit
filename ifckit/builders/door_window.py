@@ -573,11 +573,12 @@ def _apply_material_to_solid(
     material_def: Optional[dict],
 ) -> ifcopenshell.entity_instance:
     """
-    Wrap solid in IfcStyledItem with color and transparency styling.
+    Create an IfcStyledItem referencing the solid with color and transparency.
 
-    The IfcStyledItem wraps the representation item and applies visual styling
-    via IfcSurfaceStyle (color + transparency). Returns the IfcStyledItem which
-    replaces the solid in the representation Items list.
+    The IfcStyledItem is created as a standalone entity in the file — it must
+    NOT replace the solid in the representation Items list, because SweptSolid
+    representations require raw solids as items. Returns the original solid
+    unchanged so callers can safely append it to the items list.
 
     Args:
         ifc_file: IFC file object
@@ -588,7 +589,7 @@ def _apply_material_to_solid(
             - name: optional material name
 
     Returns:
-        IfcStyledItem wrapping the solid, or the solid unchanged if no material_def.
+        The original solid (unchanged).
     """
     if not material_def:
         return solid
@@ -620,14 +621,17 @@ def _apply_material_to_solid(
         Styles=[shading],
     )
 
-    # Create styled item wrapping the solid
-    styled_item = ifc_file.create_entity(
+    # Create styled item referencing the solid.
+    # IfcStyledItem must NOT be placed in the representation Items list —
+    # SweptSolid representations require raw solids as items. The styled item
+    # lives standalone in the file; geometry processors find it via Item=solid.
+    ifc_file.create_entity(
         "IfcStyledItem",
         Item=solid,
         Styles=[surface_style],
     )
 
-    return styled_item
+    return solid
 
 
 def build_window_model_b(
@@ -700,23 +704,9 @@ def build_window_model_b(
         new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
         solid.Position = new_placement
 
-        # Apply material if defined in component or overridden by pending
-        material = comp.material
-        if pending.material_overrides and comp.role in pending.material_overrides:
-            # Occurrence-level material override takes precedence
-            material_override = pending.material_overrides[comp.role]
-            if material and material_override:
-                # Merge: override fills in missing keys from component default
-                merged_material = material.copy()
-                merged_material.update(material_override)
-                material = merged_material
-            elif material_override:
-                material = material_override
-
-        # Apply styling to solid if material is defined
-        if material:
-            solid = _apply_material_to_solid(ifc_file, solid, material)
-
+        # Opening solids are voids — do NOT wrap in IfcStyledItem.
+        # Styling an opening solid puts an IfcStyledItem into the SweptSolid
+        # representation, which breaks ifcopenshell geometry processing.
         opening_solids.append(solid)
 
     opening_entity = build_opening_from_solids(
@@ -817,23 +807,9 @@ def build_door_model_b(
         new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
         solid.Position = new_placement
 
-        # Apply material if defined in component or overridden by pending
-        material = comp.material
-        if pending.material_overrides and comp.role in pending.material_overrides:
-            # Occurrence-level material override takes precedence
-            material_override = pending.material_overrides[comp.role]
-            if material and material_override:
-                # Merge: override fills in missing keys from component default
-                merged_material = material.copy()
-                merged_material.update(material_override)
-                material = merged_material
-            elif material_override:
-                material = material_override
-
-        # Apply styling to solid if material is defined
-        if material:
-            solid = _apply_material_to_solid(ifc_file, solid, material)
-
+        # Opening solids are voids — do NOT wrap in IfcStyledItem.
+        # Styling an opening solid puts an IfcStyledItem into the SweptSolid
+        # representation, which breaks ifcopenshell geometry processing.
         opening_solids.append(solid)
 
     opening_entity = build_opening_from_solids(

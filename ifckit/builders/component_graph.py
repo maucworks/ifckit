@@ -400,12 +400,17 @@ def _eval_node_list(
                     f"'extrude' node {node_id!r} references unknown profile: {profile_id!r}"
                 )
             # depth and z_offset are in the same units as the project (from params)
-            # Extrude direction is always -Z (backward through the wall)
+            # CONVENTION (DO NOT CHANGE):
+            #   - Extrusion direction is ALWAYS -Z (backward through the wall).
+            #   - z_offset in JSON is expressed as a positive value meaning
+            #     "distance into the wall from the outer face". We negate it here
+            #     so the placement origin moves in -Z before extruding further in -Z.
+            # Both choices must stay consistent — changing one without the other
+            # will silently mis-place all component geometry.
             depth = _eval_expr(node.get("depth", 0.1), resolved)
             z_offset_raw = node.get("z_offset", 0)
             z_offset_param = _eval_expr(z_offset_raw, resolved) if z_offset_raw != 0 else 0.0
-            # Apply -Z rule: negate z_offset so geometry goes backward
-            z_offset = -z_offset_param
+            z_offset = -z_offset_param  # negate: positive JSON value → move in -Z
 
             placement = axis2placement3d(ifc_file, Vec(0, 0, z_offset), Vec(0, 0, 1), Vec(1, 0, 0))
 
@@ -417,7 +422,7 @@ def _eval_node_list(
                 ifc_profile,
                 depth,
                 position=placement,
-                extrude_direction=(0.0, 0.0, -1.0),
+                extrude_direction=(0.0, 0.0, -1.0),  # ALWAYS -Z — see convention above
             )
             cache[node_id] = solid
 
