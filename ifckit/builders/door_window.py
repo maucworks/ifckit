@@ -575,11 +575,11 @@ def _apply_material_to_solid(
     material_def: Optional[dict],
 ) -> ifcopenshell.entity_instance:
     """
-    Apply material styling to a solid (currently a no-op).
+    Wrap solid in IfcStyledItem with color and transparency styling.
 
-    NOTE: Proper IFC material styling via IfcMaterial or IfcSurfaceStyle is complex.
-    For now, this is a placeholder that returns the solid unchanged.
-    Material definitions can be stored in the component graph for future use.
+    The IfcStyledItem wraps the representation item and applies visual styling
+    via IfcSurfaceStyle (color + transparency). Returns the IfcStyledItem which
+    replaces the solid in the representation Items list.
 
     Args:
         ifc_file: IFC file object
@@ -590,10 +590,46 @@ def _apply_material_to_solid(
             - name: optional material name
 
     Returns:
-        The solid unchanged for now.
+        IfcStyledItem wrapping the solid, or the solid unchanged if no material_def.
     """
-    # TODO: Implement proper IFC material styling via IfcSurfaceStyle or IfcMaterial
-    return solid
+    if not material_def:
+        return solid
+
+    color_def = material_def.get("color", {})
+    transparency = material_def.get("transparency", 1.0)
+    name = material_def.get("name", "")
+
+    # Create RGB color entity
+    color = ifc_file.create_entity(
+        "IfcColourRgb",
+        Red=float(color_def.get("r", 1.0)),
+        Green=float(color_def.get("g", 1.0)),
+        Blue=float(color_def.get("b", 1.0)),
+    )
+
+    # Create surface style shading with color and transparency
+    shading = ifc_file.create_entity(
+        "IfcSurfaceStyleShading",
+        SurfaceColour=color,
+        Transparency=float(transparency),
+    )
+
+    # Create surface style
+    surface_style = ifc_file.create_entity(
+        "IfcSurfaceStyle",
+        Name=name or "Material",
+        Side="POSITIVE",
+        Styles=[shading],
+    )
+
+    # Create styled item wrapping the solid
+    styled_item = ifc_file.create_entity(
+        "IfcStyledItem",
+        Item=solid,
+        Styles=[surface_style],
+    )
+
+    return styled_item
 
 
 def build_window_model_b(

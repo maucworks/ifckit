@@ -166,7 +166,11 @@ class TestModelBWindow:
         )
         reps = window.entity.Representation.Representations
         body_rep = next(r for r in reps if r.RepresentationIdentifier == "Body")
-        profiles = [item.SweptArea.is_a() for item in body_rep.Items]
+        profiles = []
+        for item in body_rep.Items:
+            # Unwrap IfcStyledItem to access the actual solid
+            solid = item.Item if item.is_a("IfcStyledItem") else item
+            profiles.append(solid.SweptArea.is_a())
         assert "IfcArbitraryProfileDefWithVoids" in profiles
 
     def test_missing_plane_raises(self, model_with_wall):
