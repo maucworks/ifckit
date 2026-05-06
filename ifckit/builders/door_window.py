@@ -167,12 +167,10 @@ def _build_fill_from_graph(
     fill.OverallHeight = overall_height
     fill.ObjectPlacement = _relative_to_opening(ifc_file, opening_entity.ObjectPlacement)
 
-    ifcopenshell.api.run(
-        "spatial.assign_container",
-        ifc_file,
-        products=[fill],
-        relating_structure=container,
-    )
+    # NOTE: Do NOT assign fill to spatial structure container.
+    # Fills are part of the opening's composition and should be positioned
+    # relative to the opening, not the storey. Their spatial relationship
+    # is indirect through the opening element.
 
     ifc_file.create_entity(
         "IfcRelFillsElement",
