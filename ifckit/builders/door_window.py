@@ -107,6 +107,9 @@ def _build_fill_from_graph(
     dx, dy = anchor_offset(opening_anchor, overall_width, overall_height)
 
     params: dict = {"w": overall_width, "h": overall_height}
+    # Merge user-provided component graph parameters (occurrence-level overrides)
+    if pending.parameters:
+        params.update(pending.parameters)
 
     components = evaluate_component_graph(graph_name, ifc_file, context, params)
 
@@ -596,6 +599,9 @@ def build_window_model_b(
         "h": pending.overall_height,
         "wall_thickness": wall_thickness,
     }
+    # Merge user-provided component graph parameters (occurrence-level overrides)
+    if pending.parameters:
+        params.update(pending.parameters)
 
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
     opening_solids = [c.solid for c in opening_components]
@@ -690,6 +696,9 @@ def build_door_model_b(
         "h": pending.overall_height,
         "wall_thickness": wall_thickness,
     }
+    # Merge user-provided component graph parameters (occurrence-level overrides)
+    if pending.parameters:
+        params.update(pending.parameters)
 
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
     opening_solids = [c.solid for c in opening_components]

@@ -4,50 +4,46 @@ ifckit.json_build
 
 JSON to IFC building functions.
 
-Moved here to avoid import issues with 'ifckit.schema' being treated
-as a module vs package in some environments.
-
-3-pass build
-------------
+2-pass build (Model B only)
+----------------------------
 Pass 1 — spatial hierarchy + host elements (walls, slabs, spaces, …)
           Each element can carry an optional ``"id"`` field; the resulting
           ``EntityHandle`` is stored in a flat ``id_map`` dict keyed by
           that string.
 
 Pass 2 — door/window *types* (root-level ``door_types`` / ``window_types``
-          arrays) + *openings* (nested inside each element in the
-          per-storey ``elements`` array).
-          Host is implicit — the element that contains the opening.
-          n:1 supported: each opening may have multiple door/window fills.
-
-Pass 3 — *doors* and *windows* (nested inside each opening).
-          Each fill may supply ``type_ref`` to reference a root-level type.
+          arrays) + *doors* and *windows* (nested directly inside each element).
+          Every fill must reference a type via ``type_ref``.  The type carries
+          ``component_graph`` which drives the Model B opening + fill geometry.
 
 JSON schema
 -----------
 Root level::
 
-    "door_types":  [{ ...PendingDoorType fields... }]
-    "window_types":[{ ...PendingWindowType fields... }]
+    "door_types":  [{ ...PendingDoorType fields..., "component_graph": "door_flush" }]
+    "window_types":[{ ...PendingWindowType fields..., "component_graph": "fixed_casement" }]
 
-Per-storey elements (openings nested in element, fills nested in opening)::
+Per-storey elements (fills nested directly in element)::
 
     "elements": [
       {
         "id": "w1",
         "type": "basic_wall",
         ...,
-        "openings": [
+        "windows": [
           {
-            "plane": {...},
-            "width": 0.9,
-            "height": 2.1,
-            "doors": [
-              {"overall_width": 0.9, "overall_height": 2.1, "type_ref": "my-dt"}
-            ],
-            "windows": [
-              {"overall_width": 1.2, "overall_height": 1.4, "type_ref": "my-wt"}
-            ]
+            "plane": {"origin": {...}, "x_axis": {...}, "y_axis": {...}},
+            "overall_width": 1200.0,
+            "overall_height": 1000.0,
+            "type_ref": "WT-1200x1000"
+          }
+        ],
+        "doors": [
+          {
+            "plane": {"origin": {...}, "x_axis": {...}, "y_axis": {...}},
+            "overall_width": 900.0,
+            "overall_height": 2100.0,
+            "type_ref": "DT-900x2100"
           }
         ]
       }
@@ -113,7 +109,7 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
                 if required not in entry:
                     errors.append(f"{label}[{k}] missing required field '{required}'")
 
-    # per-element openings (nested) — light structural check
+    # per-element fills — light structural check
     for i, bldg in enumerate(data.get("buildings", [])):
         for j, storey in enumerate(bldg.get("storeys", [])):
             prefix = f"buildings[{i}].storeys[{j}]"
@@ -123,35 +119,37 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
                     continue
                 eprefix = f"{prefix}.elements[{m}]"
 
-                for k, op in enumerate(elem.get("openings", [])):
-                    if not isinstance(op, dict):
-                        errors.append(f"{eprefix}.openings[{k}] must be a dict")
-                        continue
-                    for required in ("plane", "width", "height"):
-                        if required not in op:
-                            errors.append(
-                                f"{eprefix}.openings[{k}] missing required field '{required}'"
-                            )
-
-                    for dk, door in enumerate(op.get("doors", [])):
-                        if not isinstance(door, dict):
-                            errors.append(f"{eprefix}.openings[{k}].doors[{dk}] must be a dict")
+                for section, label in (("windows", "window"), ("doors", "door")):
+                    for k, fill in enumerate(elem.get(section, [])):
+                        if not isinstance(fill, dict):
+                            errors.append(f"{eprefix}.{section}[{k}] must be a dict")
                             continue
-                        for required in ("overall_width", "overall_height"):
-                            if required not in door:
-                                path = f".openings[{k}].doors[{dk}]"
-                                errors.append(f"{eprefix}{path} missing field '{required}'")
-
-                    for wk, win in enumerate(op.get("windows", [])):
-                        if not isinstance(win, dict):
-                            errors.append(f"{eprefix}.openings[{k}].windows[{wk}] must be a dict")
-                            continue
-                        for required in ("overall_width", "overall_height"):
-                            if required not in win:
-                                path = f".openings[{k}].windows[{wk}]"
-                                errors.append(f"{eprefix}{path} missing field '{required}'")
+                        for required in ("plane", "overall_width", "overall_height", "type_ref"):
+                            if required not in fill:
+                                errors.append(
+                                    f"{eprefix}.{section}[{k}] missing required field '{required}'"
+                                )
 
     return JsonValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+# ---------------------------------------------------------------------------
+# _parse_plane
+# ---------------------------------------------------------------------------
+
+
+def _parse_plane(plane_data: Dict[str, Any]):
+    """Parse a plane dict to a Plane instance."""
+    from ifckit.geometry import Plane, Vec
+
+    def _vec(d):
+        return Vec(float(d["x"]), float(d["y"]), float(d["z"]))
+
+    return Plane(
+        origin=_vec(plane_data["origin"]),
+        x_axis=_vec(plane_data["x_axis"]),
+        y_axis=_vec(plane_data["y_axis"]),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -160,16 +158,16 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
 
 
 def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
-    """Build an IfcModel from a JSON dict.
+    """Build an IfcModel from a JSON dict (Model B only).
 
-    Uses a 3-pass approach:
+    Uses a 2-pass approach:
 
     * **Pass 1** – spatial hierarchy + host elements (walls, slabs, spaces).
       Elements with an ``"id"`` field are registered in a flat ``id_map``.
-    * **Pass 2** – door/window types (root-level arrays) + openings
-      (per-storey arrays).  Openings reference hosts via ``host_ref``.
-    * **Pass 3** – doors + windows (per-storey arrays).  Fills reference
-      openings via ``opening_ref`` and optionally a type via ``type_ref``.
+    * **Pass 2** – door/window types (root-level arrays) + fills (nested
+      directly in elements via ``"windows"`` and ``"doors"`` keys).
+      Each fill references a type via ``type_ref``; the type carries
+      ``component_graph`` which drives Model B opening + fill geometry.
 
     Args:
         data:        Validated JSON dict.
@@ -200,14 +198,13 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     site = model.add_site(site_data.get("name", "Site"))
 
     # Flat map: user-assigned string id → EntityHandle.
-    # Populated by pass 1 (elements) and pass 2 (openings).
     id_map: Dict[str, Any] = {}
 
-    # Storey handles keyed by (bldg_index, storey_index) for pass 2/3.
+    # Storey handles keyed by (bldg_index, storey_index) for pass 2.
     storey_map: Dict[tuple, Any] = {}
 
     # -----------------------------------------------------------------------
-    # Pass 2 — spatial hierarchy + host elements
+    # Pass 1 — spatial hierarchy + host elements
     # -----------------------------------------------------------------------
 
     for bi, bldg_data in enumerate(data.get("buildings", [])):
@@ -219,7 +216,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             )
             storey_map[(bi, si)] = storey
 
-            storey_ids: set = set()  # ids seen within this storey — duplicates are an error
+            storey_ids: set = set()
             for elem_data in storey_data.get("elements", []):
                 elem_type = elem_data.get("type")
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
@@ -248,13 +245,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     if elem_id in storey_ids:
                         raise ValueError(f"Duplicate element id {elem_id!r} in JSON")
                     storey_ids.add(elem_id)
-                    if elem_id in id_map:
-                        # Same id reused in a different storey (common GH pattern: one
-                        # wall component feeding N storey nodes).  Scope by storey index
-                        # so downstream opening lookups still resolve within each storey.
-                        scoped_id = f"{elem_id}__s{si}"
-                    else:
-                        scoped_id = elem_id
+                    scoped_id = f"{elem_id}__s{si}" if elem_id in id_map else elem_id
                     id_map[scoped_id] = handle
 
             # spaces[]
@@ -271,10 +262,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     if space_id in storey_ids:
                         raise ValueError(f"Duplicate element id {space_id!r} in JSON")
                     storey_ids.add(space_id)
-                    if space_id in id_map:
-                        scoped_id = f"{space_id}__s{si}"
-                    else:
-                        scoped_id = space_id
+                    scoped_id = f"{space_id}__s{si}" if space_id in id_map else space_id
                     id_map[scoped_id] = handle
 
     # -----------------------------------------------------------------------
@@ -283,105 +271,103 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
 
     from ifckit.elements.types import PendingDoorType, PendingWindowType
 
-    type_handle_map: Dict[str, Any] = {}  # type_key / name → EntityHandle
+    type_map: Dict[str, Any] = {}  # name → PendingWindowType / PendingDoorType
 
     for dt_data in data.get("door_types", []):
         pending_dt = PendingDoorType.from_dict(dt_data)
-        handle = model.add_door_type(pending_dt)
-        # Register under type_key and, if present, name.
-        type_handle_map[pending_dt.type_key] = handle
+        model.add_door_type(pending_dt)
         if pending_dt.name:
-            type_handle_map[pending_dt.name] = handle
+            type_map[pending_dt.name] = pending_dt
 
     for wt_data in data.get("window_types", []):
         pending_wt = PendingWindowType.from_dict(wt_data)
-        handle = model.add_window_type(pending_wt)
-        type_handle_map[pending_wt.type_key] = handle
+        model.add_window_type(pending_wt)
         if pending_wt.name:
-            type_handle_map[pending_wt.name] = handle
+            type_map[pending_wt.name] = pending_wt
 
     # -----------------------------------------------------------------------
-    # Pass 2b — openings + Pass 3 — doors/windows (nested in elements)
+    # Pass 2b — fills (windows + doors nested directly in elements)
     # -----------------------------------------------------------------------
 
-    from ifckit.elements.opening import PendingDoor, PendingOpening, PendingWindow
+    from ifckit.elements.opening import PendingDoor, PendingWindow
 
     for bi, bldg_data in enumerate(data.get("buildings", [])):
         for si, storey_data in enumerate(bldg_data.get("storeys", [])):
-            storey = storey_map[(bi, si)]
-
             for ei, elem_data in enumerate(storey_data.get("elements", [])):
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
                 elem_id = elem_data.get("id") or elem_dict.get("id")
-                # id may have been scoped to storey when duplicate across storeys
                 scoped = f"{elem_id}__s{si}" if elem_id else None
                 lookup_id = scoped if scoped in id_map else elem_id
                 if lookup_id not in id_map:
-                    continue  # element had no id, skip
+                    continue
 
                 host_handle = id_map[lookup_id]
                 eprefix = f"buildings[{bi}].storeys[{si}].elements[{ei}]"
 
-                for ki, op_data in enumerate(elem_data.get("openings", [])):
-                    pending_op = PendingOpening.from_dict(op_data)
-                    opening_handle = model.add_opening(
-                        pending_op, host=host_handle, container=storey
+                for wk, win_data in enumerate(elem_data.get("windows", [])):
+                    type_ref = win_data.get("type_ref")
+                    pending_wt = type_map.get(type_ref) if type_ref else None
+                    if type_ref and pending_wt is None:
+                        raise ValueError(
+                            f"{eprefix}.windows[{wk}]: "
+                            f"type_ref {type_ref!r} not found. "
+                            f"Available: {sorted(type_map)}"
+                        )
+                    if not isinstance(pending_wt, PendingWindowType):
+                        raise ValueError(
+                            f"{eprefix}.windows[{wk}]: type_ref {type_ref!r} is not a window type."
+                        )
+                    if not pending_wt.component_graph:
+                        raise ValueError(
+                            f"{eprefix}.windows[{wk}]: "
+                            f"window type {type_ref!r} has no component_graph — "
+                            'add "component_graph": "fixed_casement" (or similar) to the type.'
+                        )
+
+                    plane = _parse_plane(win_data["plane"])
+                    pending_win = PendingWindow(
+                        overall_width=float(win_data["overall_width"]),
+                        overall_height=float(win_data["overall_height"]),
+                        plane=plane,
+                        component_graph=pending_wt.component_graph,
+                        name=win_data.get("name", ""),
+                        parameters=win_data.get("parameters"),
                     )
+                    model.add(pending_win, host_handle)
 
-                    opprefix = f"{eprefix}.openings[{ki}]"
-
-                    for dk, door_data in enumerate(op_data.get("doors", [])):
-                        type_ref = door_data.get("type_ref")
-                        door_type_handle = type_handle_map.get(type_ref) if type_ref else None
-                        if type_ref and door_type_handle is None:
-                            raise ValueError(
-                                f"{opprefix}.doors[{dk}]: "
-                                f"type_ref {type_ref!r} not found. "
-                                f"Available: {sorted(type_handle_map)}"
-                            )
-                        pending_door = PendingDoor.from_dict(door_data)
-                        model.add_door(
-                            pending_door,
-                            opening=opening_handle,
-                            container=storey,
-                            door_type=door_type_handle,
-                            opening_anchor=pending_op.anchor,
+                for dk, door_data in enumerate(elem_data.get("doors", [])):
+                    type_ref = door_data.get("type_ref")
+                    pending_dt = type_map.get(type_ref) if type_ref else None
+                    if type_ref and pending_dt is None:
+                        raise ValueError(
+                            f"{eprefix}.doors[{dk}]: "
+                            f"type_ref {type_ref!r} not found. "
+                            f"Available: {sorted(type_map)}"
+                        )
+                    if not isinstance(pending_dt, PendingDoorType):
+                        raise ValueError(
+                            f"{eprefix}.doors[{dk}]: type_ref {type_ref!r} is not a door type."
+                        )
+                    if not pending_dt.component_graph:
+                        raise ValueError(
+                            f"{eprefix}.doors[{dk}]: "
+                            f"door type {type_ref!r} has no component_graph — "
+                            'add "component_graph": "door_flush" (or similar) to the type.'
                         )
 
-                    for wk, win_data in enumerate(op_data.get("windows", [])):
-                        type_ref = win_data.get("type_ref")
-                        win_type_handle = type_handle_map.get(type_ref) if type_ref else None
-                        if type_ref and win_type_handle is None:
-                            raise ValueError(
-                                f"{opprefix}.windows[{wk}]: "
-                                f"type_ref {type_ref!r} not found. "
-                                f"Available: {sorted(type_handle_map)}"
-                            )
-                        pending_win = PendingWindow.from_dict(win_data)
-                        model.add_window(
-                            pending_win,
-                            opening=opening_handle,
-                            container=storey,
-                            window_type=win_type_handle,
-                            opening_anchor=pending_op.anchor,
-                        )
-
-            # elements without an id can still have openings — walk again
-            for ei, elem_data in enumerate(storey_data.get("elements", [])):
-                elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
-                elem_id = elem_data.get("id") or elem_dict.get("id")
-                if elem_id in id_map:
-                    continue  # already handled above
-                if not elem_data.get("openings"):
-                    continue
-                raise ValueError(
-                    f"buildings[{bi}].storeys[{si}].elements[{ei}]: "
-                    f"element has openings but no 'id' field — add an 'id' so the "
-                    f"opening builder can resolve the host."
-                )
+                    plane = _parse_plane(door_data["plane"])
+                    pending_door = PendingDoor(
+                        overall_width=float(door_data["overall_width"]),
+                        overall_height=float(door_data["overall_height"]),
+                        plane=plane,
+                        component_graph=pending_dt.component_graph,
+                        name=door_data.get("name", ""),
+                        parameters=door_data.get("parameters"),
+                    )
+                    model.add(pending_door, host_handle)
 
     # -----------------------------------------------------------------------
-    # Drawings (unchanged)
+    # Drawings
     # -----------------------------------------------------------------------
 
     for drawing_data in data.get("drawings", []):

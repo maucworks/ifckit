@@ -207,6 +207,7 @@ class PendingDoor(PendingElement):
         name: str = "",
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
+        parameters: Optional[Dict[str, float]] = None,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
         if overall_width <= 0:
@@ -227,6 +228,7 @@ class PendingDoor(PendingElement):
         self.type_ref = type_ref
         self.plane = plane
         self.component_graph = component_graph
+        self.parameters = parameters or {}
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -243,6 +245,8 @@ class PendingDoor(PendingElement):
             d["plane"] = self.plane.to_dict()
         if self.component_graph is not None:
             d["component_graph"] = self.component_graph
+        if self.parameters:
+            d["parameters"] = self.parameters
         return d
 
     @classmethod
@@ -297,6 +301,7 @@ class PendingWindow(PendingElement):
         name: str = "",
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
+        parameters: Optional[Dict[str, float]] = None,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
         if overall_width <= 0:
@@ -319,6 +324,7 @@ class PendingWindow(PendingElement):
         self.type_ref = type_ref
         self.plane = plane
         self.component_graph = component_graph
+        self.parameters = parameters or {}
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -335,6 +341,8 @@ class PendingWindow(PendingElement):
             d["plane"] = self.plane.to_dict()
         if self.component_graph is not None:
             d["component_graph"] = self.component_graph
+        if self.parameters:
+            d["parameters"] = self.parameters
         return d
 
     @classmethod
