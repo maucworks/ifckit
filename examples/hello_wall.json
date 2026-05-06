@@ -9,16 +9,16 @@
   "site": {
     "name": "Example Site"
   },
-  "window_types": [
-    {
-      "name": "WT-2000x500",
-      "overall_width": 2000.0,
-        "overall_height": 500.0,
-        "lining_thickness": 100.0,
-        "lining_depth": 100.0,
-     "component_graph": "fixed_casement"
-    }
-  ],
+   "window_types": [
+     {
+         "name": "WT-2000x500",
+         "overall_width": 2000.0,
+         "overall_height": 500.0,
+         "lining_thickness": 100.0,
+         "lining_depth": 100.0,
+         "component_graph": "fixed_casement"
+     }
+   ],
   "buildings": [
     {
       "name": "Demo Building",
@@ -36,8 +36,8 @@
                 "footprint": [
                   [0.0, 0.0, 0.0],
                   [5000.0, 0.0, 0.0],
-                  [5000.0, 200.0, 0.0],
-                  [0.0, 200.0, 0.0]
+                  [5000.0, 300.0, 0.0],
+                  [0.0, 300.0, 0.0]
                 ],
                 "height": 3000.0,
                 "plane": {
@@ -56,11 +56,10 @@
                    },
                    "overall_width": 2000.0,
                    "overall_height": 500.0,
-                   "type_ref": "WT-2000x500",
-                   "parameters": {
-                     "lining_thickness": 10.0,
-                     "lining_depth": 100.0
-                   }
+                    "type_ref": "WT-2000x500",
+                    "parameters": {
+                      "lining_thickness": 10.0
+                    }
                  }
                ]
             }

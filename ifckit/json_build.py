@@ -325,13 +325,31 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         )
 
                     plane = _parse_plane(win_data["plane"])
+
+                    # Merge window type parameters with occurrence parameters
+                    # (occurrence-level overrides type-level)
+                    merged_params = {}
+                    if pending_wt.lining_depth is not None:
+                        merged_params["lining_depth"] = pending_wt.lining_depth
+                    if pending_wt.lining_thickness is not None:
+                        merged_params["lining_thickness"] = pending_wt.lining_thickness
+                    if pending_wt.panel_depth is not None:
+                        merged_params["panel_depth"] = pending_wt.panel_depth
+                    if pending_wt.panel_height is not None:
+                        merged_params["panel_height"] = pending_wt.panel_height
+                    if pending_wt.panel_width is not None:
+                        merged_params["panel_width"] = pending_wt.panel_width
+                    # Occurrence parameters override type parameters
+                    if win_data.get("parameters"):
+                        merged_params.update(win_data["parameters"])
+
                     pending_win = PendingWindow(
                         overall_width=float(win_data["overall_width"]),
                         overall_height=float(win_data["overall_height"]),
                         plane=plane,
                         component_graph=pending_wt.component_graph,
                         name=win_data.get("name", ""),
-                        parameters=win_data.get("parameters"),
+                        parameters=merged_params if merged_params else None,
                     )
                     model.add(pending_win, host_handle)
 
@@ -356,13 +374,29 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         )
 
                     plane = _parse_plane(door_data["plane"])
+
+                    # Merge door type parameters with occurrence parameters
+                    # (occurrence-level overrides type-level)
+                    merged_params = {}
+                    if pending_dt.lining_depth is not None:
+                        merged_params["lining_depth"] = pending_dt.lining_depth
+                    if pending_dt.lining_thickness is not None:
+                        merged_params["lining_thickness"] = pending_dt.lining_thickness
+                    if pending_dt.panel_depth is not None:
+                        merged_params["panel_depth"] = pending_dt.panel_depth
+                    if pending_dt.panel_width is not None:
+                        merged_params["panel_width"] = pending_dt.panel_width
+                    # Occurrence parameters override type parameters
+                    if door_data.get("parameters"):
+                        merged_params.update(door_data["parameters"])
+
                     pending_door = PendingDoor(
                         overall_width=float(door_data["overall_width"]),
                         overall_height=float(door_data["overall_height"]),
                         plane=plane,
                         component_graph=pending_dt.component_graph,
                         name=door_data.get("name", ""),
-                        parameters=door_data.get("parameters"),
+                        parameters=merged_params if merged_params else None,
                     )
                     model.add(pending_door, host_handle)
 
