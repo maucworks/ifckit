@@ -26,6 +26,8 @@ Usage::
 
 from __future__ import annotations
 
+import uuid
+
 import ifcopenshell
 
 from ifckit.builders._geom import (
@@ -40,6 +42,10 @@ from ifckit.builders._geom import (
 from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
+
+
+def _guid():
+    return ifcopenshell.guid.compress(uuid.uuid4().hex)
 
 
 class SectionedSpineBuilder(BaseBuilder):
@@ -95,8 +101,7 @@ class SectionedSpineBuilder(BaseBuilder):
             rep_type="Tessellation",
         )
 
-        # Wrap in IfcProductDefinitionShape for use in product
-        return product_definition_shape(ifc_file, shape_rep)
+        return shape_rep
 
     def _create_element(
         self,
@@ -105,13 +110,12 @@ class SectionedSpineBuilder(BaseBuilder):
         container: ifcopenshell.entity_instance,
         geometry: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        # Create a generic IFC entity - could be IfcBuildingElementProxy
-        # or a custom geometric entity
         element = ifc_file.create_entity(
             "IfcBuildingElementProxy",
+            GlobalId=_guid(),
             Name=pending.name or "SectionedSpine",
             Representation=product_definition_shape(ifc_file, geometry),
-            ObjectPlacement=container.ObjectPlacement,
+            ObjectPlacement=container.ObjectPlacement if container else None,
         )
 
         # Write properties if any

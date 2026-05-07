@@ -41,18 +41,12 @@ def test_basic_spike():
     # Build
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
-    shape = builder._create_geometry(ifc_file, pending, None, context)
-    # shape is now IfcProductDefinitionShape
-
-    element = ifc_file.create_entity(
-        "IfcBuildingElementProxy",
-        Name=pending.name,
-        Representation=shape,
-    )
+    shape_rep = builder._create_geometry(ifc_file, pending, None, context)
+    element = builder._create_element(ifc_file, pending, None, shape_rep)
 
     print(f"  Element: {element.is_a()} - {element.Name}")
     # Get the actual geometry from the representation
-    geom_item = shape.Representations[0].Items[0]
+    geom_item = shape_rep.Items[0]
     print(f"  Spine: {geom_item.is_a()}")
 
     model.save("output/test_sectioned_spine_basic.ifc")
@@ -93,16 +87,10 @@ def test_varying_profiles():
     # Build
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
-    shape = builder._create_geometry(ifc_file, pending, None, context)
-    # shape is now IfcProductDefinitionShape
+    shape_rep = builder._create_geometry(ifc_file, pending, None, context)
+    element = builder._create_element(ifc_file, pending, None, shape_rep)
 
-    element = ifc_file.create_entity(
-        "IfcBuildingElementProxy",
-        Name=pending.name,
-        Representation=shape,
-    )
-
-    geom_item = shape.Representations[0].Items[0]
+    geom_item = shape_rep.Items[0]
     print(f"  Element: {element.is_a()}")
     print(f"  Geometry: {geom_item.is_a()}")
     if geom_item.is_a() == "IfcPolygonalFaceSet":
@@ -138,16 +126,10 @@ def test_ibeam_spike():
     # Build
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
-    shape = builder._create_geometry(ifc_file, pending, None, context)
-    # shape is now IfcProductDefinitionShape
+    shape_rep = builder._create_geometry(ifc_file, pending, None, context)
+    element = builder._create_element(ifc_file, pending, None, shape_rep)
 
-    element = ifc_file.create_entity(
-        "IfcBuildingElementProxy",
-        Name=pending.name,
-        Representation=shape,
-    )
-
-    geom_item = shape.Representations[0].Items[0]
+    geom_item = shape_rep.Items[0]
     print(f"  Element: {element.is_a()}")
     print(f"  Geometry: {geom_item.is_a()}")
     if geom_item.is_a() == "IfcPolygonalFaceSet":
