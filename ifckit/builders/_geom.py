@@ -585,6 +585,48 @@ def _tessellate_sectioned_spine(
                 for i in range(segments)
             ]
             profile_rings.append(pts)
+        elif prof_def.is_a() == "IfcIShapeProfileDef":
+            w = prof_def.OverallWidth
+            h = prof_def.OverallDepth
+            tw = prof_def.WebThickness
+            tf = prof_def.FlangeThickness
+            # I-shape: 12 vertices (H-shape outline)
+            hw = w / 2
+            hh = h / 2
+            htw = tw / 2
+            pts = [
+                (-hw, -hh),  # bottom-left
+                (hw, -hh),  # bottom-right
+                (hw, -hh + tf),  # bottom flange top-right
+                (htw, -hh + tf),  # web bottom-right
+                (htw, hh - tf),  # web top-right
+                (hw, hh - tf),  # top flange bottom-right
+                (hw, hh),  # top-right
+                (-hw, hh),  # top-left
+                (-hw, hh - tf),  # top flange bottom-left
+                (-htw, hh - tf),  # web top-left
+                (-htw, -hh + tf),  # web bottom-left
+                (-hw, -hh + tf),  # bottom flange top-left
+            ]
+            profile_rings.append(pts)
+        elif prof_def.is_a() in (
+            "IfcArbitraryClosedProfileDef",
+            "IfcArbitraryProfileDefWithVoids",
+        ):
+            # Extract outer curve points
+            outer = prof_def.OuterCurve
+            if outer.is_a() == "IfcPolyline":
+                pts = [(pt.Coordinates[0], pt.Coordinates[1]) for pt in outer.Points]
+                # Remove closing point if present (last == first)
+                if (
+                    len(pts) > 1
+                    and abs(pts[0][0] - pts[-1][0]) < 1e-6
+                    and abs(pts[0][1] - pts[-1][1]) < 1e-6
+                ):
+                    pts = pts[:-1]
+                profile_rings.append(pts)
+            else:
+                profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
         else:
             # Fallback: use arbitrary small profile
             profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
