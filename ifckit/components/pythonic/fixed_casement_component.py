@@ -5,7 +5,7 @@ Alternative to fixed_casement.json. Creates a simple
 window with aluminum frame (with hole) and glazing panel.
 """
 
-from ifckit.builders._geom import extrude_profile, profile_from_points
+from ifckit.builders._geom import axis2placement3d, extrude_profile, profile_from_points
 from ifckit.components import EvaluatedComponent, WindowComponent, component
 from ifckit.geometry import Path, Vec
 
@@ -17,7 +17,7 @@ ALUMINUM_FRAME = {
 
 CLEAR_GLASS = {
     "color": {"r": 0.9, "g": 0.95, "b": 1.0},
-    "transparency": 0.8,
+    "transparency": 0.5,
     "name": "Clear glass",
 }
 
@@ -102,7 +102,7 @@ class FixedCasementComponent(WindowComponent):
             )
         )
 
-        # Glazing
+        # Glazing - positioned at center of lining depth
         glass_x0 = ltx
         glass_y0 = ltx
         glass_x1 = wx - ltx
@@ -118,8 +118,20 @@ class FixedCasementComponent(WindowComponent):
                     (glass_x0, glass_y1),
                 ],
             )
+            # Position at center: -(ld/2 - gd/2) to match JSON (negative Z)
+            z_offset = -(ld / 2 - gd / 2)
+            glass_position = axis2placement3d(
+                ifc_file,
+                Vec(0, 0, z_offset),
+                Vec(0, 0, 1),
+                Vec(1, 0, 0),
+            )
             glass_solid = extrude_profile(
-                ifc_file, glass_profile, depth=gd, extrude_direction=(0, 0, -1)
+                ifc_file,
+                glass_profile,
+                depth=gd,
+                position=glass_position,
+                extrude_direction=(0, 0, -1),
             )
             comps.append(
                 EvaluatedComponent(
