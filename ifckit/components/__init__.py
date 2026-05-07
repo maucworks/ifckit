@@ -77,11 +77,13 @@ class EvaluatedComponent:
              Common values: "Lining", "Glazing", "Panel", "Opening"
         material: Material definition dict, same structure as JSON.
                  Keys: "color" (r/g/b 0-1), "transparency" (0-1), "name"
+        node_id: Optional node identifier for tracking.
     """
 
     solid: "ifcopenshell.entity_instance"
     role: str
     material: dict | None = None
+    node_id: str | None = None
 
 
 class WindowComponent(ABC):
