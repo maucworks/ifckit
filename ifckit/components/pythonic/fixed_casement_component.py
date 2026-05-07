@@ -135,50 +135,36 @@ class FixedCasementComponent(WindowComponent):
 
 def profile_from_points_from_path(ifc_file, path: Path):
     """Create IFC profile from Path (supports holes)."""
-    curve = ifc_file.createIfcCompositeCurve(
-        [
-            ifc_file.createIfcPolyline(
-                [
-                    ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
-                    for seg in path.segments
-                ]
-                + [
-                    ifc_file.createIfcCartesianPoint(
-                        (path.segments[0].start.x, path.segments[0].start.y, 0.0)
-                    )
-                ]
-            )
-        ]
-    )
+    # Use IfcPolyline instead of CompositeCurve for better viewer compatibility
+    outer_points = [
+        ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0)) for seg in path.segments
+    ] + [
+        ifc_file.createIfcCartesianPoint((path.segments[0].start.x, path.segments[0].start.y, 0.0))
+    ]
+    outer_curve = ifc_file.createIfcPolyline(outer_points)
 
     if path.holes:
         # Create IfcArbitraryProfileDefWithVoids
         inner_curves = []
         for hole_path in path.holes:
-            hole_curve = ifc_file.createIfcCompositeCurve(
-                [
-                    ifc_file.createIfcPolyline(
-                        [
-                            ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
-                            for seg in hole_path.segments
-                        ]
-                        + [
-                            ifc_file.createIfcCartesianPoint(
-                                (hole_path.segments[0].start.x, hole_path.segments[0].start.y, 0.0)
-                            )
-                        ]
-                    )
-                ]
-            )
-            inner_curves.append(hole_curve)
+            inner_points = [
+                ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
+                for seg in hole_path.segments
+            ] + [
+                ifc_file.createIfcCartesianPoint(
+                    (hole_path.segments[0].start.x, hole_path.segments[0].start.y, 0.0)
+                )
+            ]
+            inner_curve = ifc_file.createIfcPolyline(inner_points)
+            inner_curves.append(inner_curve)
 
         return ifc_file.createIfcArbitraryProfileDefWithVoids(
             ProfileType="AREA",
-            OuterCurve=curve,
+            OuterCurve=outer_curve,
             InnerCurves=inner_curves,
         )
     else:
-        return ifc_file.createIfcArbitraryClosedProfileDef(OuterCurve=curve)
+        return ifc_file.createIfcArbitraryClosedProfileDef(OuterCurve=outer_curve)
 
 
 FixedCasementComponent.register()
