@@ -276,12 +276,75 @@ def extrude_profile(
     )
 
 
+def mapped_item(
+    f: ifcopenshell.file,
+    representation_map: ifcopenshell.entity_instance,
+    mapping_target: ifcopenshell.entity_instance | None = None,
+) -> ifcopenshell.entity_instance:
+    """Create IfcMappedItem referencing a RepresentationMap."""
+    if mapping_target is None:
+        mapping_target = axis2placement3d(
+            f,
+            Vec(0, 0, 0),
+            Vec(0, 0, 1),
+            Vec(1, 0, 0),
+        )
+    return f.create_entity(
+        "IfcMappedItem",
+        MappingSource=representation_map,
+        MappingTarget=mapping_target,
+    )
+
+
+def representation_map(
+    f: ifcopenshell.file,
+    context: ifcopenshell.entity_instance,
+    solid: ifcopenshell.entity_instance,
+    placement: ifcopenshell.entity_instance | None = None,
+    rep_type: str = "SweptSolid",
+) -> ifcopenshell.entity_instance:
+    """Create IfcRepresentationMap with ShapeRepresentation.
+
+    Use this to create a reusable geometry definition that can be
+    referenced via IfcMappedItem. This avoids issues with representation
+    rebuilding in viewers (e.g., TAB cycling in Bonsai).
+    """
+    if placement is None:
+        placement = axis2placement3d(
+            f,
+            Vec(0, 0, 0),
+            Vec(0, 0, 1),
+            Vec(1, 0, 0),
+        )
+    shape_rep = f.create_entity(
+        "IfcShapeRepresentation",
+        ContextOfItems=context,
+        RepresentationIdentifier="Body",
+        RepresentationType=rep_type,
+        Items=[solid],
+    )
+    return f.create_entity(
+        "IfcRepresentationMap",
+        MappingOrigin=placement,
+        MappedRepresentation=shape_rep,
+    )
+
+
 def shape_representation(
     f: ifcopenshell.file,
     context: ifcopenshell.entity_instance,
     solid: ifcopenshell.entity_instance,
     rep_type: str = "SweptSolid",
 ) -> ifcopenshell.entity_instance:
+    valid_types = (
+        "SweptSolid",
+        "SectionedSpine",
+        "Brep",
+        "Tessellation",
+        "MappedRepresentation",
+    )
+    if rep_type not in valid_types:
+        raise ValueError(f"Invalid rep_type '{rep_type}'. Must be one of: {valid_types}")
     return f.create_entity(
         "IfcShapeRepresentation",
         ContextOfItems=context,
@@ -312,6 +375,45 @@ def project_profile_to_plane(
     for p in points:
         local = plane.to_local(p)
         result.append((local.x, local.y))
+    return result
+
+
+def project_2d_to_plane(
+    points_2d: list[tuple[float, float]],
+    target_plane: "Plane",
+) -> list["Vec"]:
+    """Project 2D profile points onto a target plane.
+
+    Takes a list of 2D (u, v) coordinates (in world XY frame)
+    and projects them onto a target plane which may be rotated/tilted.
+
+    This allows you to:
+    - Define profiles with clean 90° angles in XY
+    - Then project them onto a skewed plane (e.g., sloped sill at 15°)
+
+    The resulting points lie on a plane parallel to the target plane,
+    at the target's origin.
+
+    Args:
+        points_2d: List of (u, v) coordinates in world XY
+        target_plane: Target plane (may be rotated/tilted)
+
+    Returns:
+        List of Vec points in 3D, on the target plane
+    """
+    origin = target_plane.origin
+    x_axis = target_plane.x_axis
+    y_axis = target_plane.y_axis
+
+    result = []
+    for u, v in points_2d:
+        # (U, V) in world coords → world position on target plane
+        # local (0,0,0) → origin
+        # local (U,0,0) → origin + U * x_axis
+        # local (0,V,0) → origin + V * y_axis
+        point = origin + x_axis * u + y_axis * v
+        result.append(point)
+
     return result
 
 
@@ -411,6 +513,206 @@ def directrix_from_path(
         "IfcCompositeCurve",
         Segments=ifc_segments,
         SelfIntersect=False,
+    )
+
+
+def _tessellate_sectioned_spine(
+    spine_curve: ifcopenshell.entity_instance,
+    cross_sections: list[ifcopenshell.entity_instance],
+    positions: list[ifcopenshell.entity_instance],
+    segments: int = 8,
+) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
+    """Tessellate IfcSectionedSpine data to vertices and face indices.
+
+    Converts the mathematical definition of a sectioned spine into a mesh.
+    Returns vertices (3D points) and face indices (triangles/quads).
+
+    Args:
+        spine_curve: IfcCompositeCurve (must have resolvable points)
+        cross_sections: List of IfcProfileDef
+        positions: List of IfcAxis2Placement3D
+        segments: Number of segments per profile (for roundness)
+
+    Returns:
+        Tuple of (vertices: list of (x, y, z), faces: list of index tuples)
+    """
+    import numpy as np
+
+    from ifckit.geometry import Vec
+
+    # Extract spine curve points
+    spine_points = []
+    for seg in spine_curve.Segments:
+        parent = seg.ParentCurve
+        if parent.is_a() == "IfcPolyline":
+            for pt in parent.Points:
+                coords = pt.Coordinates
+                spine_points.append((coords[0], coords[1], coords[2]))
+        elif parent.is_a() == "IfcLine":
+            # Line: Pnt + Dir*param
+            pnt = parent.Pnt.Coordinates
+            dir_vec = parent.Dir.DirectionRatios
+            for param in [0.0, 1.0]:
+                spine_points.append(
+                    (
+                        pnt[0] + dir_vec[0] * param,
+                        pnt[1] + dir_vec[1] * param,
+                        pnt[2] + dir_vec[2] * param,
+                    )
+                )
+
+    # Build axis frames at each position
+    axis_frames = []
+    for axis in positions:
+        origin = axis.Location.Coordinates
+        z_axis = axis.Axis.DirectionRatios if axis.Axis else (0, 0, 1)
+        x_axis = axis.RefDirection.DirectionRatios if axis.RefDirection else (1, 0, 0)
+
+        # Normalize
+        z_vec = Vec(*z_axis).normalized()
+        x_vec = Vec(*x_axis).normalized()
+        y_vec = z_vec.cross(x_vec).normalized()  # cross product
+
+        axis_frames.append(
+            {
+                "origin": Vec(*origin),
+                "x": x_vec,
+                "y": y_vec,
+                "z": z_vec,
+            }
+        )
+
+    # Extract profile points
+    profile_rings = []
+    for prof_def in cross_sections:
+        if prof_def.is_a() == "IfcRectangleProfileDef":
+            x_dim = prof_def.XDim
+            y_dim = prof_def.YDim
+            # Create rectangle outline
+            pts = [
+                (-x_dim / 2, -y_dim / 2),
+                (x_dim / 2, -y_dim / 2),
+                (x_dim / 2, y_dim / 2),
+                (-x_dim / 2, y_dim / 2),
+            ]
+            profile_rings.append(pts)
+        elif prof_def.is_a() == "IfcCircleProfileDef":
+            r = prof_def.Radius
+            pts = [
+                (r * np.cos(2 * np.pi * i / segments), r * np.sin(2 * np.pi * i / segments))
+                for i in range(segments)
+            ]
+            profile_rings.append(pts)
+        else:
+            # Fallback: use arbitrary small profile
+            profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
+
+    # Interpolate spine positions to match profile count
+    if len(spine_points) != len(positions):
+        # Linear interpolation between spine points
+        t_vals = np.linspace(0, 1, len(positions))
+        interpolated = []
+        for t in t_vals:
+            # Simple linear blend
+            idx = min(t * (len(spine_points) - 1), len(spine_points) - 1)
+            i0, i1 = int(idx), min(int(idx) + 1, len(spine_points) - 1)
+            blend = idx - i0
+            p0 = np.array(spine_points[i0])
+            p1 = np.array(spine_points[i1])
+            interpolated.append(tuple(p0 * (1 - blend) + p1 * blend))
+        spine_points = interpolated
+
+    # Build mesh vertices and faces
+    vertices = []
+    faces = []
+    section_vertex_offsets = []  # Track starting index of each section
+
+    for section_idx in range(len(positions)):
+        frame = axis_frames[section_idx]
+        profile_pts = profile_rings[section_idx]
+
+        # Record starting index for this section
+        section_vertex_offsets.append(len(vertices))
+
+        # Transform 2D profile to 3D at this position
+        for x2d, y2d in profile_pts:
+            x_comp = frame["x"] * x2d
+            y_comp = frame["y"] * y2d
+            pt_3d = frame["origin"] + x_comp + y_comp
+            vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
+
+        # Connect to previous section
+        if section_idx > 0:
+            prev_start = section_vertex_offsets[section_idx - 1]
+            curr_start = section_vertex_offsets[section_idx]
+            prev_ring_size = len(profile_rings[section_idx - 1])
+            curr_ring_size = len(profile_pts)
+
+            # Create quad faces linking previous and current section
+            for i in range(min(prev_ring_size, curr_ring_size)):
+                i_next = (i + 1) % min(prev_ring_size, curr_ring_size)
+
+                v_prev = prev_start + i
+                v_prev_next = prev_start + i_next
+                v_curr = curr_start + i
+                v_curr_next = curr_start + i_next
+
+                # Quad face (ensure correct winding)
+                faces.append((v_prev, v_prev_next, v_curr_next, v_curr))
+
+    return vertices, faces
+
+
+def sectioned_spine(
+    f: ifcopenshell.file,
+    spine_curve: ifcopenshell.entity_instance,
+    cross_sections: list[ifcopenshell.entity_instance],
+    positions: list[ifcopenshell.entity_instance],
+) -> ifcopenshell.entity_instance:
+    """Create IfcSectionedSpine or IfcPolygonalFaceSet fallback.
+
+    Creates a solid by sweeping cross-sectional profiles along a spine curve.
+    Since IfcOpenShell doesn't support IfcSectionedSpine rendering, this
+    tessellates to IfcPolygonalFaceSet for Bonsai compatibility.
+
+    Args:
+        spine_curve: IfcCompositeCurve (3D curve/boog)
+        cross_sections: LIST of IfcProfileDef (profielen op elke positie)
+        positions: LIST of IfcAxis2Placement3D (posities langs curve)
+
+    Returns:
+        IfcPolygonalFaceSet entity
+    """
+    if len(cross_sections) != len(positions):
+        raise ValueError(
+            f"CrossSections ({len(cross_sections)}) must have same length "
+            f"as CrossSectionPositions ({len(positions)})"
+        )
+    if len(cross_sections) < 2:
+        raise ValueError("At least 2 cross-sections are required")
+
+    # Tessellate to mesh
+    vertices, faces = _tessellate_sectioned_spine(spine_curve, cross_sections, positions)
+
+    # Convert to IFC IfcPolygonalFaceSet
+    # CoordList expects [[x1, y1, z1], [x2, y2, z2], ...]
+    coord_list = [[_round_coord(v[0]), _round_coord(v[1]), _round_coord(v[2])] for v in vertices]
+
+    # Build IfcIndexedPolygonalFace entities from face indices
+    ifc_faces = []
+    for face_indices in faces:
+        # IfcIndexedPolygonalFace uses 1-based indexing
+        ifc_face = f.create_entity(
+            "IfcIndexedPolygonalFace",
+            CoordIndex=[idx + 1 for idx in face_indices],
+        )
+        ifc_faces.append(ifc_face)
+
+    # Create the IfcPolygonalFaceSet
+    return f.create_entity(
+        "IfcPolygonalFaceSet",
+        Coordinates=f.create_entity("IfcCartesianPointList3D", CoordList=coord_list),
+        Faces=ifc_faces,
     )
 
 

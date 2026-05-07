@@ -50,6 +50,7 @@ Examples::
 """
 
 from ifckit.profiles.base import Profile
+from ifckit.profiles.derived import DerivedProfile
 from ifckit.profiles.i_beam import IBeamProfile
 from ifckit.profiles.l_beam import LBeamProfile
 from ifckit.profiles.shapes import (
@@ -64,6 +65,8 @@ from ifckit.profiles.steel import SteelProfile
 __all__ = [
     # Base
     "Profile",
+    # Derived
+    "DerivedProfile",
     # Shape profiles
     "PolygonProfile",
     "RoundedPolygonProfile",

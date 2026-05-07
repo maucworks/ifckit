@@ -1,6 +1,6 @@
 """
 ifckit.elements
-===============
+==============
 
 Pending IFC element data containers.
 """
@@ -23,6 +23,7 @@ from ifckit.elements.opening import (
     PendingWindow,
 )
 from ifckit.elements.registry import ElementRegistry
+from ifckit.elements.sectioned_spine import PendingSectionedSpine
 from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import (
     PendingBeam,
@@ -54,6 +55,7 @@ __all__ = [
     "PendingColumn",
     "PendingExtrudedElement",
     "PendingRevolvedBeam",
+    "PendingSectionedSpine",  # NEW
     "AlignmentSegment",
     "BridgePartType",
     "PendingAlignment",

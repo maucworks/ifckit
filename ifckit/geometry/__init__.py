@@ -16,7 +16,10 @@ Classes:
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    import ifcopenshell
 
 # ---------------------------------------------------------------------------
 # "Vec"
@@ -887,6 +890,79 @@ class Path:
         new_path._segments = [copy.copy(seg) for seg in self._segments]
         new_path._holes = [h.duplicate() for h in self._holes]
         return new_path
+
+    def project_to_plane(self, target_plane: "Plane") -> "Path":
+        """Project this Path onto a target plane and return a new Path.
+
+        Takes a 2D-style path defined in world XY coordinates
+        and projects each vertex onto the target plane.
+
+        This allows you to:
+        - Define profiles with clean 90° angles in XY
+        - Then project them onto a skewed plane (e.g., sloped sill)
+
+        Each segment becomes a Line in 3D between the projected points.
+        Arc segments are NOT supported in this method.
+
+        Args:
+            target_plane: The target plane (may be rotated/tilted)
+
+        Returns:
+            A new Path with segments projected onto target_plane
+
+        Raises:
+            ValueError: If any segment is an Arc
+        """
+        # Check for Arc segments
+        for seg in self._segments:
+            if isinstance(seg, Arc):
+                raise ValueError("project_to_plane() does not support Arc segments")
+
+        # Project each vertex
+        origin = target_plane.origin
+        x_axis = target_plane.x_axis
+        y_axis = target_plane.y_axis
+
+        projected_pts = []
+        for seg in self._segments:
+            pt = origin + x_axis * seg.start.x + y_axis * seg.start.y
+            projected_pts.append(pt)
+
+        # Add the closing point if closed
+        if self.is_closed and len(self._segments) > 0:
+            last_seg = self._segments[-1]
+            pt = origin + x_axis * last_seg.end.x + y_axis * last_seg.end.y
+            projected_pts.append(pt)
+
+        # Create new path with projected points
+        new_path = Path(plane=target_plane)
+        for i in range(len(projected_pts) - 1):
+            new_path._segments.append(Line(projected_pts[i], projected_pts[i + 1]))
+
+        # Handle holes the same way
+        for hole in self._holes:
+            hole_projected = hole.project_to_plane(target_plane)
+            new_path._holes.append(hole_projected)
+
+        return new_path
+
+    def directrix(self, ifc_file) -> "ifcopenshell.entity_instance":
+        """Create an IfcCompositeCurve for use in IfcSectionedSpine.
+
+        Converts the Path segments (Line/Arc) into IFC geometric representation.
+        Each segment becomes an IfcCompositeCurveSegment.
+
+        Requires: ifcopenshell package
+
+        Args:
+            ifc_file: ifcopenshell file instance
+
+        Returns:
+            IfcCompositeCurve entity
+        """
+        from ifckit.builders._geom import directrix_from_path as _directrix
+
+        return _directrix(ifc_file, self)
 
     def offset(self, dist: float) -> "Path":
         """Return a new inward-offset Path at distance dist.
