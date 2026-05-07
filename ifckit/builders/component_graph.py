@@ -315,11 +315,14 @@ def _eval_node_rect(
                 raise ValueError(
                     f"Hole with op='offset' in rect node {node.get('id')!r} missing 'dist'."
                 )
-            # dist is an occurrence value (e.g., "$lining_thickness"); don't scale it.
-            # If it's a literal or expression with literals, it stays as-is because
-            # it's meant to be in reference-frame units (mm). Variables like "$lining_thickness"
-            # are already in mm, so no scaling.
             dist = _eval_expr(dist_raw, params)
+            # Only inline offset (offset parent) supported in rect holes.
+            # For named source offsets, use a standalone offset node.
+            if hole_op == "offset" and hole_node.get("source"):
+                raise ValueError(
+                    "Source reference in rect hole not supported. "
+                    "Use standalone offset node instead."
+                )
             hole_path = path.offset(dist)
         else:
             raise ValueError(
@@ -403,6 +406,11 @@ def _eval_node_polygon(
                     f"Hole with op='offset' in polygon node {node.get('id')!r} missing 'dist'."
                 )
             dist = _eval_expr(dist_raw, params)
+            if hole_node.get("source"):
+                raise ValueError(
+                    "Source reference in polygon hole not supported. "
+                    "Use standalone offset node instead."
+                )
             hole_path = path.offset(dist)
         else:
             raise ValueError(
@@ -481,6 +489,25 @@ def _eval_node_list(
 
         elif op == "difference":
             result = _eval_node_difference(node, cache, resolved)
+            cache[node_id] = result
+
+        elif op == "offset":
+            # Standalone offset node: retrieve source path and apply offset
+            source_id = node.get("source")
+            if source_id is None:
+                raise ValueError(f"'offset' node {node_id!r} missing 'source'")
+            if source_id and isinstance(source_id, str) and source_id.startswith("$"):
+                source_id = source_id[1:]
+            source_path = cache.get(source_id)
+            if source_path is None:
+                raise ValueError(
+                    f"'offset' node {node_id!r} references unknown source: {source_id!r}"
+                )
+            dist_raw = node.get("dist")
+            if dist_raw is None:
+                raise ValueError(f"'offset' node {node_id!r} missing 'dist'")
+            dist = _eval_expr(dist_raw, resolved)
+            result = source_path.offset(dist)
             cache[node_id] = result
 
         elif op in ("boolean_cut", "boolean_union", "boolean_intersection"):

@@ -24,7 +24,7 @@
          "name": "DT-1000x2300",
          "overall_width": 2000.0,
          "overall_height": 3000.0,
-         "lining_thickness": 50.0,
+         "lining_thickness": 10.0,
          "lining_depth": 150.0,
          "component_graph": "door_flush"
      }
@@ -89,7 +89,11 @@
                     },
                     "overall_width": 2000.0,
                     "overall_height": 3000.0,
-                    "type_ref": "DT-1000x2300"
+                      "type_ref": "DT-1000x2300",
+                      "parameters":{
+                          "lining_depth": 200
+                      }
+                      
                   }
                ]
              }
