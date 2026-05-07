@@ -565,15 +565,15 @@ def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
 
     Strategy:
     1. Look for IfcExtrudedAreaSolid in the host representation.
-       For a wall with a rectangular footprint, the profile is
-       IfcRectangleProfileDef with YDim = thickness.
-    2. Fallback: return 200 (200 mm, a common default).
+    2. For IfcRectangleProfileDef: YDim = thickness
+    3. For IfcArbitraryClosedProfileDef: use bounding box Y extent
+    4. Fallback: return 200 (200 mm, a common default).
 
     Args:
         host_entity: An IfcWall, IfcWallStandardCase, or IfcSlab entity.
 
     Returns:
-        Thickness in millimeters (IFC metres are converted to mm for component_graph).
+        Thickness in millimeters.
     """
     try:
         rep = host_entity.Representation
@@ -586,8 +586,10 @@ def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
                     area = item.SweptArea
                     if area.is_a("IfcRectangleProfileDef"):
                         # For a wall: XDim = length, YDim = thickness
-                        # IFC stores in metres, convert to mm for component_graph
                         return float(area.YDim) * 1000.0
+                    elif area.is_a("IfcArbitraryClosedProfileDef"):
+                        # Calculate thickness from bounding box Y extent
+                        return _get_profile_thickness(area)
                 # IfcBooleanClippingResult wraps a solid
                 if item.is_a("IfcBooleanClippingResult"):
                     first_op = item.FirstOperand
@@ -595,9 +597,44 @@ def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
                         area = first_op.SweptArea
                         if area.is_a("IfcRectangleProfileDef"):
                             return float(area.YDim) * 1000.0
+                        elif area.is_a("IfcArbitraryClosedProfileDef"):
+                            return _get_profile_thickness(area)
     except Exception:  # noqa: BLE001
         pass
     return 200.0  # 200 mm default
+
+
+def _get_profile_thickness(area) -> float:
+    """Extract thickness from profile by calculating bounding box Y extent."""
+    try:
+        # Get outer curve points
+        curve = area.OuterCurve
+        if hasattr(curve, "Points"):
+            coords_raw = [(p.Coordinates[0], p.Coordinates[1]) for p in curve.Points]
+        else:
+            # CompositeCurve
+            coords_raw = []
+            for seg in curve:
+                if hasattr(seg, "Points"):
+                    coords_raw.extend([(p.Coordinates[0], p.Coordinates[1]) for p in seg.Points])
+        if not coords_raw:
+            return 200.0
+
+        # Detect unit from magnitude
+        # If values are > 100, they're likely in mm; otherwise in metres
+        test_y = max(p[1] for p in coords_raw)
+        if test_y > 100:
+            # Values in mm - use as-is
+            thickness = max(p[1] for p in coords_raw) - min(p[1] for p in coords_raw)
+        else:
+            # Values in metres - convert to mm
+            thickness = (max(p[1] for p in coords_raw) - min(p[1] for p in coords_raw)) * 1000.0
+
+        if thickness > 0:
+            return thickness
+    except Exception:  # noqa: BLE001
+        pass
+    return 200.0
 
 
 def _apply_material_to_solid(

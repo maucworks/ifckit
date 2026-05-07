@@ -2,11 +2,12 @@
 Fixed Casement Component — Python Generative Window
 
 Alternative to fixed_casement.json. Creates a simple
-window with aluminum frame and glazing panel.
+window with aluminum frame (with hole) and glazing panel.
 """
 
 from ifckit.builders._geom import extrude_profile, profile_from_points
 from ifckit.components import EvaluatedComponent, WindowComponent, component
+from ifckit.geometry import Path, Vec
 
 ALUMINUM_FRAME = {
     "color": {"r": 0.8, "g": 0.8, "b": 0.8},
@@ -45,7 +46,8 @@ class FixedCasementComponent(WindowComponent):
         wy = float(h)
         ltx = float(lt)
 
-        # Opening void (creates hole in wall)
+        # Opening void (for IfcOpeningElement - creates hole in wall)
+        # Depth is 2x wall_thickness to go through the wall
         opening_profile = profile_from_points(
             ifc_file, [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]
         )
@@ -64,9 +66,30 @@ class FixedCasementComponent(WindowComponent):
             )
         )
 
-        # Lining (frame around opening) - simplified: just outer rect
-        outer_pts = [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]
-        lining_profile = profile_from_points(ifc_file, outer_pts)
+        # Lining with hole: outer rect minus inner rect (glazing opening)
+        # Using Path class like JSON evaluator does
+        outer_pts = [Vec(x, y, 0) for x, y in [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]]
+        outer_path = Path.from_pts(outer_pts, closed=True)
+
+        hole_x0 = ltx
+        hole_y0 = ltx
+        hole_x1 = wx - ltx
+        hole_y1 = wy - ltx
+
+        if hole_x1 > hole_x0 and hole_y1 > hole_y0:
+            hole_pts = [
+                Vec(x, y, 0)
+                for x, y in [
+                    (hole_x0, hole_y0),
+                    (hole_x1, hole_y0),
+                    (hole_x1, hole_y1),
+                    (hole_x0, hole_y1),
+                ]
+            ]
+            hole_path = Path.from_pts(hole_pts, closed=True)
+            outer_path = outer_path.with_hole(hole_path)
+
+        lining_profile = profile_from_points_from_path(ifc_file, outer_path)
         lining_solid = extrude_profile(
             ifc_file, lining_profile, depth=ld, extrude_direction=(0, 0, -1)
         )
@@ -108,6 +131,54 @@ class FixedCasementComponent(WindowComponent):
             )
 
         return comps
+
+
+def profile_from_points_from_path(ifc_file, path: Path):
+    """Create IFC profile from Path (supports holes)."""
+    curve = ifc_file.createIfcCompositeCurve(
+        [
+            ifc_file.createIfcPolyline(
+                [
+                    ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
+                    for seg in path.segments
+                ]
+                + [
+                    ifc_file.createIfcCartesianPoint(
+                        (path.segments[0].start.x, path.segments[0].start.y, 0.0)
+                    )
+                ]
+            )
+        ]
+    )
+
+    if path.holes:
+        # Create IfcArbitraryProfileDefWithVoids
+        inner_curves = []
+        for hole_path in path.holes:
+            hole_curve = ifc_file.createIfcCompositeCurve(
+                [
+                    ifc_file.createIfcPolyline(
+                        [
+                            ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
+                            for seg in hole_path.segments
+                        ]
+                        + [
+                            ifc_file.createIfcCartesianPoint(
+                                (hole_path.segments[0].start.x, hole_path.segments[0].start.y, 0.0)
+                            )
+                        ]
+                    )
+                ]
+            )
+            inner_curves.append(hole_curve)
+
+        return ifc_file.createIfcArbitraryProfileDefWithVoids(
+            ProfileType="AREA",
+            OuterCurve=curve,
+            InnerCurves=inner_curves,
+        )
+    else:
+        return ifc_file.createIfcArbitraryClosedProfileDef(OuterCurve=curve)
 
 
 FixedCasementComponent.register()
