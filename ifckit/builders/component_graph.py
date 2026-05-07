@@ -679,19 +679,85 @@ def evaluate_opening_nodes(
     params: Dict[str, float],
     plane=None,
 ) -> List[EvaluatedComponent]:
-    """Evaluate the opening_nodes section — JSON first, then Python fallback."""
+    """Evaluate the opening_nodes section — Try Python first, then JSON."""
+    # Check Python registry first (will be loaded lazily)
+    import ifckit.components
+
+    if not ifckit.components._pythonic_registered:
+        ifckit.components._ensure_components_registered()
+
+    if preset_name in ifckit.components.COMPONENT_REGISTRY and plane is not None:
+        comp_cls = ifckit.components.get_component(preset_name)
+        comp = comp_cls()
+        opening_comps = comp.build(
+            ifc_file, plane, params.get("w", 1000), params.get("h", 1000), params
+        )
+
+        wall_thickness = params.get("wall_thickness", 200)
+        result = []
+        from ifckit.builders._geom import extrude_profile, profile_from_points
+
+        for ec in opening_comps:
+            result.append(ec)
+            if ec.role in ("Lining", "Glazing", "Panel"):
+                solid = ec.solid
+                if hasattr(solid, "SweptArea"):
+                    poly = solid.SweptArea
+                else:
+                    continue
+
+                pts = []
+                if hasattr(poly, "OuterCurve"):
+                    outer = poly.OuterCurve
+                    if hasattr(outer, "Points"):
+                        pts = [
+                            (float(p.Coordinates[0]), float(p.Coordinates[1])) for p in outer.Points
+                        ]
+                elif hasattr(poly, "Points"):
+                    pts = [(float(p.Coordinates[0]), float(p.Coordinates[1])) for p in poly.Points]
+
+                if pts:
+                    min_x = min(p[0] for p in pts)
+                    max_x = max(p[0] for p in pts)
+                    min_y = min(p[1] for p in pts)
+                    max_y = max(p[1] for p in pts)
+                    void_profile = profile_from_points(
+                        ifc_file,
+                        [
+                            (min_x, min_y),
+                            (max_x, min_y),
+                            (max_x, max_y),
+                            (min_x, max_y),
+                        ],
+                    )
+                    void_solid = extrude_profile(
+                        ifc_file,
+                        void_profile,
+                        depth=wall_thickness,
+                        extrude_direction=(0, 0, -1),
+                    )
+                    void_comp = EvaluatedComponent(
+                        solid=void_solid,
+                        role="Opening",
+                        node_id="void",
+                        material={
+                            "color": {"r": 0.5, "g": 0.5, "b": 0.5},
+                            "transparency": 1.0,
+                            "name": "Opening void",
+                        },
+                    )
+                    result.append(void_comp)
+        return result
+
+    # Fall back to JSON preset
     try:
         preset = _load_preset(preset_name)
     except FileNotFoundError:
-        from ifckit.components import COMPONENT_REGISTRY, get_component
+        raise FileNotFoundError(
+            f"Component graph preset not found: {preset_name!r}. "
+            f"Expected ifckit.components.json/{preset_name}.json"
+        )
 
-        if preset_name in COMPONENT_REGISTRY and plane is not None:
-            comp_cls = get_component(preset_name)
-            comp = comp_cls()
-            return comp.build(ifc_file, plane, params.get("w", 1000), params.get("h", 1000), params)
-        raise
-
-    opening_nodes = preset.get("opening_nodes")
     opening_nodes = preset.get("opening_nodes")
     if opening_nodes is None:
         raise ValueError(

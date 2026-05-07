@@ -342,7 +342,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                             overall_width=win_data.get("overall_width", 1000),
                             overall_height=win_data.get("overall_height", 1000),
                             component_graph=component_graph,
-                            parameters=win_data.get("parameters"),
                         )
                     else:
                         raise ValueError(

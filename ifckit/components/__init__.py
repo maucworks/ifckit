@@ -54,6 +54,18 @@ from ifckit.geometry import Plane
 # Global registry: name -> Component class
 COMPONENT_REGISTRY: dict[str, type[WindowComponent]] = {}
 
+_pythonic_registered = False
+
+
+def _ensure_components_registered():
+    """Auto-import Pythonic components to register them."""
+    global _pythonic_registered
+    if _pythonic_registered:
+        return
+    _pythonic_registered = True
+    # Trigger import of pythonic package which registers its components
+    import ifckit.components.pythonic  # noqa: F401
+
 
 @dataclass
 class EvaluatedComponent:
@@ -178,4 +190,7 @@ def get_component(name: str) -> type[WindowComponent] | None:
 
 def list_components() -> list[str]:
     """List all registered component names."""
+    # Ensure Pythonic components are registered
+    if not _pythonic_registered:
+        import ifckit.components.pythonic  # noqa: F401
     return list(COMPONENT_REGISTRY.keys())
