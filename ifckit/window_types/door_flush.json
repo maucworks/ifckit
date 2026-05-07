@@ -35,19 +35,20 @@
             "p0": ["$lining_thickness", 0],
             "p1": ["$lining_thickness + $door_width", "$door_height"]
         },
-        {
-            "id": "jamb_rect",
-            "op": "rect",
-            "p0": ["$lining_thickness - $jamb", "-1 * $jamb"],
-            "p1": ["$lining_thickness + $door_width + $jamb", "$door_height + $jamb"]
-            },
+       
         {
             "id": "lining_profile",
-            "op": "rect",
-            "p0": [0, 0],
-            "p1": ["$w", "$h"],
-            "holes":[
+            "op": "polygon",
+            "points" : [
+                [0, 0],
+                ["$lining_thickness", 0],
+                ["$lining_thickness", "$door_height"],
+                ["$lining_thickness + $door_width", "$door_height"],
+                ["$lining_thickness + $door_width", 0],
+                ["$w", 0],["$w","$h"], [0, "$h"]
                 
+            ],
+            "holes":[
                 {
                     "id": "top_window_rect",
                     "op": "rect",
@@ -59,38 +60,24 @@
                     "op": "rect",
                     "p0": [" $lining_thickness + $lining_thickness + $door_width", "$lining_thickness"],
                     "p1": ["$w - $lining_thickness", "$h - $lining_thickness"]
-                }]
+                }
+            ]
         },
         {
-            "id": "lining_cutter",
-            "op": "extrude",
-            "profile": "jamb_rect",
-            "depth": "2 * $lining_depth",
-            "z_offset": 0,
-            "output": false
-        },
-        {
-            "id": "lining_base",
+            "id": "lining",
             "op": "extrude",
             "profile": "lining_profile",
             "depth": "$lining_depth",
             "z_offset": 0,
-            "output": false,
-            "role": "Lining"        },
-        {
-            "id": "lining",
-            "op": "boolean_cut",
-            "base": "lining_base",
-            "tool": "lining_cutter",
             "output": true,
             "role": "Lining",
             "material": {
-              "color": {"r": 0.8, "g": 0.8, "b": 0.8},
-                "transparency": 0,
-                "name": "Aluminum frame"
+               "color": {"r": 0.9, "g": 0.9, "b": 0.9},
+               "transparency": 0,
+               "name": "Door panel"
             }
-
         },
+       
        {
            "id": "door_panel",
            "op": "extrude",
