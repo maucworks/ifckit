@@ -609,6 +609,50 @@ def _tessellate_sectioned_spine(
                 (-hw, -hh + tf),  # bottom flange top-left
             ]
             profile_rings.append(pts)
+        elif prof_def.is_a() == "IfcDerivedProfileDef":
+            # Extract parent profile points and apply transformation
+            parent = prof_def.ParentProfile
+            # Recursively extract parent profile points
+            if parent.is_a() == "IfcRectangleProfileDef":
+                x_dim = parent.XDim
+                y_dim = parent.YDim
+                pts = [
+                    (-x_dim / 2, -y_dim / 2),
+                    (x_dim / 2, -y_dim / 2),
+                    (x_dim / 2, y_dim / 2),
+                    (-x_dim / 2, y_dim / 2),
+                ]
+            elif parent.is_a() == "IfcCircleProfileDef":
+                r = parent.Radius
+                pts = [
+                    (
+                        r * np.cos(2 * np.pi * i / segments),
+                        r * np.sin(2 * np.pi * i / segments),
+                    )
+                    for i in range(segments)
+                ]
+            else:
+                pts = [(0, 0), (1, 0), (1, 1), (0, 1)]
+
+            # Apply transformation operator
+            op = prof_def.Operator
+            if op and op.is_a() == "IfcCartesianTransformationOperator2D":
+                # Axis1 and Axis2 define scale/rotation
+                # LocalOrigin defines offset
+                origin = op.LocalOrigin.Coordinates
+                # Default Axis1=(1,0), Axis2=(0,1) if not specified
+                a1 = op.Axis1.DirectionRatios if op.Axis1 else (1, 0)
+                a2 = op.Axis2.DirectionRatios if op.Axis2 else (0, 1)
+                # Scale factor
+                scale = getattr(op, "Scale", None) or 1.0
+                transformed = []
+                for u, v in pts:
+                    x = origin[0] + scale * (a1[0] * u + a2[0] * v)
+                    y = origin[1] + scale * (a1[1] * u + a2[1] * v)
+                    transformed.append((x, y))
+                pts = transformed
+
+            profile_rings.append(pts)
         elif prof_def.is_a() in (
             "IfcArbitraryClosedProfileDef",
             "IfcArbitraryProfileDefWithVoids",
