@@ -723,7 +723,9 @@ def build_window_model_b(
     if pending.parameters:
         params.update(pending.parameters)
 
-    opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
+    opening_components = evaluate_opening_nodes(
+        pending.component_graph, ifc_file, context, params, pending.plane
+    )
 
     # Apply anchor offset to opening solids and apply materials
 
@@ -817,7 +819,9 @@ def build_door_model_b(
     if pending.parameters:
         params.update(pending.parameters)
 
-    opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
+    opening_components = evaluate_opening_nodes(
+        pending.component_graph, ifc_file, context, params, pending.plane
+    )
 
     # Apply anchor offset to opening solids and apply materials
 

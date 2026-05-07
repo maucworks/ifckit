@@ -124,11 +124,15 @@ def validate_json(data: Dict[str, Any]) -> JsonValidationResult:
                         if not isinstance(fill, dict):
                             errors.append(f"{eprefix}.{section}[{k}] must be a dict")
                             continue
-                        for required in ("plane", "overall_width", "overall_height", "type_ref"):
+                        for required in ("plane", "overall_width", "overall_height"):
                             if required not in fill:
                                 errors.append(
                                     f"{eprefix}.{section}[{k}] missing required field '{required}'"
                                 )
+                        if "type_ref" not in fill and "component_graph" not in fill:
+                            errors.append(
+                                f"{eprefix}.{section}[{k}] requires 'type_ref' or 'component_graph'"
+                            )
 
     return JsonValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
@@ -309,22 +313,40 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
 
                 for wk, win_data in enumerate(elem_data.get("windows", [])):
                     type_ref = win_data.get("type_ref")
-                    pending_wt = type_map.get(type_ref) if type_ref else None
-                    if type_ref and pending_wt is None:
-                        raise ValueError(
-                            f"{eprefix}.windows[{wk}]: "
-                            f"type_ref {type_ref!r} not found. "
-                            f"Available: {sorted(type_map)}"
+                    component_graph = win_data.get("component_graph")
+
+                    # Support inline component_graph (no type needed)
+                    pending_wt = None
+                    if type_ref:
+                        pending_wt = type_map.get(type_ref)
+                        if pending_wt is None:
+                            raise ValueError(
+                                f"{eprefix}.windows[{wk}]: "
+                                f"type_ref {type_ref!r} not found. "
+                                f"Available: {sorted(type_map)}"
+                            )
+                        if not isinstance(pending_wt, PendingWindowType):
+                            raise ValueError(
+                                f"{eprefix}.windows[{wk}]: "
+                                f"type_ref {type_ref!r} is not a window type."
+                            )
+                        if not pending_wt.component_graph:
+                            raise ValueError(
+                                f"{eprefix}.windows[{wk}]: "
+                                f"window type {type_ref!r} has no component_graph."
+                            )
+                    elif component_graph:
+                        # Inline component - create temporary type
+                        pending_wt = PendingWindowType(
+                            name=f"inline_{component_graph}",
+                            overall_width=win_data.get("overall_width", 1000),
+                            overall_height=win_data.get("overall_height", 1000),
+                            component_graph=component_graph,
+                            parameters=win_data.get("parameters"),
                         )
-                    if not isinstance(pending_wt, PendingWindowType):
+                    else:
                         raise ValueError(
-                            f"{eprefix}.windows[{wk}]: type_ref {type_ref!r} is not a window type."
-                        )
-                    if not pending_wt.component_graph:
-                        raise ValueError(
-                            f"{eprefix}.windows[{wk}]: "
-                            f"window type {type_ref!r} has no component_graph — "
-                            'add "component_graph": "fixed_casement" (or similar) to the type.'
+                            f"{eprefix}.windows[{wk}]: requires 'type_ref' or 'component_graph'"
                         )
 
                     plane = _parse_plane(win_data["plane"])
@@ -382,22 +404,38 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
 
                 for dk, door_data in enumerate(elem_data.get("doors", [])):
                     type_ref = door_data.get("type_ref")
-                    pending_dt = type_map.get(type_ref) if type_ref else None
-                    if type_ref and pending_dt is None:
-                        raise ValueError(
-                            f"{eprefix}.doors[{dk}]: "
-                            f"type_ref {type_ref!r} not found. "
-                            f"Available: {sorted(type_map)}"
+                    component_graph = door_data.get("component_graph")
+
+                    # Support inline component_graph (no type needed)
+                    pending_dt = None
+                    if type_ref:
+                        pending_dt = type_map.get(type_ref)
+                        if pending_dt is None:
+                            raise ValueError(
+                                f"{eprefix}.doors[{dk}]: "
+                                f"type_ref {type_ref!r} not found. "
+                                f"Available: {sorted(type_map)}"
+                            )
+                        if not isinstance(pending_dt, PendingDoorType):
+                            raise ValueError(
+                                f"{eprefix}.doors[{dk}]: type_ref {type_ref!r} is not a door type."
+                            )
+                        if not pending_dt.component_graph:
+                            raise ValueError(
+                                f"{eprefix}.doors[{dk}]: "
+                                f"door type {type_ref!r} has no component_graph."
+                            )
+                    elif component_graph:
+                        # Inline component - create temporary type
+                        pending_dt = PendingDoorType(
+                            name=f"inline_{component_graph}",
+                            overall_width=door_data.get("overall_width", 1000),
+                            overall_height=door_data.get("overall_height", 2100),
+                            component_graph=component_graph,
                         )
-                    if not isinstance(pending_dt, PendingDoorType):
+                    else:
                         raise ValueError(
-                            f"{eprefix}.doors[{dk}]: type_ref {type_ref!r} is not a door type."
-                        )
-                    if not pending_dt.component_graph:
-                        raise ValueError(
-                            f"{eprefix}.doors[{dk}]: "
-                            f"door type {type_ref!r} has no component_graph — "
-                            'add "component_graph": "door_flush" (or similar) to the type.'
+                            f"{eprefix}.doors[{dk}]: requires 'type_ref' or 'component_graph'"
                         )
 
                     plane = _parse_plane(door_data["plane"])

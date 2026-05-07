@@ -79,23 +79,36 @@
                      }
                   }
                 ],
-               "doors": [
-                  {
-                    "name": "D-1",
-                    "plane": {
-                      "origin": {"x": 5000.0, "y": 0.0, "z": 0.0},
-                      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
-                      "y_axis": {"x": 0.0, "y": 0.0, "z": 1.0}
-                    },
-                    "overall_width": 2000.0,
-                    "overall_height": 3000.0,
-                      "type_ref": "DT-1000x2300",
-                      "parameters":{
-                          "lining_depth": 200
-                      }
-                      
-                  }
-               ]
+"doors": [
+                   {
+                     "name": "D-JSON",
+                     "plane": {
+                       "origin": {"x": 2500.0, "y": 0.0, "z": 0.0},
+                       "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                       "y_axis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                     },
+                     "overall_width": 2000.0,
+                     "overall_height": 3000.0,
+                       "type_ref": "DT-1000x2300",
+                       "parameters":{
+                           "lining_depth": 200
+                       }
+                   },
+                   {
+                     "name": "D-PYTHON",
+                     "plane": {
+                       "origin": {"x": 5500.0, "y": 0.0, "z": 0.0},
+                       "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                       "y_axis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                     },
+                     "overall_width": 2000.0,
+                     "overall_height": 3000.0,
+                       "component_graph": "door_flush_component",
+                       "parameters":{
+                           "lining_depth": 200
+                       }
+                   }
+                ]
              }
            ]
          }

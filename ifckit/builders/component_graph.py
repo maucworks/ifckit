@@ -677,32 +677,21 @@ def evaluate_opening_nodes(
     ifc_file: ifcopenshell.file,
     context: ifcopenshell.entity_instance,
     params: Dict[str, float],
+    plane=None,
 ) -> List[EvaluatedComponent]:
-    """
-    Evaluate the ``opening_nodes`` section of a preset and produce IFC void geometry.
+    """Evaluate the opening_nodes section — JSON first, then Python fallback."""
+    try:
+        preset = _load_preset(preset_name)
+    except FileNotFoundError:
+        from ifckit.components import COMPONENT_REGISTRY, get_component
 
-    The caller must include ``wall_thickness`` in *params* — this is used as
-    the ``$wall_thickness`` parameter in depth expressions.
+        if preset_name in COMPONENT_REGISTRY and plane is not None:
+            comp_cls = get_component(preset_name)
+            comp = comp_cls()
+            return comp.build(ifc_file, plane, params.get("w", 1000), params.get("h", 1000), params)
+        raise
 
-    Nodes with ``output: false`` are silently skipped (they may still be used
-    as profiles by other nodes). This allows future presets to define an opening
-    shape without emitting any void solid (e.g., template-only presets).
-
-    Args:
-        preset_name: Name of the preset (e.g., "fixed_casement").
-        ifc_file:    Open ifcopenshell file.
-        context:     Body sub-context.
-        params:      Override dict. Must include ``w``, ``h``, and
-                     ``wall_thickness``.
-
-    Returns:
-        List of EvaluatedComponent for opening_nodes with ``output: true``.
-
-    Raises:
-        ValueError: If preset has no ``opening_nodes`` section.
-        ValueError: If required parameters are missing.
-    """
-    preset = _load_preset(preset_name)
+    opening_nodes = preset.get("opening_nodes")
     opening_nodes = preset.get("opening_nodes")
     if opening_nodes is None:
         raise ValueError(

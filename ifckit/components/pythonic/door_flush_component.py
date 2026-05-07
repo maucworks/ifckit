@@ -1,27 +1,13 @@
 """
-DoorFlush Component
-===================
+DoorFlush Component — Python Generative Door
 
-Generative DoorFlush component - 3-sided frame door with glazing.
-This is the Pythonic alternative to door_flush.json.
-
-Creates:
-- Lining: 3-sided frame with door opening + top/side glazing
-- Panel: Door leaf
-- Glazing: Top and side light glass
-
-Uses reference Plane:
-- Profile drawn in local XY plane
-- Extrudes in local -Z direction (into wall)
+Alternative to door_flush.json. Creates a 3-sided frame
+with door panel and optional glazing.
 """
-
-from __future__ import annotations
 
 from ifckit.builders._geom import extrude_profile, profile_from_points
 from ifckit.components import EvaluatedComponent, WindowComponent, component
-from ifckit.geometry import Plane
 
-# Material definitions (same structure as JSON)
 ALUMINUM_FRAME = {
     "color": {"r": 0.8, "g": 0.8, "b": 0.8},
     "transparency": 0.0,
@@ -35,232 +21,98 @@ CLEAR_GLASS = {"color": {"r": 0.9, "g": 0.95, "b": 1.0}, "transparency": 0.8, "n
 
 @component("door_flush_component")
 class DoorFlushComponent(WindowComponent):
-    """3-sided frame door with top and side glazing."""
+    """Generative door: 3-sided frame with panel and glazing."""
 
     name = "door_flush_component"
 
-    def build(
-        self,
-        ifc_file,
-        plane: Plane,
-        width: float,
-        height: float,
-        params: dict[str, float],
-    ) -> list[EvaluatedComponent]:
-        """Build DoorFlush geometry.
+    def build(self, ifc_file, plane, w, h, params):
+        lt = params.get("lining_thickness", 50)
+        ld = params.get("lining_depth", 100)
+        dw = params.get("door_width", w - 2 * lt)
+        dh = params.get("door_height", h - lt)
+        dd = params.get("door_depth", 50)
+        pd = params.get("panel_depth", 10)
 
-        Args:
-            ifc_file: Active IFC file
-            plane: Reference plane (local XY defines profile plane)
-            width: Overall width (typically from occurrence)
-            height: Overall height (from occurrence)
-            params: Resolved parameters
+        comps = []
 
-        Returns:
-            List of 4 EvaluatedComponents: Lining, Panel, TopGlazing, SideGlazing
-        """
-        # Extract parameters with defaults
-        lining_thickness = params.get("lining_thickness", 50)
-        lining_depth = params.get("lining_depth", 100)
-        door_width = params.get("door_width", 900)
-        door_height = params.get("door_height", 2100)
-        door_depth = params.get("door_depth", 50)
-        panel_depth = params.get("panel_depth", 10)
+        # Dimensions in local coords
+        wx = float(w)
+        wy = float(h)
+        ltx = float(lt)
+        dwx = float(dw)
+        dhy = float(dh)
 
-        # Convenience
-        origin = plane.origin
-        x = plane.x_axis
-        y = plane.y_axis
-        z = plane.z_axis
-
-        # === 1. LINING: Individual frame segments ===
-        # For simplicity, we create separate lining segments
-
-        # Door opening origin
-        # Create separate solids for each element
-
-        components: list[EvaluatedComponent] = []
-
-        # === LINING: Extrude frame profile with hole ===
-        # Since we need the full frame, create individual lining segments
         # Bottom sill
-        sill_profile = profile_from_points(ifc_file, [origin, origin + x * width], closed=False)
-        sill_solid = extrude_profile(
-            ifc_file,
-            sill_profile,
-            depth=lining_depth,
-            extrude_direction=tuple(-z),
-        )
-        components.append(
-            EvaluatedComponent(
-                solid=sill_solid,
-                role="Lining",
-                material=ALUMINUM_FRAME,
-            )
-        )
+        sill = profile_from_points(ifc_file, [(0.0, 0.0), (wx, 0.0)])
+        sill_solid = extrude_profile(ifc_file, sill, depth=ld, extrude_direction=(0, 0, -1))
+        comps.append(EvaluatedComponent(solid=sill_solid, role="Lining", material=ALUMINUM_FRAME))
 
         # Left side
-        left_profile = profile_from_points(
-            ifc_file,
-            [
-                origin,
-                origin + y * door_height,
-            ],
-            closed=False,
-        )
-        left_solid = extrude_profile(
-            ifc_file,
-            left_profile,
-            depth=lining_depth,
-            extrude_direction=tuple(-z),
-        )
-        components.append(
-            EvaluatedComponent(
-                solid=left_solid,
-                role="Lining",
-                material=ALUMINUM_FRAME,
-            )
-        )
+        left = profile_from_points(ifc_file, [(ltx, 0.0), (ltx, dhy)])
+        left_solid = extrude_profile(ifc_file, left, depth=ld, extrude_direction=(0, 0, -1))
+        comps.append(EvaluatedComponent(solid=left_solid, role="Lining", material=ALUMINUM_FRAME))
 
         # Right side
-        right_origin = origin + x * (lining_thickness + door_width)
-        right_profile = profile_from_points(
+        right_x = ltx + dwx
+        right = profile_from_points(ifc_file, [(right_x, 0.0), (right_x, dhy)])
+        right_solid = extrude_profile(ifc_file, right, depth=ld, extrude_direction=(0, 0, -1))
+        comps.append(EvaluatedComponent(solid=right_solid, role="Lining", material=ALUMINUM_FRAME))
+
+        # Top (above door)
+        if h > dh + lt:
+            top_y = dhy + lt
+            top = profile_from_points(ifc_file, [(0.0, top_y), (wx, top_y)])
+            top_solid = extrude_profile(ifc_file, top, depth=ld, extrude_direction=(0, 0, -1))
+            comps.append(
+                EvaluatedComponent(solid=top_solid, role="Lining", material=ALUMINUM_FRAME)
+            )
+
+        # Door panel
+        panel_x = ltx
+        panel_z = ld - dd
+        panel = profile_from_points(
             ifc_file,
             [
-                right_origin,
-                right_origin + y * door_height,
+                (panel_x, panel_z),
+                (panel_x + dwx, panel_z),
+                (panel_x + dwx, panel_z + dhy),
+                (panel_x, panel_z + dhy),
             ],
-            closed=False,
         )
-        right_solid = extrude_profile(
-            ifc_file,
-            right_profile,
-            depth=lining_depth,
-            extrude_direction=tuple(-z),
-        )
-        components.append(
-            EvaluatedComponent(
-                solid=right_solid,
-                role="Lining",
-                material=ALUMINUM_FRAME,
-            )
-        )
+        panel_solid = extrude_profile(ifc_file, panel, depth=dd, extrude_direction=(0, 0, 1))
+        comps.append(EvaluatedComponent(solid=panel_solid, role="Panel", material=DOOR_PANEL))
 
-        # Top (above door opening)
-        if height > door_height:
-            top_origin = origin + y * door_height
-            top_profile = profile_from_points(
+        # Top glazing (above door)
+        if h > dh + lt + lt:
+            glass_bottom = dhy + lt
+            glass_top = wy - lt
+            glass = profile_from_points(
                 ifc_file,
                 [
-                    top_origin,
-                    top_origin + x * width,
+                    (ltx, glass_bottom),
+                    (ltx + dwx, glass_bottom),
+                    (ltx + dwx, glass_top),
+                    (ltx, glass_top),
                 ],
-                closed=False,
             )
-            top_solid = extrude_profile(
+            glass_solid = extrude_profile(ifc_file, glass, depth=pd, extrude_direction=(0, 0, -1))
+            comps.append(
+                EvaluatedComponent(solid=glass_solid, role="Glazing", material=CLEAR_GLASS)
+            )
+
+        # Side glazing
+        side_space = w - dwx - 2 * lt
+        if side_space > lt:
+            side_left = ltx + dwx + lt
+            side_right = wx - lt
+            side = profile_from_points(
                 ifc_file,
-                top_profile,
-                depth=lining_depth,
-                extrude_direction=tuple(-z),
+                [(side_left, lt), (side_right, lt), (side_right, wy - lt), (side_left, wy - lt)],
             )
-            components.append(
-                EvaluatedComponent(
-                    solid=top_solid,
-                    role="Lining",
-                    material=ALUMINUM_FRAME,
-                )
-            )
+            side_solid = extrude_profile(ifc_file, side, depth=pd, extrude_direction=(0, 0, -1))
+            comps.append(EvaluatedComponent(solid=side_solid, role="Glazing", material=CLEAR_GLASS))
 
-        # === DOOR PANEL ===
-        panel_origin = origin + x * lining_thickness + z * (lining_depth - door_depth)
-        panel_profile = profile_from_points(
-            ifc_file,
-            [
-                panel_origin,
-                panel_origin + x * door_width,
-                panel_origin + x * door_width + y * door_height,
-                panel_origin + y * door_height,
-            ],
-            closed=True,
-        )
-        panel_solid = extrude_profile(
-            ifc_file,
-            panel_profile,
-            depth=door_depth,
-            extrude_direction=tuple(z),  # Outward from wall
-        )
-        components.append(
-            EvaluatedComponent(
-                solid=panel_solid,
-                role="Panel",
-                material=DOOR_PANEL,
-            )
-        )
-
-        # === TOP GLAZING ===
-        # Check if there's space above door
-        top_glass_height = height - door_height - lining_thickness
-        if top_glass_height > 0:
-            glass_origin = origin + x * lining_thickness + y * (door_height + lining_thickness)
-            glass_profile = profile_from_points(
-                ifc_file,
-                [
-                    glass_origin,
-                    glass_origin + x * door_width,
-                    glass_origin + x * door_width + y * top_glass_height,
-                    glass_origin + y * top_glass_height,
-                ],
-                closed=True,
-            )
-            glass_solid = extrude_profile(
-                ifc_file,
-                glass_profile,
-                depth=panel_depth,
-                extrude_direction=tuple(-z),
-            )
-            components.append(
-                EvaluatedComponent(
-                    solid=glass_solid,
-                    role="Glazing",
-                    material=CLEAR_GLASS,
-                )
-            )
-
-        # === SIDE GLAZING ===
-        # Check if there's space on the side
-        side_glass_space = width - door_width - lining_thickness * 2
-        if side_glass_space > 0:
-            side_origin = (
-                origin
-                + x * (lining_thickness + door_width + lining_thickness)
-                + y * lining_thickness
-            )
-            side_profile = profile_from_points(
-                ifc_file,
-                [
-                    side_origin,
-                    side_origin + x * side_glass_space,
-                    side_origin + x * side_glass_space + y * (height - lining_thickness),
-                    side_origin + y * (height - lining_thickness),
-                ],
-                closed=True,
-            )
-            side_solid = extrude_profile(
-                ifc_file,
-                side_profile,
-                depth=panel_depth,
-                extrude_direction=tuple(-z),
-            )
-            components.append(
-                EvaluatedComponent(
-                    solid=side_solid,
-                    role="Glazing",
-                    material=CLEAR_GLASS,
-                )
-            )
-
-        return components
+        return comps
 
 
-# Auto-register when module is imported
 DoorFlushComponent.register()
