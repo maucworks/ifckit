@@ -540,29 +540,9 @@ def _tessellate_sectioned_spine(
 
     from ifckit.geometry import Vec
 
-    # Extract spine curve points
-    spine_points = []
-    for seg in spine_curve.Segments:
-        parent = seg.ParentCurve
-        if parent.is_a() == "IfcPolyline":
-            for pt in parent.Points:
-                coords = pt.Coordinates
-                spine_points.append((coords[0], coords[1], coords[2]))
-        elif parent.is_a() == "IfcLine":
-            # Line: Pnt + Dir*param
-            pnt = parent.Pnt.Coordinates
-            dir_vec = parent.Dir.DirectionRatios
-            for param in [0.0, 1.0]:
-                spine_points.append(
-                    (
-                        pnt[0] + dir_vec[0] * param,
-                        pnt[1] + dir_vec[1] * param,
-                        pnt[2] + dir_vec[2] * param,
-                    )
-                )
-
-    # Build axis frames at each position
+    # Build axis frames at each position and extract spine points from origins
     axis_frames = []
+    spine_points = []
     for axis in positions:
         origin = axis.Location.Coordinates
         z_axis = axis.Axis.DirectionRatios if axis.Axis else (0, 0, 1)
@@ -573,14 +553,16 @@ def _tessellate_sectioned_spine(
         x_vec = Vec(*x_axis).normalized()
         y_vec = z_vec.cross(x_vec).normalized()  # cross product
 
+        origin_vec = Vec(*origin)
         axis_frames.append(
             {
-                "origin": Vec(*origin),
+                "origin": origin_vec,
                 "x": x_vec,
                 "y": y_vec,
                 "z": z_vec,
             }
         )
+        spine_points.append((origin_vec.x, origin_vec.y, origin_vec.z))
 
     # Extract profile points
     profile_rings = []
@@ -607,21 +589,6 @@ def _tessellate_sectioned_spine(
             # Fallback: use arbitrary small profile
             profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
 
-    # Interpolate spine positions to match profile count
-    if len(spine_points) != len(positions):
-        # Linear interpolation between spine points
-        t_vals = np.linspace(0, 1, len(positions))
-        interpolated = []
-        for t in t_vals:
-            # Simple linear blend
-            idx = min(t * (len(spine_points) - 1), len(spine_points) - 1)
-            i0, i1 = int(idx), min(int(idx) + 1, len(spine_points) - 1)
-            blend = idx - i0
-            p0 = np.array(spine_points[i0])
-            p1 = np.array(spine_points[i1])
-            interpolated.append(tuple(p0 * (1 - blend) + p1 * blend))
-        spine_points = interpolated
-
     # Build mesh vertices and faces
     vertices = []
     faces = []
@@ -635,10 +602,11 @@ def _tessellate_sectioned_spine(
         section_vertex_offsets.append(len(vertices))
 
         # Transform 2D profile to 3D at this position
+        # Profile sits in YZ plane (perpendicular to spine direction Z)
         for x2d, y2d in profile_pts:
-            x_comp = frame["x"] * x2d
-            y_comp = frame["y"] * y2d
-            pt_3d = frame["origin"] + x_comp + y_comp
+            y_comp = frame["y"] * x2d
+            z_comp = frame["z"] * y2d
+            pt_3d = frame["origin"] + y_comp + z_comp
             vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
 
         # Connect to previous section
@@ -662,18 +630,38 @@ def _tessellate_sectioned_spine(
 
     # Add end caps (first and last section rings)
     if len(section_vertex_offsets) >= 2:
-        # Front cap (first section) - fan triangulation, reversed winding
         first_start = section_vertex_offsets[0]
         first_ring_size = len(profile_rings[0])
-        for i in range(1, first_ring_size - 1):
-            faces.append((first_start, first_start + i + 1, first_start + i))
-
-        # Back cap (last section) - fan triangulation, normal winding
         last_section = len(section_vertex_offsets) - 1
         last_start = section_vertex_offsets[last_section]
         last_ring_size = len(profile_rings[last_section])
-        for i in range(1, last_ring_size - 1):
-            faces.append((last_start, last_start + i, last_start + i + 1))
+
+        if first_ring_size == 4:
+            # Quad cap — single face
+            # Front: reversed winding so normal points backward
+            faces.append(
+                (
+                    first_start,
+                    first_start + 3,
+                    first_start + 2,
+                    first_start + 1,
+                )
+            )
+            # Back: normal winding so normal points forward
+            faces.append(
+                (
+                    last_start,
+                    last_start + 1,
+                    last_start + 2,
+                    last_start + 3,
+                )
+            )
+        else:
+            # Fan triangulation for non-rectangular profiles
+            for i in range(1, first_ring_size - 1):
+                faces.append((first_start, first_start + i + 1, first_start + i))
+            for i in range(1, last_ring_size - 1):
+                faces.append((last_start, last_start + i, last_start + i + 1))
 
     return vertices, faces
 
@@ -727,7 +715,7 @@ def sectioned_spine(
     return f.create_entity(
         "IfcPolygonalFaceSet",
         Coordinates=f.create_entity("IfcCartesianPointList3D", CoordList=coord_list),
-        Closed=False,
+        Closed=True,
         Faces=ifc_faces,
     )
 
