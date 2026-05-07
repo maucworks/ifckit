@@ -13,6 +13,7 @@ from ifckit.elements import PendingSectionedSpine
 from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles import RectangleProfile, DerivedProfile, IBeamProfile
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
+from ifckit.builders._geom import get_body_context
 
 
 def test_basic_spike():
@@ -38,7 +39,7 @@ def test_basic_spike():
     )
 
     # Build
-    context = ifc_file.by_type("IfcGeometricRepresentationContext")[0]
+    context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
     shape = builder._create_geometry(ifc_file, pending, None, context)
     # shape is now IfcProductDefinitionShape
@@ -90,7 +91,7 @@ def test_varying_profiles():
     )
 
     # Build
-    context = ifc_file.by_type("IfcGeometricRepresentationContext")[0]
+    context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
     shape = builder._create_geometry(ifc_file, pending, None, context)
     # shape is now IfcProductDefinitionShape
@@ -116,7 +117,7 @@ def test_ibeam_spike():
     """SectionedSpine with I-beam profiles."""
     print("=== Test 3: I-Beam Spine ===")
 
-    model = IfcModel()
+    model = IfcModel(unit=LengthUnit.MILLIMETRE)
     ifc_file = model.ifc_file
 
     # Spine
@@ -135,7 +136,7 @@ def test_ibeam_spike():
     )
 
     # Build
-    context = ifc_file.by_type("IfcGeometricRepresentationContext")[0]
+    context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
     shape = builder._create_geometry(ifc_file, pending, None, context)
     # shape is now IfcProductDefinitionShape
