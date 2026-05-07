@@ -27,8 +27,12 @@ def _make_storey(ifc_file, project):
     o = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
     z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
     x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
-    axis = ifc_file.create_entity("IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x)
-    place = ifc_file.create_entity("IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis)
+    axis = ifc_file.create_entity(
+        "IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x
+    )
+    place = ifc_file.create_entity(
+        "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis
+    )
     storey = ifc_file.create_entity(
         "IfcBuildingStorey",
         GlobalId=_guid(),
@@ -151,7 +155,10 @@ def test_ibeam_spine():
     pos2 = Plane(Vec(2000, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
 
     pending = PendingSectionedSpine(
-        spine=spine, profiles=[p1, p2], positions=[pos1, pos2], name="ibeam_spine"
+        spine=spine,
+        profiles=[p1, p2],
+        positions=[pos1, pos2],
+        name="ibeam_spine",
     )
 
     # Build
