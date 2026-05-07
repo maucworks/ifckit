@@ -81,6 +81,50 @@ class TestEvalExpr:
         # "$a - $b + $c" = (a - b) + c left-to-right
         assert _eval_expr("$a - $b + $c", {"a": 10.0, "b": 3.0, "c": 1.0}) == pytest.approx(8.0)
 
+    def test_mul_before_add(self):
+        # 2 + 3 * 4 = 14, not 20
+        assert _eval_expr("2 + 3 * 4", {}) == pytest.approx(14.0)
+
+    def test_mul_before_sub(self):
+        # 10 - 2 * 3 = 4, not 24
+        assert _eval_expr("10 - 2 * 3", {}) == pytest.approx(4.0)
+
+    def test_div_before_add(self):
+        # $h / 2 + 10 = 0.6 + 10 = 10.6
+        assert _eval_expr("$h / 2 + 10", {"h": 1.2}) == pytest.approx(10.6)
+
+    def test_mixed_precedence_with_params(self):
+        # "$lining_depth / 2 + $lining_thickness * 3"
+        assert _eval_expr(
+            "$lining_depth / 2 + $lining_thickness * 3",
+            {"lining_depth": 100.0, "lining_thickness": 10.0},
+        ) == pytest.approx(80.0)  # 50 + 30
+
+    def test_parentheses_override_precedence(self):
+        # (2 + 3) * 4 = 20, not 14
+        assert _eval_expr("(2 + 3) * 4", {}) == pytest.approx(20.0)
+
+    def test_parentheses_in_denominator(self):
+        # $h / ($lining_depth / 2) = 1.2 / 0.6 = 2.0
+        assert _eval_expr(
+            "$h / ($lining_depth / 2)",
+            {"h": 1.2, "lining_depth": 1.2},
+        ) == pytest.approx(2.0)
+
+    def test_nested_parentheses(self):
+        # ((2 + 3) * (4 - 1)) = 5 * 3 = 15
+        assert _eval_expr("((2 + 3) * (4 - 1))", {}) == pytest.approx(15.0)
+
+    def test_unary_minus(self):
+        assert _eval_expr("-$x", {"x": 5.0}) == pytest.approx(-5.0)
+
+    def test_param_times_literal_plus_param(self):
+        # "2 * $lining_thickness + $door_width" = 2*50 + 1000 = 1100
+        assert _eval_expr(
+            "2 * $lining_thickness + $door_width",
+            {"lining_thickness": 50.0, "door_width": 1000.0},
+        ) == pytest.approx(1100.0)
+
     def test_unknown_param(self):
         with pytest.raises(KeyError, match="unknown_param"):
             _eval_expr("$unknown_param", {})
@@ -399,15 +443,17 @@ class TestEvaluateFixedCasement:
 
 
 class TestEvaluateDoorFlush:
-    def test_returns_one_component(self):
+    def test_returns_two_components(self):
         f, ctx = _make_ifc()
         comps = evaluate_component_graph("door_flush", f, ctx, {"w": 0.9, "h": 2.1})
-        assert len(comps) == 1
+        assert len(comps) == 4
 
-    def test_component_role_is_door(self):
+    def test_component_roles(self):
         f, ctx = _make_ifc()
         comps = evaluate_component_graph("door_flush", f, ctx, {"w": 0.9, "h": 2.1})
-        assert comps[0].role == "Door"
+        roles = {c.role for c in comps}
+        assert "Lining" in roles
+        assert "Panel" in roles
 
     def test_door_is_extruded_solid(self):
         f, ctx = _make_ifc()

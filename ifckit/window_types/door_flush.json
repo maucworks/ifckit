@@ -1,9 +1,14 @@
 {
   "version": 1,
   "parameters": {
-    "w": 1000,
-    "h": 1000,
-    "door_depth": 0.044
+    "w": 3000,
+    "h": 3000,
+      "door_height": 2300,
+      "door_width": 1000,
+      "door_depth": 50,
+      "lining_thickness": 50,
+      "lining_depth": 100,
+      "panel_depth": 6
   },
   "opening_nodes": [
     {
@@ -16,7 +21,7 @@
       "id": "opening_void",
       "op": "extrude",
       "profile": "opening_rect",
-      "depth": "$wall_thickness",
+      "depth": "2 * $wall_thickness",
       "z_offset": 0,
       "output": true,
       "role": "Opening"
@@ -24,19 +29,88 @@
   ],
   "nodes": [
     {
-      "id": "door_rect",
+      "id": "lining_profile",
       "op": "rect",
       "p0": [0, 0],
-      "p1": ["$w", "$h"]
+        "p1": ["$w", "$h"],
+        "holes":[
+            {
+                "id": "door_rect",
+                "op": "rect",
+                "p0": ["$lining_thickness", 0],
+                "p1": ["$lining_thickness + $door_width", "$door_height"]
+            },
+            {
+                "id": "top_window_rect",
+                "op": "rect",
+                "p0": ["$lining_thickness", "$door_height + $lining_thickness"],
+                "p1": ["$lining_thickness + $door_width", "$h - $lining_thickness"]
+            },
+            {
+                "id": "side_window_rect",
+                "op": "rect",
+                "p0": [" $lining_thickness + $lining_thickness + $door_width", "$lining_thickness"],
+                "p1": ["$w - $lining_thickness", "$h - $lining_thickness"]
+            }]
     },
-    {
-      "id": "door_leaf",
-      "op": "extrude",
-      "profile": "door_rect",
-      "depth": "$door_depth",
-      "z_offset": 0,
-      "output": true,
-      "role": "Door"
+      {
+          "id": "lining",
+          "op": "extrude",
+          "profile": "lining_profile",
+          "depth": "$lining_depth",
+          "z_offset": 0,
+          "output": true,
+          "role": "Lining",
+          "material": {
+              "color": {"r": 0.8, "g": 0.8, "b": 0.8},
+              "transparency": 0,
+              "name": "Aluminum frame"
+          }
+      },
+       {
+           "id": "door_panel",
+           "op": "extrude",
+           "profile": "door_rect",
+           "depth": "$door_depth",
+           "z_offset": 0,
+           "output": true,
+           "role": "Panel",
+           "material": {
+               "color": {"r": 0.9, "g": 0, "b": 0},
+               "transparency": 0,
+               "name": "Door panel"
+           }
+    }
+      ,
+       {
+           "id": "top_window",
+           "op": "extrude",
+           "profile": "top_window_rect",
+           "depth": "$panel_depth",
+           "z_offset": "$lining_depth / 2",
+           "output": true,
+           "role": "Glazing",
+           "material": {
+               "color": {"r": 0.9, "g": 0.95, "b": 1.0},
+               "transparency": 0.8,
+               "name": "Glass"
+           }
+       }
+      ,
+       {
+           "id": "side_window",
+           "op": "extrude",
+           "profile": "side_window_rect",
+           "depth": "$panel_depth",
+           "z_offset": "$lining_depth / 2",
+           "output": true,
+           "role": "Glazing",
+           "material": {
+               "color": {"r": 0.9, "g": 0.95, "b": 1.0},
+               "transparency": 0.8,
+               "name": "Glass"
+           }
     }
   ]
 }
+

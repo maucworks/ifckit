@@ -606,18 +606,22 @@ def _apply_material_to_solid(
         Blue=float(color_def.get("b", 1.0)),
     )
 
-    # Create surface style shading with color and transparency
+    # IfcSurfaceStyleRendering is the correct subtype — it is supported by all
+    # major viewers (Blender, web-ifc, Bonsai). IfcSurfaceStyleShading is the
+    # abstract base and may be ignored or handled inconsistently.
+    # ReflectanceMethod=FLAT gives flat shading without specular highlights.
     shading = ifc_file.create_entity(
-        "IfcSurfaceStyleShading",
+        "IfcSurfaceStyleRendering",
         SurfaceColour=color,
         Transparency=float(transparency),
+        ReflectanceMethod="FLAT",
     )
 
-    # Create surface style
+    # BOTH: style applies to front and back faces.
     surface_style = ifc_file.create_entity(
         "IfcSurfaceStyle",
         Name=name or "Material",
-        Side="POSITIVE",
+        Side="BOTH",
         Styles=[shading],
     )
 

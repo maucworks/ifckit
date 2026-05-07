@@ -259,8 +259,8 @@ class TestModelBDoor:
         after = len(m._file.by_type("IfcOpeningElement"))
         assert after == before + 1
 
-    def test_door_shape_has_one_solid(self, model_with_wall):
-        """door_flush produces a single Door solid."""
+    def test_door_shape_has_two_solids(self, model_with_wall):
+        """door_flush produces lining + panel solids."""
         m, storey, wall = model_with_wall
         door = m.add(
             PendingDoor(
@@ -273,7 +273,7 @@ class TestModelBDoor:
         )
         reps = door.entity.Representation.Representations
         body_rep = next(r for r in reps if r.RepresentationIdentifier == "Body")
-        assert len(body_rep.Items) == 1
+        assert len(body_rep.Items) == 4
 
     def test_door_fills_opening(self, model_with_wall):
         m, storey, wall = model_with_wall

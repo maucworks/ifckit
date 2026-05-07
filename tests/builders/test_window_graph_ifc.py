@@ -200,8 +200,8 @@ class TestDoorWithDoorFlushGraph:
         )
         assert door.entity.is_a("IfcDoor")
 
-    def test_door_shape_has_one_solid(self, model_with_wall):
-        """door_flush produces a single Door component."""
+    def test_door_shape_has_two_solids(self, model_with_wall):
+        """door_flush produces lining + panel solids."""
         m, storey, wall = model_with_wall
         opening = m.add_opening(
             PendingOpening(width=0.9, height=2.1, plane=_opening_plane(2.0)),
@@ -219,7 +219,7 @@ class TestDoorWithDoorFlushGraph:
         )
         reps = door.entity.Representation.Representations
         body_rep = next(r for r in reps if r.RepresentationIdentifier == "Body")
-        assert len(body_rep.Items) == 1
+        assert len(body_rep.Items) == 4
 
 
 # ---------------------------------------------------------------------------

@@ -62,77 +62,93 @@ class EvaluatedComponent:
 def _eval_expr(expr: Any, params: Dict[str, float]) -> float:
     """Evaluate a parameter expression to a float.
 
-    Respects operator precedence: * and / before + and -.
+    Supports +, -, *, / with correct precedence, parentheses, and $variables.
+    Uses a recursive descent parser: no regex token-list mutation.
+
+    Grammar:
+        expr   = term   (('+' | '-') term)*
+        term   = factor (('*' | '/') factor)*
+        factor = '(' expr ')' | number | '$' name | '-' factor
     """
     if isinstance(expr, (int, float)):
         return float(expr)
-
     if not isinstance(expr, str):
         raise ValueError(f"_eval_expr: expected str or number, got {type(expr).__name__!r}")
 
-    expr = expr.strip()
+    src = expr.strip()
+    pos = [0]  # mutable int so nested functions can advance it
 
-    # Simple substitution: "$name"
-    if re.fullmatch(r"\$[A-Za-z_][A-Za-z0-9_]*", expr):
-        name = expr[1:]
+    def peek() -> str:
+        while pos[0] < len(src) and src[pos[0]] == " ":
+            pos[0] += 1
+        return src[pos[0]] if pos[0] < len(src) else ""
+
+    def consume(expected: str | None = None) -> str:
+        ch = peek()
+        if expected is not None and ch != expected:
+            raise ValueError(f"_eval_expr: expected {expected!r} got {ch!r} in {expr!r}")
+        pos[0] += 1
+        return ch
+
+    def parse_number() -> float:
+        start = pos[0]
+        while pos[0] < len(src) and src[pos[0]] in "0123456789.":
+            pos[0] += 1
+        if pos[0] == start:
+            raise ValueError(f"_eval_expr: expected number at pos {start} in {expr!r}")
+        return float(src[start : pos[0]])
+
+    def parse_variable() -> float:
+        pos[0] += 1  # skip '$'
+        start = pos[0]
+        while pos[0] < len(src) and (src[pos[0]].isalnum() or src[pos[0]] == "_"):
+            pos[0] += 1
+        name = src[start : pos[0]]
         if name not in params:
             raise KeyError(f"Unknown parameter: {name!r}")
         return float(params[name])
 
-    def _resolve_token(tok: str) -> float:
-        """Resolve a single token (variable or literal)."""
-        tok = str(tok).strip()
-        if tok.startswith("$"):
-            name = tok[1:]
-            if name not in params:
-                raise KeyError(f"Unknown parameter: {name!r}")
-            return float(params[name])
-        try:
-            return float(tok)
-        except ValueError:
-            raise ValueError(f"_eval_expr: cannot parse token {tok!r}")
+    def parse_factor() -> float:
+        ch = peek()
+        if ch == "(":
+            consume("(")
+            val = parse_expr()
+            consume(")")
+            return val
+        if ch == "-":
+            consume("-")
+            return -parse_factor()
+        if ch == "$":
+            return parse_variable()
+        return parse_number()
 
-    # Tokenize: split by operators but keep them
-    tokens = re.split(r"\s*([\+\-\*\/])\s*", expr)
-
-    if len(tokens) == 1:
-        return _resolve_token(tokens[0])
-
-    # First pass: resolve all * and / (higher precedence)
-    i = 1
-    while i < len(tokens):
-        if i >= len(tokens) - 1:
-            break
-        op = tokens[i].strip()
-        if op in ("*", "/"):
-            lhs = _resolve_token(tokens[i - 1])
-            rhs = _resolve_token(tokens[i + 1])
+    def parse_term() -> float:
+        val = parse_factor()
+        while peek() in ("*", "/"):
+            op = consume()
+            rhs = parse_factor()
             if op == "*":
-                result = lhs * rhs
-            else:  # op == "/"
+                val *= rhs
+            else:
                 if abs(rhs) < 1e-15:
                     raise ValueError(f"_eval_expr: division by zero in {expr!r}")
-                result = lhs / rhs
-            # Replace [lhs, op, rhs] with result
-            tokens[i - 1 : i + 2] = [result]
-            # Stay at same i to check next operator
-        else:
-            i += 2
+                val /= rhs
+        return val
 
-    # Second pass: resolve all + and - (lower precedence)
-    result = _resolve_token(tokens[0])
-    i = 1
-    while i < len(tokens) - 1:
-        op = tokens[i].strip()
-        rhs = _resolve_token(tokens[i + 1])
-        if op == "+":
-            result += rhs
-        elif op == "-":
-            result -= rhs
-        else:
-            raise ValueError(f"_eval_expr: unexpected operator {op!r}")
-        i += 2
+    def parse_expr() -> float:
+        val = parse_term()
+        while peek() in ("+", "-"):
+            op = consume()
+            rhs = parse_term()
+            if op == "+":
+                val += rhs
+            else:
+                val -= rhs
+        return val
 
+    result = parse_expr()
+    if pos[0] != len(src) and src[pos[0] :].strip():
+        raise ValueError(f"_eval_expr: unexpected trailing input {src[pos[0] :]!r} in {expr!r}")
     return result
 
 
@@ -389,6 +405,12 @@ def _eval_node_list(
         if op == "rect":
             result = _eval_node_rect(node, resolved, scale_x, scale_y)
             cache[node_id] = result
+            # Also cache any named holes so extrude nodes can reference them directly.
+            for hole_node in node.get("holes", []):
+                hole_id = hole_node.get("id")
+                if hole_id and hole_id not in cache:
+                    hole_result = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
+                    cache[hole_id] = hole_result
 
         elif op == "extrude":
             profile_id = node.get("profile")

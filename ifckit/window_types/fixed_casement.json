@@ -53,7 +53,7 @@
       "role": "Lining",
       "material": {
         "color": {"r": 0.8, "g": 0.8, "b": 0.8},
-        "transparency": 0.95,
+        "transparency": 0,
         "name": "Aluminum frame"
       }
     },
@@ -73,7 +73,7 @@
       "role": "Glazing",
       "material": {
         "color": {"r": 0.9, "g": 0.95, "b": 1.0},
-        "transparency": 0.1,
+        "transparency": 0.8,
         "name": "Clear glass"
       }
     }
