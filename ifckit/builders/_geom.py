@@ -566,16 +566,42 @@ def _triangulate_polygon(
             if _area(prev, curr, nxt) <= 0:
                 continue
 
-            # No other vertex inside the triangle
+            # No convex vertex inside the triangle
+            # (reflex/concave vertices inside don't block the ear — per mapbox/earcut)
             inside = False
             for j in indices:
                 if j in (prev, curr, nxt):
                     continue
                 if _inside(prev, curr, nxt, j):
-                    inside = True
+                    # Only block if j is convex (signed area ≥ 0 for CCW)
+                    j_prev = indices[(indices.index(j) - 1) % len(indices)]
+                    j_next = indices[(indices.index(j) + 1) % len(indices)]
+                    if _area(j_prev, j, j_next) >= 0:
+                        inside = True
+                        break
+
+            if inside:
+                continue
+
+            # Diagonal (prev, nxt) must not cross any other edge
+            cross_edge = False
+            for ei in range(len(indices)):
+                a = indices[ei]
+                b = indices[(ei + 1) % len(indices)]
+                if a in (prev, nxt) or b in (prev, nxt):
+                    continue
+                # Check if segments (prev, nxt) and (a, b) intersect
+                d1 = _area(prev, nxt, a)
+                d2 = _area(prev, nxt, b)
+                d3 = _area(a, b, prev)
+                d4 = _area(a, b, nxt)
+                if (d1 > 0 and d2 < 0 or d1 < 0 and d2 > 0) and (
+                    d3 > 0 and d4 < 0 or d3 < 0 and d4 > 0
+                ):
+                    cross_edge = True
                     break
 
-            if not inside:
+            if not cross_edge:
                 ear = i
                 break
 
@@ -669,23 +695,27 @@ def _tessellate_sectioned_spine(
             h = prof_def.OverallDepth
             tw = prof_def.WebThickness
             tf = prof_def.FlangeThickness
-            # I-shape: 12 vertices (H-shape outline)
             hw = w / 2
             hh = h / 2
             htw = tw / 2
+            # Three separate convex rectangles: bottom flange, web, top flange
+            # Each is a 4-vertex rectangle that forms a clean quad face
             pts = [
-                (-hw, -hh),  # bottom-left
-                (-hw, -hh + tf),  # bottom flange top-left
+                # Bottom flange (CCW)
+                (-hw, -hh),        # bottom-left
+                (hw, -hh),         # bottom-right
+                (hw, -hh + tf),    # bottom flange top-right
+                (-hw, -hh + tf),   # bottom flange top-left
+                # Web (CCW)
                 (-htw, -hh + tf),  # web bottom-left
-                (-htw, hh - tf),  # web top-left
-                (-hw, hh - tf),  # top flange bottom-left
-                (-hw, hh),  # top-left
-                (hw, hh),  # top-right
-                (hw, hh - tf),  # top flange bottom-right
-                (htw, hh - tf),  # web top-right
-                (htw, -hh + tf),  # web bottom-right
-                (hw, -hh + tf),  # bottom flange top-right
-                (hw, -hh),  # bottom-right
+                (htw, -hh + tf),   # web bottom-right
+                (htw, hh - tf),    # web top-right
+                (-htw, hh - tf),   # web top-left
+                # Top flange (CCW)
+                (-hw, hh - tf),    # top flange bottom-left
+                (hw, hh - tf),     # top flange bottom-right
+                (hw, hh),          # top-right
+                (-hw, hh),         # top-left
             ]
             profile_rings.append(pts)
         elif prof_def.is_a() == "IfcDerivedProfileDef":

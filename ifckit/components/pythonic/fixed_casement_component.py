@@ -68,7 +68,9 @@ class FixedCasementComponent(WindowComponent):
 
         # Lining with hole: outer rect minus inner rect (glazing opening)
         # Using Path class like JSON evaluator does
-        outer_pts = [Vec(x, y, 0) for x, y in [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy), (0, 0)]]
+        outer_pts = [
+            Vec(x, y, 0) for x, y in [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]
+        ]
         outer_path = Path.from_pts(outer_pts, closed=True)
 
         hole_x0 = ltx
@@ -84,7 +86,6 @@ class FixedCasementComponent(WindowComponent):
                     (hole_x1, hole_y0),
                     (hole_x1, hole_y1),
                     (hole_x0, hole_y1),
-                    (hole_x0, hole_y0),
                 ]
             ]
             hole_path = Path.from_pts(hole_pts, closed=True)
@@ -150,9 +151,12 @@ def profile_from_points_from_path(ifc_file, path: Path):
     """Create IFC profile from Path (supports holes)."""
     # Use IfcPolyline instead of CompositeCurve for better viewer compatibility
     outer_points = [
-        ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0)) for seg in path.segments
+        ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
+        for seg in path.segments
     ] + [
-        ifc_file.createIfcCartesianPoint((path.segments[0].start.x, path.segments[0].start.y, 0.0))
+        ifc_file.createIfcCartesianPoint(
+            (path.segments[0].start.x, path.segments[0].start.y, 0.0)
+        )
     ]
     outer_curve = ifc_file.createIfcPolyline(outer_points)
 

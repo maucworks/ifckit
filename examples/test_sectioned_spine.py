@@ -16,6 +16,7 @@ from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.builders._geom import get_body_context
 import ifcopenshell
 import uuid
+import math
 
 
 def _guid():
@@ -27,12 +28,8 @@ def _make_storey(ifc_file, project):
     o = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
     z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
     x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
-    axis = ifc_file.create_entity(
-        "IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x
-    )
-    place = ifc_file.create_entity(
-        "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis
-    )
+    axis = ifc_file.create_entity("IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x)
+    place = ifc_file.create_entity("IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis)
     storey = ifc_file.create_entity(
         "IfcBuildingStorey",
         GlobalId=_guid(),
@@ -148,16 +145,34 @@ def test_ibeam_spine():
 
     # I-Beam profiles (start small, end larger)
     p1 = IBeamProfile(height=100, width=100, flange_thickness=10, web_thickness=6)
-    p2 = IBeamProfile(height=150, width=150, flange_thickness=12, web_thickness=8)
+    p2 = IBeamProfile(
+        height=100 / math.cos(math.radians(45)),
+        width=150,
+        flange_thickness=12,
+        web_thickness=8,
+    )
+    p3 = IBeamProfile(
+        height=100,
+        width=150 / math.cos(math.radians(45)),
+        flange_thickness=12,
+        web_thickness=8,
+    )
+    p4 = IBeamProfile(height=100, width=150, flange_thickness=12, web_thickness=8)
 
     # Positions
     pos1 = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
-    pos2 = Plane(Vec(2000, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+    pos2 = Plane(Vec(2000, 0, 0), Vec(1, 0, 1), Vec(0, 1, 0))
+    pos3 = Plane(Vec(2000, 0, 1000), Vec(0, -1, 1), Vec(0, 1, 1))
+    pos4 = Plane(
+        Vec(2000, -1000, 1000),
+        Vec(0, -1, 0),
+        Vec(0, 0, 1),
+    )
 
     pending = PendingSectionedSpine(
         spine=spine,
-        profiles=[p1, p2],
-        positions=[pos1, pos2],
+        profiles=[p1, p2, p3, p4],
+        positions=[pos1, pos2, pos3, pos4],
         name="ibeam_spine",
     )
 
