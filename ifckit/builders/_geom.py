@@ -871,26 +871,25 @@ def sectioned_spine(
     # Tessellate to mesh
     vertices, faces = _tessellate_sectioned_spine(spine_curve, cross_sections, positions)
 
-    # Convert to IFC IfcPolygonalFaceSet
     # CoordList expects [[x1, y1, z1], [x2, y2, z2], ...]
     coord_list = [[_round_coord(v[0]), _round_coord(v[1]), _round_coord(v[2])] for v in vertices]
 
-    # Build IfcIndexedPolygonalFace entities from face indices
-    ifc_faces = []
+    # Convert all faces to triangles (split quads)
+    tris = []
     for face_indices in faces:
-        # IfcIndexedPolygonalFace uses 1-based indexing
-        ifc_face = f.create_entity(
-            "IfcIndexedPolygonalFace",
-            CoordIndex=[idx + 1 for idx in face_indices],
-        )
-        ifc_faces.append(ifc_face)
+        if len(face_indices) == 4:
+            tris.append((face_indices[0], face_indices[1], face_indices[2]))
+            tris.append((face_indices[0], face_indices[2], face_indices[3]))
+        elif len(face_indices) == 3:
+            tris.append(face_indices)
 
-    # Create the IfcPolygonalFaceSet
+    # Use IfcTriangulatedFaceSet — explicit triangles prevent viewer re-triangulation
+    # CoordIndex is a 1-based list of triangle index triples
     return f.create_entity(
-        "IfcPolygonalFaceSet",
+        "IfcTriangulatedFaceSet",
         Coordinates=f.create_entity("IfcCartesianPointList3D", CoordList=coord_list),
-        Closed=True,
-        Faces=ifc_faces,
+        Closed=False,
+        CoordIndex=[[idx + 1 for idx in tri] for tri in tris],
     )
 
 
