@@ -33,11 +33,11 @@ DOOR_PANEL = {"color": {"r": 0.9, "g": 0.0, "b": 0.0}, "transparency": 0.0, "nam
 CLEAR_GLASS = {"color": {"r": 0.9, "g": 0.95, "b": 1.0}, "transparency": 0.8, "name": "Clear glass"}
 
 
-@component("door_flush")
+@component("door_flush_component")
 class DoorFlushComponent(WindowComponent):
     """3-sided frame door with top and side glazing."""
 
-    name = "door_flush"
+    name = "door_flush_component"
 
     def build(
         self,
