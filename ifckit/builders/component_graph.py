@@ -24,7 +24,7 @@ Expression syntax (v1):
     "$a OP $b"        binary op: +, -, *, /
     "$a OP literal"   e.g. "$panel_depth / 2"
 
-See ifckit/window_types/*.json for examples.
+See ifckit.components.json/*.json for examples.
 """
 
 from __future__ import annotations
@@ -233,13 +233,14 @@ def _eval_point(
 
 
 def _load_preset(name: str) -> Dict[str, Any]:
-    """Load a JSON preset by name from ifckit.window_types."""
+    """Load a JSON preset by name from ifckit.components.json."""
     try:
-        pkg = importlib.resources.files("ifckit.window_types")
+        pkg = importlib.resources.files("ifckit.components.json")
         data = (pkg / f"{name}.json").read_text(encoding="utf-8")
     except (FileNotFoundError, TypeError) as exc:
         raise FileNotFoundError(
-            f"Component graph preset not found: {name!r}. Expected ifckit/window_types/{name}.json"
+            f"Component graph preset not found: {name!r}. "
+            f"Expected ifckit.components.json/{name}.json"
         ) from exc
     parsed = json.loads(data)
     version = parsed.get("version")
@@ -615,6 +616,7 @@ def evaluate_component_graph(
     ifc_file: ifcopenshell.file,
     context: ifcopenshell.entity_instance,
     params: Dict[str, float],
+    plane=None,
 ) -> List[EvaluatedComponent]:
     """
     Evaluate a component graph preset and produce IFC fill geometry.
@@ -625,11 +627,32 @@ def evaluate_component_graph(
         context:     Body sub-context.
         params:      Override dict. Must include ``w`` and ``h`` (actual
                      dimensions). Other keys override preset defaults.
+        plane:       Reference plane for Python components.
+                    If None, falls back to JSON-only evaluation.
 
     Returns:
         List of EvaluatedComponent for nodes with ``output: true``.
     """
-    preset = _load_preset(preset_name)
+    # 1. Check JSON preset first (JSON wins on name collision)
+    try:
+        preset = _load_preset(preset_name)
+    except FileNotFoundError:
+        # 2. Fall back to Python component if JSON not found
+        from ifckit.components import COMPONENT_REGISTRY, get_component
+
+        if preset_name in COMPONENT_REGISTRY and plane is not None:
+            component_cls = get_component(preset_name)
+            component = component_cls()
+            return component.build(
+                ifc_file,
+                plane,
+                params.get("w", 1000),
+                params.get("h", 1000),
+                params,
+            )
+        raise  # Re-raise original error
+
+    # JSON preset exists - use it (Python can override by deleting JSON file)
     resolved = _resolve_parameters(preset, params)
     ref_w = float(preset["parameters"]["w"])
     ref_h = float(preset["parameters"]["h"])

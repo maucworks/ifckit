@@ -110,7 +110,7 @@ def _build_fill_from_graph(
     if pending.parameters:
         params.update(pending.parameters)
 
-    components = evaluate_component_graph(graph_name, ifc_file, context, params)
+    components = evaluate_component_graph(graph_name, ifc_file, context, params, pending.plane)
 
     # Each component solid has its own placement (z_offset from the graph).
     # Apply the anchor (dx, dy) as an additional XY translation on each placement.
