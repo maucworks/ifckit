@@ -14,6 +14,34 @@ from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles import RectangleProfile, DerivedProfile, IBeamProfile
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.builders._geom import get_body_context
+import ifcopenshell
+import uuid
+
+
+def _guid():
+    return ifcopenshell.guid.compress(uuid.uuid4().hex)
+
+
+def _make_storey(ifc_file, project):
+    """Create a basic storey and return it."""
+    o = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
+    z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
+    x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
+    axis = ifc_file.create_entity("IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x)
+    place = ifc_file.create_entity("IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis)
+    storey = ifc_file.create_entity(
+        "IfcBuildingStorey",
+        GlobalId=_guid(),
+        Name="Storey",
+        ObjectPlacement=place,
+    )
+    ifc_file.create_entity(
+        "IfcRelAggregates",
+        GlobalId=_guid(),
+        RelatingObject=project,
+        RelatedObjects=[storey],
+    )
+    return storey
 
 
 def test_basic_spike():
@@ -22,6 +50,7 @@ def test_basic_spike():
 
     model = IfcModel(unit=LengthUnit.MILLIMETRE)
     ifc_file = model.ifc_file
+    storey = _make_storey(ifc_file, model._project)
 
     # Spine: straight line 0 to 1000
     spine = Path.from_pts([Vec(0, 0, 0), Vec(0, 0, 500)])
@@ -41,8 +70,8 @@ def test_basic_spike():
     # Build
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
-    shape_rep = builder._create_geometry(ifc_file, pending, None, context)
-    element = builder._create_element(ifc_file, pending, None, shape_rep)
+    shape_rep = builder._create_geometry(ifc_file, pending, storey, context)
+    element = builder._create_element(ifc_file, pending, storey, shape_rep)
 
     print(f"  Element: {element.is_a()} - {element.Name}")
     # Get the actual geometry from the representation
@@ -59,6 +88,7 @@ def test_varying_profiles():
 
     model = IfcModel(unit=LengthUnit.MILLIMETRE)
     ifc_file = model.ifc_file
+    storey = _make_storey(ifc_file, model._project)
 
     # Spine: straight line
     spine = Path.from_pts([Vec(0, 0, 0), Vec(1000, 0, 0)])
@@ -87,8 +117,8 @@ def test_varying_profiles():
     # Build
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
-    shape_rep = builder._create_geometry(ifc_file, pending, None, context)
-    element = builder._create_element(ifc_file, pending, None, shape_rep)
+    shape_rep = builder._create_geometry(ifc_file, pending, storey, context)
+    element = builder._create_element(ifc_file, pending, storey, shape_rep)
 
     geom_item = shape_rep.Items[0]
     print(f"  Element: {element.is_a()}")
@@ -101,12 +131,13 @@ def test_varying_profiles():
     print("  Saved: output/test_sectioned_spine_varying.ifc\n")
 
 
-def test_ibeam_spike():
+def test_ibeam_spine():
     """SectionedSpine with I-beam profiles."""
     print("=== Test 3: I-Beam Spine ===")
 
     model = IfcModel(unit=LengthUnit.MILLIMETRE)
     ifc_file = model.ifc_file
+    storey = _make_storey(ifc_file, model._project)
 
     # Spine
     spine = Path.from_pts([Vec(0, 0, 0), Vec(2000, 0, 0)])
@@ -126,8 +157,8 @@ def test_ibeam_spike():
     # Build
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
-    shape_rep = builder._create_geometry(ifc_file, pending, None, context)
-    element = builder._create_element(ifc_file, pending, None, shape_rep)
+    shape_rep = builder._create_geometry(ifc_file, pending, storey, context)
+    element = builder._create_element(ifc_file, pending, storey, shape_rep)
 
     geom_item = shape_rep.Items[0]
     print(f"  Element: {element.is_a()}")
@@ -143,5 +174,5 @@ def test_ibeam_spike():
 if __name__ == "__main__":
     test_basic_spike()
     test_varying_profiles()
-    test_ibeam_spike()
+    test_ibeam_spine()
     print("All tests complete!")

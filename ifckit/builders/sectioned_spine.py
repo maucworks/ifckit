@@ -110,13 +110,35 @@ class SectionedSpineBuilder(BaseBuilder):
         container: ifcopenshell.entity_instance,
         geometry: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
+        # Create ObjectPlacement at origin if no container
+        if container and container.ObjectPlacement:
+            placement = container.ObjectPlacement
+        else:
+            origin = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
+            z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
+            x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
+            axis = ifc_file.create_entity(
+                "IfcAxis2Placement3D", Location=origin, Axis=z, RefDirection=x
+            )
+            placement = ifc_file.create_entity(
+                "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis
+            )
+
         element = ifc_file.create_entity(
             "IfcBuildingElementProxy",
             GlobalId=_guid(),
             Name=pending.name or "SectionedSpine",
             Representation=product_definition_shape(ifc_file, geometry),
-            ObjectPlacement=container.ObjectPlacement if container else None,
+            ObjectPlacement=placement,
         )
+
+        # Contain in spatial structure if container provided
+        if container:
+            ifc_file.create_entity(
+                "IfcRelContainedInSpatialStructure",
+                RelatingStructure=container,
+                RelatedElements=[element],
+            )
 
         # Write properties if any
         if pending.properties:
