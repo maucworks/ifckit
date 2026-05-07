@@ -555,6 +555,13 @@ def _triangulate_polygon(
             curr = indices[i]
             nxt = indices[(i + 1) % len(indices)]
 
+            # Must be a convex vertex (for CCW polygon: cross product > 0)
+            cross = (pts[curr][0] - pts[prev][0]) * (pts[nxt][1] - pts[curr][1]) - (
+                pts[curr][1] - pts[prev][1]
+            ) * (pts[nxt][0] - pts[curr][0])
+            if cross <= 0:
+                continue
+
             # Must form a CCW triangle
             if _area(prev, curr, nxt) <= 0:
                 continue
