@@ -693,60 +693,12 @@ def evaluate_opening_nodes(
             ifc_file, plane, params.get("w", 1000), params.get("h", 1000), params
         )
 
-        wall_thickness = params.get("wall_thickness", 200)
         result = []
-        from ifckit.builders._geom import extrude_profile, profile_from_points
 
+        # Python components return Opening, Lining, Glazing components directly
+        # No need to create extra void geometry here
         for ec in opening_comps:
             result.append(ec)
-            if ec.role in ("Lining", "Glazing", "Panel"):
-                solid = ec.solid
-                if hasattr(solid, "SweptArea"):
-                    poly = solid.SweptArea
-                else:
-                    continue
-
-                pts = []
-                if hasattr(poly, "OuterCurve"):
-                    outer = poly.OuterCurve
-                    if hasattr(outer, "Points"):
-                        pts = [
-                            (float(p.Coordinates[0]), float(p.Coordinates[1])) for p in outer.Points
-                        ]
-                elif hasattr(poly, "Points"):
-                    pts = [(float(p.Coordinates[0]), float(p.Coordinates[1])) for p in poly.Points]
-
-                if pts:
-                    min_x = min(p[0] for p in pts)
-                    max_x = max(p[0] for p in pts)
-                    min_y = min(p[1] for p in pts)
-                    max_y = max(p[1] for p in pts)
-                    void_profile = profile_from_points(
-                        ifc_file,
-                        [
-                            (min_x, min_y),
-                            (max_x, min_y),
-                            (max_x, max_y),
-                            (min_x, max_y),
-                        ],
-                    )
-                    void_solid = extrude_profile(
-                        ifc_file,
-                        void_profile,
-                        depth=wall_thickness,
-                        extrude_direction=(0, 0, -1),
-                    )
-                    void_comp = EvaluatedComponent(
-                        solid=void_solid,
-                        role="Opening",
-                        node_id="void",
-                        material={
-                            "color": {"r": 0.5, "g": 0.5, "b": 0.5},
-                            "transparency": 1.0,
-                            "name": "Opening void",
-                        },
-                    )
-                    result.append(void_comp)
         return result
 
     # Fall back to JSON preset

@@ -163,23 +163,121 @@ def _build_fill_from_graph(
         RepresentationType=rep_type,
         Items=solids,
     )
-    prod_rep = product_definition_shape(ifc_file, shape_rep)
 
-    fill = ifcopenshell.api.run(
-        "root.create_entity",
-        ifc_file,
-        ifc_class=ifc_class,
-        name=name,
+    product_def_shape = ifc_file.create_entity(
+        "IfcProductDefinitionShape",
+        Representations=[shape_rep],
     )
-    fill.Representation = prod_rep
+
+    fill = ifc_file.create_entity(
+        ifc_class,
+        GlobalId=ifcopenshell.guid.new(),
+        Name=name,
+        Description=None,
+        ObjectType="fill",
+        ObjectPlacement=_relative_to_opening(ifc_file, opening_entity.ObjectPlacement),
+        Representation=product_def_shape,
+    )
+
     fill.OverallWidth = overall_width
     fill.OverallHeight = overall_height
-    fill.ObjectPlacement = _relative_to_opening(ifc_file, opening_entity.ObjectPlacement)
 
-    # NOTE: Do NOT assign fill to spatial structure container.
-    # Fills are part of the opening's composition and should be positioned
-    # relative to the opening, not the storey. Their spatial relationship
-    # is indirect through the opening element.
+    ifc_file.create_entity(
+        "IfcRelFillsElement",
+        GlobalId=ifcopenshell.guid.new(),
+        RelatingOpeningElement=opening_entity,
+        RelatedBuildingElement=fill,
+    )
+
+    if type_entity is not None:
+        _assign_type(ifc_file, fill, type_entity)
+
+    write_psets(ifc_file, fill, pending)
+    return fill
+
+
+def _build_fill_from_components(
+    ifc_file: ifcopenshell.file,
+    ifc_class: str,
+    name: str,
+    overall_width: float,
+    overall_height: float,
+    components,
+    pending,
+    opening_entity: ifcopenshell.entity_instance,
+    container: ifcopenshell.entity_instance,
+    context: ifcopenshell.entity_instance,
+    type_entity=None,
+    opening_anchor: str = "s",
+) -> ifcopenshell.entity_instance:
+    """Create a fill element from pre-built EvaluatedComponent list.
+
+    Components already have geometry and placements; apply materials.
+    """
+    solids = []
+
+    # Apply materials to components (already positioned)
+    for comp in components:
+        solid = comp.solid
+
+        # Apply material if defined or overridden
+        material = comp.material
+        if pending.material_overrides and comp.role in pending.material_overrides:
+            material_override = pending.material_overrides[comp.role]
+            if material and material_override:
+                merged_material = material.copy()
+                merged_material.update(material_override)
+                material = merged_material
+            elif material_override:
+                material = material_override
+
+        if not material:
+            material = {
+                "color": {"r": 0.75, "g": 0.75, "b": 0.75},
+                "transparency": 0.0,
+                "name": "Default",
+            }
+        solid = _apply_material_to_solid(ifc_file, solid, material)
+        solids.append(solid)
+
+    if not solids:
+        raise ValueError("_build_fill_from_components: no fill components")
+
+    # Build shape representation
+    has_boolean = any(s.is_a("IfcBooleanResult") for s in solids)
+    has_swept = any(s.is_a("IfcExtrudedAreaSolid") for s in solids)
+    if has_boolean and has_swept:
+        rep_type = "SolidModel"
+    elif has_boolean:
+        rep_type = "CSG"
+    else:
+        rep_type = "SweptSolid"
+
+    shape_rep = ifc_file.create_entity(
+        "IfcShapeRepresentation",
+        ContextOfItems=context,
+        RepresentationIdentifier="Body",
+        RepresentationType=rep_type,
+        Items=solids,
+    )
+
+    product_def_shape = ifc_file.create_entity(
+        "IfcProductDefinitionShape",
+        Representations=[shape_rep],
+    )
+
+    fill = ifc_file.create_entity(
+        ifc_class,
+        GlobalId=ifcopenshell.guid.new(),
+        Name=name,
+        Description=None,
+        ObjectType="fill",
+        ObjectPlacement=_relative_to_opening(ifc_file, opening_entity.ObjectPlacement),
+        Representation=product_def_shape,
+    )
+
+    fill.OverallWidth = overall_width
+    fill.OverallHeight = overall_height
 
     ifc_file.create_entity(
         "IfcRelFillsElement",
@@ -764,17 +862,20 @@ def build_window_model_b(
         pending.component_graph, ifc_file, context, params, pending.plane
     )
 
-    # Apply anchor offset to opening solids and apply materials
-
+    # Apply anchor offset to all components first
     opening_anchor = "s"
     dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
-    opening_solids = []
     for comp in opening_components:
-        solid = comp.solid
-        _shift_solid_placement(ifc_file, solid, dx, dy)
+        _shift_solid_placement(ifc_file, comp.solid, dx, dy)
 
-        # Opening solids are voids — do NOT wrap in IfcStyledItem.
-        opening_solids.append(solid)
+    # Separate Opening components from Fill components by role
+    opening_solids = []
+    fill_components = []
+    for comp in opening_components:
+        if comp.role == "Opening":
+            opening_solids.append(comp.solid)
+        else:
+            fill_components.append(comp)
 
     opening_entity = build_opening_from_solids(
         ifc_file,
@@ -788,24 +889,40 @@ def build_window_model_b(
     if opening_entity is None:
         raise ValueError(
             f"build_window_model_b: preset {pending.component_graph!r} "
-            "produced no opening solid (all opening_nodes have output: false "
-            "or opening_nodes is absent). Cannot create IfcOpeningElement."
+            "produced no opening solid. Cannot create IfcOpeningElement."
         )
 
-    window = _build_fill(
-        ifc_file=ifc_file,
-        ifc_class="IfcWindow",
-        name=pending.name,
-        overall_width=pending.overall_width,
-        overall_height=pending.overall_height,
-        pending=pending,
-        opening_entity=opening_entity,
-        container=container,
-        context=context,
-        type_entity=None,
-        opening_anchor="s",
-        graph_name=pending.component_graph,
-    )
+    # Build window fill - either from components or with graph
+    if fill_components:
+        window = _build_fill_from_components(
+            ifc_file=ifc_file,
+            ifc_class="IfcWindow",
+            name=pending.name,
+            overall_width=pending.overall_width,
+            overall_height=pending.overall_height,
+            components=fill_components,
+            pending=pending,
+            opening_entity=opening_entity,
+            container=container,
+            context=context,
+            type_entity=None,
+            opening_anchor=opening_anchor,
+        )
+    else:
+        window = _build_fill(
+            ifc_file=ifc_file,
+            ifc_class="IfcWindow",
+            name=pending.name,
+            overall_width=pending.overall_width,
+            overall_height=pending.overall_height,
+            pending=pending,
+            opening_entity=opening_entity,
+            container=container,
+            context=context,
+            type_entity=None,
+            opening_anchor="s",
+            graph_name=pending.component_graph,
+        )
     _set_window_type_attr(ifc_file, window, pending.window_type)
     return window
 
