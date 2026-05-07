@@ -14,7 +14,11 @@ ALUMINUM_FRAME = {
     "name": "Aluminum frame",
 }
 
-CLEAR_GLASS = {"color": {"r": 0.9, "g": 0.95, "b": 1.0}, "transparency": 0.8, "name": "Clear glass"}
+CLEAR_GLASS = {
+    "color": {"r": 0.9, "g": 0.95, "b": 1.0},
+    "transparency": 0.8,
+    "name": "Clear glass",
+}
 
 
 @component("fixed_casement_component")
@@ -52,7 +56,7 @@ class FixedCasementComponent(WindowComponent):
             )
 
         lining_solid = extrude_profile(
-            ifc_file, lining_profile, depth=ld, extrude_direction=(0, 0, -1)
+            ifc_file, lining_profile, depth=ld, extrude_direction=(0, 1, -1)
         )
         comps.append(EvaluatedComponent(solid=lining_solid, role="Lining", material=ALUMINUM_FRAME))
 
