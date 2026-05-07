@@ -668,17 +668,17 @@ def _tessellate_sectioned_spine(
             htw = tw / 2
             pts = [
                 (-hw, -hh),  # bottom-left
-                (hw, -hh),  # bottom-right
-                (hw, -hh + tf),  # bottom flange top-right
-                (htw, -hh + tf),  # web bottom-right
-                (htw, hh - tf),  # web top-right
-                (hw, hh - tf),  # top flange bottom-right
-                (hw, hh),  # top-right
-                (-hw, hh),  # top-left
-                (-hw, hh - tf),  # top flange bottom-left
-                (-htw, hh - tf),  # web top-left
-                (-htw, -hh + tf),  # web bottom-left
                 (-hw, -hh + tf),  # bottom flange top-left
+                (-htw, -hh + tf),  # web bottom-left
+                (-htw, hh - tf),  # web top-left
+                (-hw, hh - tf),  # top flange bottom-left
+                (-hw, hh),  # top-left
+                (hw, hh),  # top-right
+                (hw, hh - tf),  # top flange bottom-right
+                (htw, hh - tf),  # web top-right
+                (htw, -hh + tf),  # web bottom-right
+                (hw, -hh + tf),  # bottom flange top-right
+                (hw, -hh),  # bottom-right
             ]
             profile_rings.append(pts)
         elif prof_def.is_a() == "IfcDerivedProfileDef":
@@ -746,6 +746,21 @@ def _tessellate_sectioned_spine(
         else:
             # Fallback: use arbitrary small profile
             profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
+
+    # Ensure all profile rings are CCW
+    for r in range(len(profile_rings)):
+        _area = (
+            sum(
+                (
+                    profile_rings[r][i][0] * profile_rings[r][(i + 1) % len(profile_rings[r])][1]
+                    - profile_rings[r][(i + 1) % len(profile_rings[r])][0] * profile_rings[r][i][1]
+                )
+                for i in range(len(profile_rings[r]))
+            )
+            / 2.0
+        )
+        if _area < 0:
+            profile_rings[r] = list(reversed(profile_rings[r]))
 
     # Build mesh vertices and faces
     vertices = []
