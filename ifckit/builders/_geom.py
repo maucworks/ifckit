@@ -516,6 +516,78 @@ def directrix_from_path(
     )
 
 
+def _triangulate_polygon(
+    pts: list[tuple[float, float]],
+) -> list[tuple[int, int, int]]:
+    """Triangulate a simple polygon using ear-clipping.
+
+    Args:
+        pts: List of (x, y) tuples in CCW order (not closed).
+
+    Returns:
+        List of (i, j, k) index tuples forming triangles.
+    """
+    n = len(pts)
+    if n < 3:
+        return []
+    if n == 3:
+        return [(0, 1, 2)]
+
+    indices = list(range(n))
+    triangles = []
+
+    def _area(i, j, k):
+        px, py = pts[i]
+        qx, qy = pts[j]
+        rx, ry = pts[k]
+        return (qx - px) * (ry - py) - (qy - py) * (rx - px)
+
+    def _inside(a, b, c, p):
+        ab = _area(a, b, p)
+        bc = _area(b, c, p)
+        ca = _area(c, a, p)
+        return (ab > 0 and bc > 0 and ca > 0) or (ab < 0 and bc < 0 and ca < 0)
+
+    while len(indices) > 3:
+        ear = None
+        for i in range(len(indices)):
+            prev = indices[i - 1]
+            curr = indices[i]
+            nxt = indices[(i + 1) % len(indices)]
+
+            # Must form a CCW triangle
+            if _area(prev, curr, nxt) <= 0:
+                continue
+
+            # No other vertex inside the triangle
+            inside = False
+            for j in indices:
+                if j in (prev, curr, nxt):
+                    continue
+                if _inside(prev, curr, nxt, j):
+                    inside = True
+                    break
+
+            if not inside:
+                ear = i
+                break
+
+        if ear is None:
+            # Degenerate polygon — fallback to fan
+            for i in range(1, len(indices) - 1):
+                triangles.append((indices[0], indices[i], indices[i + 1]))
+            return triangles
+
+        prev = indices[ear - 1]
+        curr = indices[ear]
+        nxt = indices[(ear + 1) % len(indices)]
+        triangles.append((prev, curr, nxt))
+        indices.pop(ear)
+
+    triangles.append(tuple(indices))
+    return triangles
+
+
 def _tessellate_sectioned_spine(
     spine_curve: ifcopenshell.entity_instance,
     cross_sections: list[ifcopenshell.entity_instance],
@@ -722,32 +794,26 @@ def _tessellate_sectioned_spine(
         last_start = section_vertex_offsets[last_section]
         last_ring_size = len(profile_rings[last_section])
 
-        if first_ring_size == 4:
-            # Quad cap — single face
-            # Front: reversed winding so normal points backward
-            faces.append(
-                (
-                    first_start,
-                    first_start + 3,
-                    first_start + 2,
-                    first_start + 1,
-                )
-            )
-            # Back: normal winding so normal points forward
-            faces.append(
-                (
-                    last_start,
-                    last_start + 1,
-                    last_start + 2,
-                    last_start + 3,
-                )
-            )
-        else:
-            # Fan triangulation for non-rectangular profiles
-            for i in range(1, first_ring_size - 1):
-                faces.append((first_start, first_start + i + 1, first_start + i))
-            for i in range(1, last_ring_size - 1):
-                faces.append((last_start, last_start + i, last_start + i + 1))
+        for ring_size, start, pts in [
+            (first_ring_size, first_start, profile_rings[0]),
+            (last_ring_size, last_start, profile_rings[last_section]),
+        ]:
+            if ring_size == 4:
+                # Quad cap — single face
+                # Front cap uses reversed winding
+                if start == first_start:
+                    faces.append((start, start + 3, start + 2, start + 1))
+                else:
+                    faces.append((start, start + 1, start + 2, start + 3))
+            else:
+                # Ear-clipping for non-rectangular profiles
+                tris = _triangulate_polygon(pts)
+                for tri in tris:
+                    if start == first_start:
+                        # Reverse winding for front cap
+                        faces.append((start + tri[2], start + tri[1], start + tri[0]))
+                    else:
+                        faces.append((start + tri[0], start + tri[1], start + tri[2]))
 
     return vertices, faces
 
