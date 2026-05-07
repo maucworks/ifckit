@@ -60,12 +60,12 @@
                   {
                     "name": "W-1",
                     "plane": {
-                      "origin": {"x": 1500.0, "y": 0.0, "z": 1000.0},
+                      "origin": {"x": 1500.0, "y": 0.0, "z": 500.0},
                       "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
                       "y_axis": {"x": 0.0, "y": 0.0, "z": 1.0}
                     },
-                    "overall_width": 2000.0,
-                    "overall_height": 500.0,
+                    "overall_width": 500.0,
+                    "overall_height": 2000.0,
                      "type_ref": "WT-2000x500",
                      "parameters": {
                        "lining_depth": 300.0

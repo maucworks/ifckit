@@ -11,7 +11,11 @@ shape representation.
 
 Supported ops (v1):
     rect        2D rectangle from two corner points
-    difference  Boolean 2D difference (a minus b)
+    difference          Boolean 2D difference (a minus b)
+    extrude             Extrude a 2D profile to a solid
+    boolean_cut         3D solid DIFFERENCE (base minus tool) → IfcBooleanResult
+    boolean_union       3D solid UNION (base + tool) → IfcBooleanResult
+    boolean_intersection 3D solid INTERSECTION → IfcBooleanResult
     extrude     Extrude a 2D profile to a 3D solid
 
 Expression syntax (v1):
@@ -412,6 +416,47 @@ def _eval_node_list(
                     hole_result = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
                     cache[hole_id] = hole_result
 
+        elif op == "difference":
+            result = _eval_node_difference(node, cache, resolved)
+            cache[node_id] = result
+
+        elif op in ("boolean_cut", "boolean_union", "boolean_intersection"):
+            base_id = node.get("base")
+            tool_id = node.get("tool")
+            if base_id is None:
+                raise ValueError(f"{op!r} node {node_id!r} missing 'base'")
+            if tool_id is None:
+                raise ValueError(f"{op!r} node {node_id!r} missing 'tool'")
+            base_solid = cache.get(base_id)
+            tool_solid = cache.get(tool_id)
+            if base_solid is None:
+                raise ValueError(f"{op!r} node {node_id!r} references unknown node: {base_id!r}")
+            if tool_solid is None:
+                raise ValueError(f"{op!r} node {node_id!r} references unknown node: {tool_id!r}")
+            ifc_operator = {
+                "boolean_cut": "DIFFERENCE",
+                "boolean_union": "UNION",
+                "boolean_intersection": "INTERSECTION",
+            }[op]
+            result = ifc_file.create_entity(
+                "IfcBooleanResult",
+                Operator=ifc_operator,
+                FirstOperand=base_solid,
+                SecondOperand=tool_solid,
+            )
+            cache[node_id] = result
+            if node.get("output", False):
+                role = node.get("role", node_id)
+                material = node.get("material")
+                outputs.append(
+                    EvaluatedComponent(
+                        role=role,
+                        solid=result,
+                        node_id=node_id,
+                        material=material,
+                    )
+                )
+
         elif op == "extrude":
             profile_id = node.get("profile")
             if profile_id is None:
@@ -463,7 +508,8 @@ def _eval_node_list(
         else:
             raise ValueError(
                 f"Unknown op {op!r} in node {node_id!r} of preset {preset_name!r}. "
-                f"Supported ops: rect, extrude."
+                "Supported ops: rect, difference, extrude, "
+                "boolean_cut, boolean_union, boolean_intersection."
             )
 
     return outputs

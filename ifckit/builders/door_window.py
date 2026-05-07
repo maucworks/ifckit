@@ -102,7 +102,6 @@ def _build_fill_from_graph(
     Returns the created ``IfcDoor`` or ``IfcWindow`` entity.
     """
     from ifckit.builders.component_graph import evaluate_component_graph
-    from ifckit.geometry import Vec
 
     dx, dy = anchor_offset(opening_anchor, overall_width, overall_height)
 
@@ -115,17 +114,11 @@ def _build_fill_from_graph(
 
     # Each component solid has its own placement (z_offset from the graph).
     # Apply the anchor (dx, dy) as an additional XY translation on each placement.
+    # IfcBooleanResult has no Position — _shift_solid_placement recurses into leaves.
     solids = []
     for comp in components:
         solid = comp.solid
-        # Shift the existing placement by (dx, dy, 0): rebuild the placement.
-        existing_pos = solid.Position
-        old_origin = existing_pos.Location
-        ox = old_origin.Coordinates[0] + dx
-        oy = old_origin.Coordinates[1] + dy
-        oz = old_origin.Coordinates[2]
-        new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
-        solid.Position = new_placement
+        _shift_solid_placement(ifc_file, solid, dx, dy)
 
         # Apply material if defined in component or overridden by pending
         material = comp.material
@@ -140,18 +133,34 @@ def _build_fill_from_graph(
             elif material_override:
                 material = material_override
 
-        # Apply styling to solid if material is defined
-        if material:
-            solid = _apply_material_to_solid(ifc_file, solid, material)
+        # Apply styling to solid — fall back to neutral grey if no material defined
+        if not material:
+            material = {
+                "color": {"r": 0.75, "g": 0.75, "b": 0.75},
+                "transparency": 0.0,
+                "name": "Default",
+            }
+        solid = _apply_material_to_solid(ifc_file, solid, material)
 
         solids.append(solid)
 
     # Build shape representation with all component solids.
+    # - SweptSolid: only when all items are IfcExtrudedAreaSolid
+    # - SolidModel: when mixing IfcBooleanResult with IfcExtrudedAreaSolid
+    # - CSG: only when ALL items are IfcBooleanResult (pure CSG tree)
+    has_boolean = any(s.is_a("IfcBooleanResult") for s in solids)
+    has_swept = any(s.is_a("IfcExtrudedAreaSolid") for s in solids)
+    if has_boolean and has_swept:
+        rep_type = "SolidModel"
+    elif has_boolean:
+        rep_type = "CSG"
+    else:
+        rep_type = "SweptSolid"
     shape_rep = ifc_file.create_entity(
         "IfcShapeRepresentation",
         ContextOfItems=context,
         RepresentationIdentifier="Body",
-        RepresentationType="SweptSolid",
+        RepresentationType=rep_type,
         Items=solids,
     )
     prod_rep = product_definition_shape(ifc_file, shape_rep)
@@ -341,6 +350,30 @@ def _build_fill(
 
     write_psets(ifc_file, fill, pending)
     return fill
+
+
+def _shift_solid_placement(
+    ifc_file: ifcopenshell.file,
+    solid: ifcopenshell.entity_instance,
+    dx: float,
+    dy: float,
+) -> None:
+    """Recursively shift all leaf solid placements by (dx, dy, 0).
+
+    IfcBooleanResult has no Position attribute — recurse into operands
+    until we reach leaf solids that do (e.g. IfcExtrudedAreaSolid).
+    """
+    from ifckit.geometry import Vec
+
+    if solid.is_a("IfcBooleanResult"):
+        _shift_solid_placement(ifc_file, solid.FirstOperand, dx, dy)
+        _shift_solid_placement(ifc_file, solid.SecondOperand, dx, dy)
+    elif hasattr(solid, "Position"):
+        old_origin = solid.Position.Location
+        ox = old_origin.Coordinates[0] + dx
+        oy = old_origin.Coordinates[1] + dy
+        oz = old_origin.Coordinates[2]
+        solid.Position = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
 
 
 def _relative_to_opening(
@@ -693,24 +726,15 @@ def build_window_model_b(
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
 
     # Apply anchor offset to opening solids and apply materials
-    from ifckit.geometry import Vec
 
     opening_anchor = "s"
     dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
     opening_solids = []
     for comp in opening_components:
         solid = comp.solid
-        existing_pos = solid.Position
-        old_origin = existing_pos.Location
-        ox = old_origin.Coordinates[0] + dx
-        oy = old_origin.Coordinates[1] + dy
-        oz = old_origin.Coordinates[2]
-        new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
-        solid.Position = new_placement
+        _shift_solid_placement(ifc_file, solid, dx, dy)
 
         # Opening solids are voids — do NOT wrap in IfcStyledItem.
-        # Styling an opening solid puts an IfcStyledItem into the SweptSolid
-        # representation, which breaks ifcopenshell geometry processing.
         opening_solids.append(solid)
 
     opening_entity = build_opening_from_solids(
@@ -796,20 +820,13 @@ def build_door_model_b(
     opening_components = evaluate_opening_nodes(pending.component_graph, ifc_file, context, params)
 
     # Apply anchor offset to opening solids and apply materials
-    from ifckit.geometry import Vec
 
     opening_anchor = "s"
     dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
     opening_solids = []
     for comp in opening_components:
         solid = comp.solid
-        existing_pos = solid.Position
-        old_origin = existing_pos.Location
-        ox = old_origin.Coordinates[0] + dx
-        oy = old_origin.Coordinates[1] + dy
-        oz = old_origin.Coordinates[2]
-        new_placement = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
-        solid.Position = new_placement
+        _shift_solid_placement(ifc_file, solid, dx, dy)
 
         # Opening solids are voids — do NOT wrap in IfcStyledItem.
         # Styling an opening solid puts an IfcStyledItem into the SweptSolid

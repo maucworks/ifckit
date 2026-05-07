@@ -455,10 +455,10 @@ class TestEvaluateDoorFlush:
         assert "Lining" in roles
         assert "Panel" in roles
 
-    def test_door_is_extruded_solid(self):
+    def test_door_is_extruded_or_boolean_solid(self):
         f, ctx = _make_ifc()
         comps = evaluate_component_graph("door_flush", f, ctx, {"w": 0.9, "h": 2.1})
-        assert comps[0].solid.is_a("IfcExtrudedAreaSolid")
+        assert comps[0].solid.is_a("IfcExtrudedAreaSolid") or comps[0].solid.is_a("IfcBooleanResult")
 
 
 # ---------------------------------------------------------------------------
