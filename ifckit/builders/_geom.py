@@ -660,6 +660,21 @@ def _tessellate_sectioned_spine(
                 # Quad face (ensure correct winding)
                 faces.append((v_prev, v_prev_next, v_curr_next, v_curr))
 
+    # Add end caps (first and last section rings)
+    if len(section_vertex_offsets) >= 2:
+        # Front cap (first section) - fan triangulation, reversed winding
+        first_start = section_vertex_offsets[0]
+        first_ring_size = len(profile_rings[0])
+        for i in range(1, first_ring_size - 1):
+            faces.append((first_start, first_start + i + 1, first_start + i))
+
+        # Back cap (last section) - fan triangulation, normal winding
+        last_section = len(section_vertex_offsets) - 1
+        last_start = section_vertex_offsets[last_section]
+        last_ring_size = len(profile_rings[last_section])
+        for i in range(1, last_ring_size - 1):
+            faces.append((last_start, last_start + i, last_start + i + 1))
+
     return vertices, faces
 
 
@@ -712,6 +727,7 @@ def sectioned_spine(
     return f.create_entity(
         "IfcPolygonalFaceSet",
         Coordinates=f.create_entity("IfcCartesianPointList3D", CoordList=coord_list),
+        Closed=False,
         Faces=ifc_faces,
     )
 

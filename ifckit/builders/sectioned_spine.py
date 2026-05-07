@@ -86,12 +86,13 @@ class SectionedSpineBuilder(BaseBuilder):
             pos_entities,
         )
 
-        # 5. Create shape representation with SectionedSpine type
+        # 5. Create shape representation with Tessellation type
+        # (IfcPolygonalFaceSet uses "Tessellation" representation type)
         shape_rep = shape_representation(
             ifc_file,
             context,
             spine,
-            rep_type="SectionedSpine",
+            rep_type="Tessellation",
         )
 
         # Wrap in IfcProductDefinitionShape for use in product
