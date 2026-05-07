@@ -145,7 +145,9 @@ def _pts_to_polyline(
         ensure_ccw:      If True and the outer winding is CW, reverse to CCW.
         reverse_for_hole: If True, reverse winding (IFC inner curves must be CW).
     """
-    pts = list(pts_2d)
+    # Round to 0.001mm precision to avoid floating-point artifacts
+    _ROUND = 1000.0
+    pts = [(round(p[0] * _ROUND) / _ROUND, round(p[1] * _ROUND) / _ROUND) for p in pts_2d]
     _EPS = 1e-9
     if not (abs(pts[0][0] - pts[-1][0]) < _EPS and abs(pts[0][1] - pts[-1][1]) < _EPS):
         pts.append(pts[0])
