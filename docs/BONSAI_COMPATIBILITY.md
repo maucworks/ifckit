@@ -55,3 +55,15 @@ To make pure-pythonic IFC files Bonsai-compatible, we likely need to:
 
 - `output/test_*.ifc` — hanging test files
 - `output/import_to_blender.py` — Blender Python script for direct mesh import
+
+## Additional Finding: IfcArbitraryProfileDefWithVoids Not Closed
+
+**Observation**: `IfcArbitraryProfileDefWithVoids` profiles (used for window openings with holes) appear as **not-closed** in Bonsai's geometry viewer, even though the `IfcPolyline` has `First == Last` point in the IFC file.
+
+**Verification**:
+- IFC file: `OuterCurve.Points[0] == OuterCurve.Points[-1]` ✓ (closed)
+- Bonsai display: Profile shown as open curve ✗
+
+**Workaround**: Manually close the profile curves in Blender's edit mode.
+
+**Impact**: This affects all window/door components that use `IfcArbitraryProfileDefWithVoids` for frame-with-hole geometry.
