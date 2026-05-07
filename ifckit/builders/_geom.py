@@ -519,13 +519,13 @@ def directrix_from_path(
 def _triangulate_polygon(
     pts: list[tuple[float, float]],
 ) -> list[tuple[int, int, int]]:
-    """Triangulate a simple polygon using ear-clipping.
+    """Triangulate a simple polygon using ear-clipping (port of mapbox/earcut).
 
     Args:
-        pts: List of (x, y) tuples in CCW order (not closed).
+        pts: List of (x, y) tuples (not closed). CCW outer curve.
 
     Returns:
-        List of (i, j, k) index tuples forming triangles.
+        List of (i, j, k) index tuples forming CCW triangles.
     """
     n = len(pts)
     if n < 3:
@@ -533,91 +533,81 @@ def _triangulate_polygon(
     if n == 3:
         return [(0, 1, 2)]
 
-    indices = list(range(n))
+    def _area(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    def _point_in_triangle(a, b, c, p):
+        return (
+            (c[0] - p[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (c[1] - p[1]) >= 0
+            and (a[0] - p[0]) * (b[1] - p[1]) - (b[0] - p[0]) * (a[1] - p[1]) >= 0
+            and (b[0] - p[0]) * (c[1] - p[1]) - (c[0] - p[0]) * (b[1] - p[1]) >= 0
+        )
+
+    # Build circular doubly-linked list
+    class Node:
+        __slots__ = ("i", "x", "y", "prev", "next")
+
+        def __init__(self, i, x, y):
+            self.i = i
+            self.x = x
+            self.y = y
+            self.prev = None
+            self.next = None
+
+    first = None
+    prev_node = None
+    for i, (x, y) in enumerate(pts):
+        node = Node(i, x, y)
+        if prev_node is None:
+            first = node
+        else:
+            prev_node.next = node
+            node.prev = prev_node
+        prev_node = node
+    first.prev = prev_node
+    prev_node.next = first
+
     triangles = []
+    ear = first
+    while ear is not None:
+        a, b, c = ear.prev, ear, ear.next
+        if a is c:
+            break
 
-    def _area(i, j, k):
-        px, py = pts[i]
-        qx, qy = pts[j]
-        rx, ry = pts[k]
-        return (qx - px) * (ry - py) - (qy - py) * (rx - px)
-
-    def _inside(a, b, c, p):
-        ab = _area(a, b, p)
-        bc = _area(b, c, p)
-        ca = _area(c, a, p)
-        return (ab > 0 and bc > 0 and ca > 0) or (ab < 0 and bc < 0 and ca < 0)
-
-    while len(indices) > 3:
-        ear = None
-        for i in range(len(indices)):
-            prev = indices[i - 1]
-            curr = indices[i]
-            nxt = indices[(i + 1) % len(indices)]
-
-            # Must be a convex vertex (for CCW polygon: cross product > 0)
-            cross = (pts[curr][0] - pts[prev][0]) * (pts[nxt][1] - pts[curr][1]) - (
-                pts[curr][1] - pts[prev][1]
-            ) * (pts[nxt][0] - pts[curr][0])
-            if cross <= 0:
-                continue
-
-            # Must form a CCW triangle
-            if _area(prev, curr, nxt) <= 0:
-                continue
-
-            # No convex vertex inside the triangle
-            # (reflex/concave vertices inside don't block the ear — per mapbox/earcut)
-            inside = False
-            for j in indices:
-                if j in (prev, curr, nxt):
-                    continue
-                if _inside(prev, curr, nxt, j):
-                    # Only block if j is convex (signed area ≥ 0 for CCW)
-                    j_prev = indices[(indices.index(j) - 1) % len(indices)]
-                    j_next = indices[(indices.index(j) + 1) % len(indices)]
-                    if _area(j_prev, j, j_next) >= 0:
-                        inside = True
-                        break
-
-            if inside:
-                continue
-
-            # Diagonal (prev, nxt) must not cross any other edge
-            cross_edge = False
-            for ei in range(len(indices)):
-                a = indices[ei]
-                b = indices[(ei + 1) % len(indices)]
-                if a in (prev, nxt) or b in (prev, nxt):
-                    continue
-                # Check if segments (prev, nxt) and (a, b) intersect
-                d1 = _area(prev, nxt, a)
-                d2 = _area(prev, nxt, b)
-                d3 = _area(a, b, prev)
-                d4 = _area(a, b, nxt)
-                if (d1 > 0 and d2 < 0 or d1 < 0 and d2 > 0) and (
-                    d3 > 0 and d4 < 0 or d3 < 0 and d4 > 0
-                ):
-                    cross_edge = True
-                    break
-
-            if not cross_edge:
-                ear = i
+        # Reflex vertex? (CCW: area < 0 means reflex)
+        if _area((a.x, a.y), (b.x, b.y), (c.x, c.y)) < 0:
+            ear = ear.next
+            if ear is first:
                 break
+            continue
 
-        if ear is None:
-            # Degenerate polygon — fallback to fan
-            for i in range(1, len(indices) - 1):
-                triangles.append((indices[0], indices[i], indices[i + 1]))
-            return triangles
+        # Any reflex vertex inside the ear triangle?
+        bad = False
+        p = c.next
+        while p is not a:
+            if not _point_in_triangle((a.x, a.y), (b.x, b.y), (c.x, c.y), (p.x, p.y)):
+                p = p.next
+                continue
+            # Only block if p is reflex (CCW: area < 0)
+            if _area((p.prev.x, p.prev.y), (p.x, p.y), (p.next.x, p.next.y)) < 0:
+                bad = True
+                break
+            p = p.next
 
-        prev = indices[ear - 1]
-        curr = indices[ear]
-        nxt = indices[(ear + 1) % len(indices)]
-        triangles.append((prev, curr, nxt))
-        indices.pop(ear)
+        if bad:
+            ear = ear.next
+            if ear is first:
+                break
+            continue
 
-    triangles.append(tuple(indices))
+        # Valid ear — cut it
+        triangles.append((a.i, b.i, c.i))
+        a.next = c
+        c.prev = a
+        ear = c
+        if ear is first:
+            break
+
     return triangles
 
 
@@ -698,24 +688,20 @@ def _tessellate_sectioned_spine(
             hw = w / 2
             hh = h / 2
             htw = tw / 2
-            # Three separate convex rectangles: bottom flange, web, top flange
-            # Each is a 4-vertex rectangle that forms a clean quad face
+            # I-shape outline — 12 vertices tracing the outer boundary
             pts = [
-                # Bottom flange (CCW)
-                (-hw, -hh),        # bottom-left
-                (hw, -hh),         # bottom-right
-                (hw, -hh + tf),    # bottom flange top-right
-                (-hw, -hh + tf),   # bottom flange top-left
-                # Web (CCW)
-                (-htw, -hh + tf),  # web bottom-left
-                (htw, -hh + tf),   # web bottom-right
-                (htw, hh - tf),    # web top-right
-                (-htw, hh - tf),   # web top-left
-                # Top flange (CCW)
-                (-hw, hh - tf),    # top flange bottom-left
-                (hw, hh - tf),     # top flange bottom-right
-                (hw, hh),          # top-right
-                (-hw, hh),         # top-left
+                (-hw, -hh),       # bottom-left
+                (hw, -hh),        # bottom-right
+                (hw, -hh + tf),   # bottom flange top-right
+                (htw, -hh + tf),  # web bottom-right
+                (htw, hh - tf),   # web top-right
+                (hw, hh - tf),    # top flange bottom-right
+                (hw, hh),         # top-right
+                (-hw, hh),        # top-left
+                (-hw, hh - tf),   # top flange bottom-left
+                (-htw, hh - tf),  # web top-left
+                (-htw, -hh + tf), # web bottom-left
+                (-hw, -hh + tf),  # bottom flange top-left
             ]
             profile_rings.append(pts)
         elif prof_def.is_a() == "IfcDerivedProfileDef":
