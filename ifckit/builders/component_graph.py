@@ -11,6 +11,7 @@ shape representation.
 
 Supported ops (v1):
     rect        2D rectangle from two corner points
+    polygon    2D arbitrary polygon from explicit point list
     difference          Boolean 2D difference (a minus b)
     extrude             Extrude a 2D profile to a solid
     boolean_cut         3D solid DIFFERENCE (base minus tool) → IfcBooleanResult
@@ -361,6 +362,58 @@ def _eval_node_difference(
     return a_val.with_hole(b_val)
 
 
+def _eval_node_polygon(
+    node: Dict[str, Any],
+    params: Dict[str, float],
+    scale_x: float = 1.0,
+    scale_y: float = 1.0,
+) -> "Path":
+    """Evaluate a 'polygon' node → closed Path from explicit point list.
+
+    Provides more flexibility than 'rect' for creating non-rectangular profiles,
+    L-shapes, U-shapes, or any arbitrary polygon outline.
+    """
+    points_raw = node.get("points")
+    if not points_raw:
+        raise ValueError(f"'polygon' node {node.get('id')!r} missing 'points'.")
+
+    if len(points_raw) < 3:
+        raise ValueError(
+            f"'polygon' node {node.get('id')!r} requires at least 3 points, got {len(points_raw)}"
+        )
+
+    pts = []
+    for pt_raw in points_raw:
+        p = _eval_point(pt_raw, params, scale_x, scale_y)
+        pts.append(Vec(p[0], p[1], 0.0))
+
+    xy_plane = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+    path = Path.from_pts(pts, plane=xy_plane, closed=True)
+
+    for hole_node in node.get("holes", []):
+        hole_op = hole_node.get("op")
+        if hole_op == "rect":
+            hole_path = _eval_node_rect(hole_node, params, scale_x, scale_y)
+        elif hole_op == "polygon":
+            hole_path = _eval_node_polygon(hole_node, params, scale_x, scale_y)
+        elif hole_op == "offset":
+            dist_raw = hole_node.get("dist")
+            if dist_raw is None:
+                raise ValueError(
+                    f"Hole with op='offset' in polygon node {node.get('id')!r} missing 'dist'."
+                )
+            dist = _eval_expr(dist_raw, params)
+            hole_path = path.offset(dist)
+        else:
+            raise ValueError(
+                f"Unsupported hole op {hole_op!r} in polygon node {node.get('id')!r}. "
+                "Supported ops: 'rect', 'polygon', 'offset'."
+            )
+        path = path.with_hole(hole_path)
+
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Internal node list evaluator
 # ---------------------------------------------------------------------------
@@ -410,6 +463,16 @@ def _eval_node_list(
             result = _eval_node_rect(node, resolved, scale_x, scale_y)
             cache[node_id] = result
             # Also cache any named holes so extrude nodes can reference them directly.
+            for hole_node in node.get("holes", []):
+                hole_id = hole_node.get("id")
+                if hole_id and hole_id not in cache:
+                    hole_result = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
+                    cache[hole_id] = hole_result
+
+        elif op == "polygon":
+            result = _eval_node_polygon(node, resolved, scale_x, scale_y)
+            cache[node_id] = result
+            # Also cache any named holes.
             for hole_node in node.get("holes", []):
                 hole_id = hole_node.get("id")
                 if hole_id and hole_id not in cache:
