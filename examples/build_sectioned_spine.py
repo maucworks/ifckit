@@ -10,7 +10,7 @@ Usage:
 
 from ifckit import IfcModel, LengthUnit
 from ifckit.elements import PendingSectionedSpine
-from ifckit.geometry import Path, Plane, Vec
+from ifckit.geometry import Path, Plane, Vec, transport_frames, fixed_ref_frames
 from ifckit.profiles import RectangleProfile, DerivedProfile, IBeamProfile
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.builders._geom import get_body_context
@@ -219,8 +219,190 @@ def test_ibeam_spine():
     print("  Saved: output/test_sectioned_spine_ibeam.ifc\n")
 
 
+def test_transport_spine():
+    """Compare parallel-transport vs fixed-ref frames along a 3D path."""
+    print("=== Test 4: Transport vs Fixed-Ref Frames ===")
+
+    model = IfcModel(unit=LengthUnit.MILLIMETRE)
+    ifc_file = model.ifc_file
+    storey = _make_storey(ifc_file, model._project)
+
+    pts = [Vec(0, 0, 0), Vec(2000, 0, 0), Vec(2500, 1000, 0), Vec(3000, 1000, 1000)]
+    spine = Path.from_pts(pts)
+    # World Y stays perpendicular to all segments (none point in Y direction)
+    ref = Vec(0, 1, 0)
+
+    # ---- build both frame types --------------------------------------------
+    tp_field = transport_frames(pts, ref)
+    fr_field = fixed_ref_frames(pts, ref)
+    tp_frames = tp_field.frames
+    fr_frames = fr_field.frames
+
+    segs = [pts[i + 1] - pts[i] for i in range(3)]
+    angles = []
+    for i in range(4):
+        if i == 0 or i == 3:
+            angles.append(0.0)
+        else:
+            # interior angle = angle between BA and BC (vectors FROM corner)
+            ba = pts[i - 1] - pts[i]
+            bc = pts[i + 1] - pts[i]
+            angles.append(ba.angle_to(bc))
+
+    # ---- Compare frame orientations ----------------------------------------
+    print()
+    print("  Parallel-transport frames (X rotates to stay ⟂ Z):")
+    for i, (p, pl, ang) in enumerate(zip(pts, tp_frames, angles)):
+        s = round(1.0 / (math.sin(ang / 2) + 1e-12), 3) if ang > 0 else 1.0
+        print(
+            f"    P{i}:  Z=({pl.z_axis.x:.3f},{pl.z_axis.y:.3f},{pl.z_axis.z:.3f})  "
+            f"X=({pl.x_axis.x:.3f},{pl.x_axis.y:.3f},{pl.x_axis.z:.3f})  "
+            f"θ={math.degrees(ang):.0f}°int  Yscale={s}"
+        )
+
+    print()
+    print("  Fixed-ref frames (X = project ref onto plane ⟂ Z):")
+    for i, (p, pl, ang) in enumerate(zip(pts, fr_frames, angles)):
+        s = round(1.0 / (math.sin(ang / 2) + 1e-12), 3) if ang > 0 else 1.0
+        print(
+            f"    P{i}:  Z=({pl.z_axis.x:.3f},{pl.z_axis.y:.3f},{pl.z_axis.z:.3f})  "
+            f"X=({pl.x_axis.x:.3f},{pl.x_axis.y:.3f},{pl.x_axis.z:.3f})  "
+            f"θ={math.degrees(ang):.0f}°int  Yscale={s}"
+        )
+
+    # ---- Build sectioned spine with transport frames -----------------------
+    base_h, base_w = 300, 150
+    profiles = [RectangleProfile(base_w, base_h)]
+
+    for i in range(1, 3):
+        if angles[i] > 0:
+            # rotation axis at this corner = prev_Z × curr_Z
+            # (the minimal rotation turning the cross-section plane from
+            #  one side of the corner to the other)
+            prev_z = fr_frames[i - 1].z_axis
+            curr_z = fr_frames[i].z_axis
+            ax = prev_z**curr_z
+            ax = ax.normalized()
+            pl = fr_frames[i]
+            x_ax, y_ax = pl.x_axis, pl.y_axis
+            # which frame axis does the rotation align with?
+            dot_x = abs(ax @ x_ax)
+            dot_y = abs(ax @ y_ax)
+            scale = 1.0 / math.sin(angles[i] / 2)
+            if dot_x >= dot_y:
+                # rotate around X → miter along Y
+                profiles.append(RectangleProfile(base_w, base_h * scale))
+                print(f"    P{i}: rotate around X → scale Y by {scale:.3f}")
+            else:
+                # rotate around Y → miter along X
+                profiles.append(RectangleProfile(base_w * scale, base_h))
+                print(f"    P{i}: rotate around Y → scale X by {scale:.3f}")
+        else:
+            profiles.append(RectangleProfile(base_w, base_h))
+
+    profiles.append(RectangleProfile(base_w, base_h))
+
+    pending = PendingSectionedSpine(
+        spine=spine,
+        profiles=profiles,
+        positions=fr_frames,
+        name="transport_spine",
+    )
+    context = get_body_context(ifc_file)
+    builder = SectionedSpineBuilder()
+    element = builder.build(ifc_file, pending, storey, context)
+
+    geom = element.Representation.Representations[0].Items[0]
+    print(f"\n  Built with fixed-ref frames -> {geom.is_a()}")
+    if geom.is_a() == "IfcTriangulatedFaceSet":
+        print(f"    Vertices: {len(geom.Coordinates.CoordList)}")
+        print(f"    Triangles: {len(geom.CoordIndex)}")
+
+    model.save("output/test_sectioned_spine_transport.ifc")
+    print("  Saved: output/test_sectioned_spine_transport.ifc\n")
+
+
+def test_comparison_inline_vs_core():
+    """
+    Compare test 3 (inline Plane.from_origin_and_normal) vs core transport_frames
+    on the same path.  Z axes must match (same bisectors); X/Y differences
+    between the two methods are reported.
+    """
+    print("=== Test 5: Inline vs Core transport_frames ===")
+
+    # Same path as test 3
+    a = Vec(0, 0, 0)
+    b = a + Vec(2000, 0, 0)
+    c = b + Vec(1000, 0, 1000)
+    d = c + Vec(500, -1000, 0)
+    pts = [a, b, c, d]
+
+    ref = Vec(0, 1, 0)
+
+    # ---- Inline method (Plane.from_origin_and_normal, like test 3) ---------
+    inline_frames = [
+        Plane.from_origin_and_normal(a, (b - a).normalized(), ref_direction=ref),
+        Plane.from_origin_and_normal(
+            b,
+            ((b - a).normalized() + (c - b).normalized()).normalized(),
+            ref_direction=ref,
+        ),
+        Plane.from_origin_and_normal(
+            c,
+            ((c - b).normalized() + (d - c).normalized()).normalized(),
+            ref_direction=ref,
+        ),
+        Plane.from_origin_and_normal(d, (d - c).normalized(), ref_direction=ref),
+    ]
+
+    # ---- Core method (transport_frames) ------------------------------------
+    core_field = transport_frames(pts, ref)
+    core_frames = core_field.frames
+
+    # ---- Compare -----------------------------------------------------------
+    print()
+    for i, (p, inl, cor) in enumerate(zip(pts, inline_frames, core_frames)):
+        z_match = inl.z_axis.equals(cor.z_axis, tol=1e-6)
+        x_angle = math.degrees(inl.x_axis.angle_to(cor.x_axis))
+        print(
+            f"  P{i}: Z match={z_match}  X diff={x_angle:.2f}°  "
+            f"inline X=({inl.x_axis.x:.3f},{inl.x_axis.y:.3f},{inl.x_axis.z:.3f})  "
+            f"core X=({cor.x_axis.x:.3f},{cor.x_axis.y:.3f},{cor.x_axis.z:.3f})"
+        )
+
+    # ---- Build IFC for both ------------------------------------------------
+    profile = IBeamProfile(height=200, width=100, flange_thickness=10, web_thickness=6)
+
+    for label, frames in [("inline", inline_frames), ("core", core_frames)]:
+        model = IfcModel(unit=LengthUnit.MILLIMETRE)
+        ifc_file = model.ifc_file
+        storey = _make_storey(ifc_file, model._project)
+        spine = Path.from_pts(pts)
+        pending = PendingSectionedSpine(
+            spine=spine,
+            profiles=[profile, profile, profile, profile],
+            positions=frames,
+            name=f"comparison_{label}",
+        )
+        context = get_body_context(ifc_file)
+        builder = SectionedSpineBuilder()
+        element = builder.build(ifc_file, pending, storey, context)
+        geom = element.Representation.Representations[0].Items[0]
+        if geom.is_a() == "IfcTriangulatedFaceSet":
+            print(
+                f"  [{label}] Vertices: {len(geom.Coordinates.CoordList):>3}  "
+                f"Triangles: {len(geom.CoordIndex):>3}"
+            )
+        model.save(f"output/test_sectioned_spine_comparison_{label}.ifc")
+        print(f"  Saved: output/test_sectioned_spine_comparison_{label}.ifc")
+
+    print()
+
+
 if __name__ == "__main__":
     test_basic_spike()
     test_varying_profiles()
     test_ibeam_spine()
+    test_transport_spine()
+    test_comparison_inline_vs_core()
     print("All tests complete!")

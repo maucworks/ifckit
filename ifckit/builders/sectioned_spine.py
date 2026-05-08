@@ -23,6 +23,19 @@ Usage via registry::
         name="my_spine"
     )
 
+One-shot convenience API::
+
+    builder = SectionedSpineBuilder()
+    element = builder.build_from_spine(
+        ifc_file,
+        spine=Path.from_pts(pts),
+        profile=RectangleProfile(150, 300),
+        starter_plane=Plane(pts[0], Vec(0, 1, 0), Vec(0, 0, 1)),
+        storey=storey,
+        context=context,
+        name="auto_spine",
+    )
+
 Low-level shape-rep access::
 
     builder = SectionedSpineBuilder()
@@ -47,6 +60,9 @@ from ifckit.builders._geom import (
 from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
+from ifckit.elements.sectioned_spine import PendingSectionedSpine
+from ifckit.geometry import Path, Plane, Vec, upvector_frames
+from ifckit.profiles import DerivedProfile, Profile
 
 
 def _guid():
@@ -200,3 +216,81 @@ class SectionedSpineBuilder(BaseBuilder):
             face_set,
             rep_type="Tessellation",
         )
+
+    # ------------------------------------------------------------------
+    # One-shot convenience API
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _points_from_path(spine: Path) -> list[Vec]:
+        """Extract control points from a polyline Path."""
+        segs = spine._segments
+        if not segs:
+            raise ValueError("Spine path has no segments")
+        pts = [seg.start for seg in segs]
+        pts.append(segs[-1].end)
+        return pts
+
+    def build_from_spine(
+        self,
+        ifc_file: ifcopenshell.file,
+        spine: Path,
+        profile: Profile,
+        starter_plane: Plane,
+        storey: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+        name: str = "",
+    ) -> ifcopenshell.entity_instance:
+        """Build a sectioned spine from minimal inputs.
+
+        Automates frame computation (world-up projection), miter scaling
+        (via ``DerivedProfile``), and product creation.
+
+        The starter plane's ``.y_axis`` is used as the \"world-up\"
+        direction — profile Y stays as close to this as the path allows.
+        No holonomic twist accumulates across orthogonal-plane corners.
+
+        Args:
+            ifc_file:      Open IFC file.
+            spine:         Spine path (polyline from ``Path.from_pts()``).
+            profile:       Base cross-section profile (single instance,
+                           automatically cloned and miter-scaled).
+            starter_plane: Initial frame at the path start.  Its ``.y_axis``
+                           is the world-up direction for the cross-section.
+            storey:        Spatial container (``IfcBuildingStorey``).
+            context:       Geometry context (``IfcGeometricRepresentationSubContext``).
+            name:          Optional element name.
+
+        Returns:
+            ``IfcBuildingElementProxy`` with tessellated sectioned-spine
+            geometry, object placement, and spatial containment.
+        """
+        # 1. Extract control points from path
+        pts = self._points_from_path(spine)
+
+        # 2. World-up direction from starter plane
+        world_up = starter_plane.y_axis
+
+        # 3. Compute upvector frames with miter scales
+        field = upvector_frames(pts, world_up)
+
+        # 4. Build profile list with miter-scaled copies
+        profiles: list[Profile] = []
+        for i, (scale, axis) in enumerate(field.scales):
+            if scale == 1.0:
+                profiles.append(profile)
+            elif axis == "x":
+                # rotation around X → miter along Y → scale Y
+                profiles.append(DerivedProfile(profile, scale_y=scale))
+            else:
+                # rotation around Y → miter along X → scale X
+                profiles.append(DerivedProfile(profile, scale_x=scale))
+
+        # 5. Create pending element and build
+        pending = PendingSectionedSpine(
+            spine=spine,
+            profiles=profiles,
+            positions=field.frames,
+            name=name,
+        )
+        return self.build(ifc_file, pending, storey, context)

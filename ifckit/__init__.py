@@ -42,12 +42,15 @@ from ifckit.elements import (
 from ifckit.elements.registry import ElementRegistry
 from ifckit.geometry import (
     Arc,
+    FrameField,
     Line,
     Path,
     Plane,
     Polyline,
     Vec,
-    parallel_transport_frames,
+    fixed_ref_frames,
+    transport_frames,
+    upvector_frames,
 )
 from ifckit.json_build import build, build_from_json, validate_json
 from ifckit.model import IfcModel
@@ -100,7 +103,10 @@ __all__ = [
     "Arc",
     "Polyline",
     "Path",
-    "parallel_transport_frames",
+    "FrameField",
+    "transport_frames",
+    "fixed_ref_frames",
+    "upvector_frames",
     "IfcSchema",
     "LengthUnit",
     "IfcModel",
