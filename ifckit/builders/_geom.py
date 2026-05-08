@@ -342,6 +342,7 @@ def shape_representation(
         "Brep",
         "Tessellation",
         "MappedRepresentation",
+        "Clipping",
     )
     if rep_type not in valid_types:
         raise ValueError(f"Invalid rep_type '{rep_type}'. Must be one of: {valid_types}")
@@ -611,10 +612,316 @@ def _triangulate_polygon(
     return triangles
 
 
+def _profile_def_to_pts(
+    prof_def: "ifcopenshell.entity_instance",
+    segments: int = 8,
+) -> list[tuple[float, float]]:
+    """Extract 2D outline points from any IfcProfileDef entity.
+
+    Handles Rectangle, Circle, IShape, Derived (with full Scale/Scale2
+    support), ArbitraryClosedProfileDef (Polyline and CompositeCurve),
+    and IfcArbitraryProfileDefWithVoids (outer curve only).
+
+    Args:
+        prof_def: Any IfcProfileDef entity instance.
+        segments: Circle/curve discretisation count.
+
+    Returns:
+        List of (x, y) tuples forming the CCW outer boundary (open ring,
+        last point ≠ first point).
+
+    Raises:
+        ValueError: If the profile type is not supported and no fallback
+        can be applied without silently corrupting geometry.
+    """
+    import math as _math
+
+    import numpy as np
+
+    ifc_class = prof_def.is_a()
+
+    if ifc_class == "IfcRectangleProfileDef":
+        hw = prof_def.XDim / 2
+        hh = prof_def.YDim / 2
+        return [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+
+    if ifc_class == "IfcCircleProfileDef":
+        r = prof_def.Radius
+        return [
+            (r * np.cos(2 * np.pi * i / segments), r * np.sin(2 * np.pi * i / segments))
+            for i in range(segments)
+        ]
+
+    if ifc_class == "IfcIShapeProfileDef":
+        hw = prof_def.OverallWidth / 2
+        hh = prof_def.OverallDepth / 2
+        htw = prof_def.WebThickness / 2
+        tf = prof_def.FlangeThickness
+        # 12-vertex CCW outline
+        return [
+            (-hw, -hh),
+            (hw, -hh),
+            (hw, -hh + tf),
+            (htw, -hh + tf),
+            (htw, hh - tf),
+            (hw, hh - tf),
+            (hw, hh),
+            (-hw, hh),
+            (-hw, hh - tf),
+            (-htw, hh - tf),
+            (-htw, -hh + tf),
+            (-hw, -hh + tf),
+        ]
+
+    if ifc_class == "IfcDerivedProfileDef":
+        # Recursively extract parent points
+        pts = _profile_def_to_pts(prof_def.ParentProfile, segments=segments)
+
+        op = prof_def.Operator
+        if op and op.is_a() in (
+            "IfcCartesianTransformationOperator2D",
+            "IfcCartesianTransformationOperator2DnonUniform",
+        ):
+            origin = op.LocalOrigin.Coordinates if op.LocalOrigin else (0.0, 0.0)
+            a1 = op.Axis1.DirectionRatios if op.Axis1 else (1.0, 0.0)
+            a2 = op.Axis2.DirectionRatios if op.Axis2 else (0.0, 1.0)
+            # Uniform scale on both axes by default
+            sx = getattr(op, "Scale", None) or 1.0
+            # Non-uniform: Scale applies to Axis1, Scale2 applies to Axis2
+            sy = getattr(op, "Scale2", None)
+            if sy is None:
+                sy = sx
+            transformed = []
+            for u, v in pts:
+                x = origin[0] + sx * a1[0] * u + sy * a2[0] * v
+                y = origin[1] + sx * a1[1] * u + sy * a2[1] * v
+                transformed.append((x, y))
+            pts = transformed
+
+        return pts
+
+    if ifc_class in ("IfcArbitraryClosedProfileDef", "IfcArbitraryProfileDefWithVoids"):
+        outer = prof_def.OuterCurve
+        if outer.is_a() == "IfcPolyline":
+            pts = [(pt.Coordinates[0], pt.Coordinates[1]) for pt in outer.Points]
+            # Remove closing point if present (last == first)
+            if (
+                len(pts) > 1
+                and abs(pts[0][0] - pts[-1][0]) < 1e-6
+                and abs(pts[0][1] - pts[-1][1]) < 1e-6
+            ):
+                pts = pts[:-1]
+            return pts
+        if outer.is_a() == "IfcCompositeCurve":
+            # Collect points from each segment
+            pts = []
+            for seg in outer.Segments:
+                curve = seg.ParentCurve
+                if curve.is_a() == "IfcPolyline":
+                    for pt in curve.Points:
+                        p = (pt.Coordinates[0], pt.Coordinates[1])
+                        # Avoid duplicating join points between segments
+                        if (
+                            not pts
+                            or abs(pts[-1][0] - p[0]) > 1e-6
+                            or abs(pts[-1][1] - p[1]) > 1e-6
+                        ):
+                            pts.append(p)
+                elif curve.is_a() == "IfcTrimmedCurve":
+                    # Discretise trimmed curves (arcs)
+                    basis = curve.BasisCurve
+                    if basis.is_a() == "IfcCircle":
+                        r = basis.Radius
+                        c = basis.Position
+                        cx = c.Location.Coordinates[0] if c and c.Location else 0.0
+                        cy = c.Location.Coordinates[1] if c and c.Location else 0.0
+                        t1 = curve.Trim1[0] if curve.Trim1 else 0.0
+                        t2 = curve.Trim2[0] if curve.Trim2 else _math.pi * 2
+                        # Trim values may be in degrees (IfcParameterValue)
+                        # IFC spec: parameter for IfcCircle is in radians
+                        n = max(4, segments)
+                        for k in range(n + 1):
+                            angle = t1 + (t2 - t1) * k / n
+                            p = (cx + r * _math.cos(angle), cy + r * _math.sin(angle))
+                            if (
+                                not pts
+                                or abs(pts[-1][0] - p[0]) > 1e-6
+                                or abs(pts[-1][1] - p[1]) > 1e-6
+                            ):
+                                pts.append(p)
+            # Remove closing point
+            if (
+                len(pts) > 1
+                and abs(pts[0][0] - pts[-1][0]) < 1e-6
+                and abs(pts[0][1] - pts[-1][1]) < 1e-6
+            ):
+                pts = pts[:-1]
+            if pts:
+                return pts
+        raise ValueError(
+            f"Unsupported outer curve type {outer.is_a()!r} in {ifc_class}. "
+            "Only IfcPolyline and IfcCompositeCurve are supported."
+        )
+
+    if ifc_class == "IfcLShapeProfileDef":
+        d = prof_def.Depth
+        w = prof_def.Width
+        t = prof_def.Thickness
+        pts = [
+            (0.0, 0.0),
+            (w, 0.0),
+            (w, t),
+            (t, t),
+            (t, d),
+            (0.0, d),
+        ]
+        return pts
+
+    if ifc_class == "IfcTShapeProfileDef":
+        d = prof_def.Depth
+        fw = prof_def.FlangeWidth
+        tw = prof_def.WebThickness
+        tf = prof_def.FlangeThickness
+        hw = fw / 2
+        htw = tw / 2
+        pts = [
+            (-htw, 0.0),
+            (htw, 0.0),
+            (htw, d - tf),
+            (hw, d - tf),
+            (hw, d),
+            (-hw, d),
+            (-hw, d - tf),
+            (-htw, d - tf),
+        ]
+        return pts
+
+    if ifc_class == "IfcZShapeProfileDef":
+        d = prof_def.Depth
+        fw = prof_def.FlangeWidth
+        tw = prof_def.WebThickness
+        tf = prof_def.FlangeThickness
+        htw = tw / 2
+        hd = d / 2
+        pts = [
+            (-htw, -hd),
+            (fw - htw, -hd),
+            (fw - htw, -hd + tf),
+            (htw, -hd + tf),
+            (htw, hd - tf),
+            (htw - fw, hd - tf),
+            (htw - fw, hd),
+            (-htw, hd),
+        ]
+        return pts
+
+    if ifc_class == "IfcCShapeProfileDef":
+        d = prof_def.Depth
+        w = prof_def.Width
+        t = prof_def.WallThickness
+        g = prof_def.Girth or 0.0
+        hd = d / 2
+        if g > 0:
+            pts = [
+                (0.0, -hd),
+                (w, -hd),
+                (w, -hd + g),
+                (w - t, -hd + g),
+                (w - t, -hd + t),
+                (t, -hd + t),
+                (t, hd - t),
+                (w - t, hd - t),
+                (w - t, hd - g),
+                (w, hd - g),
+                (w, hd),
+                (0.0, hd),
+            ]
+        else:
+            pts = [
+                (0.0, -hd),
+                (w, -hd),
+                (w, -hd + t),
+                (t, -hd + t),
+                (t, hd - t),
+                (w, hd - t),
+                (w, hd),
+                (0.0, hd),
+            ]
+        return pts
+
+    if ifc_class == "IfcTrapeziumProfileDef":
+        hb = prof_def.BottomXDim / 2
+        ht = prof_def.TopXDim / 2
+        y = prof_def.YDim
+        ox = prof_def.TopXOffset
+        pts = [
+            (-hb, 0.0),
+            (hb, 0.0),
+            (ox + ht, y),
+            (ox - ht, y),
+        ]
+        return pts
+
+    if ifc_class == "IfcCompositeProfileDef":
+        pts = []
+        for child in prof_def.Profiles:
+            pts.extend(_profile_def_to_pts(child, segments=segments))
+        return pts
+
+    raise ValueError(
+        f"Unsupported IfcProfileDef type {ifc_class!r}. "
+        "Supported: IfcRectangleProfileDef, IfcCircleProfileDef, IfcIShapeProfileDef, "
+        "IfcDerivedProfileDef, IfcArbitraryClosedProfileDef, IfcArbitraryProfileDefWithVoids, "
+        "IfcTShapeProfileDef, IfcZShapeProfileDef, IfcCShapeProfileDef, "
+        "IfcTrapeziumProfileDef, IfcLShapeProfileDef, IfcCompositeProfileDef."
+    )
+
+
+def _resample_ring(ring: list[tuple[float, float]], n: int) -> list[tuple[float, float]]:
+    """Resample a 2D polygon ring to exactly *n* evenly-spaced vertices.
+
+    Walks the ring perimeter by arc-length and interpolates new vertices.
+    Preserves the closed-ring topology (result has exactly *n* points,
+    last ≠ first).
+    """
+    import math as _math
+
+    if len(ring) == n:
+        return ring
+
+    # Build cumulative arc-length table (closed ring: wrap last→first)
+    cum = [0.0]
+    for i in range(len(ring)):
+        x0, y0 = ring[i]
+        x1, y1 = ring[(i + 1) % len(ring)]
+        seg_len = _math.hypot(x1 - x0, y1 - y0)
+        cum.append(cum[-1] + seg_len)
+    total = cum[-1]
+    if total < 1e-12:
+        return ring[:n] if len(ring) >= n else ring + [ring[-1]] * (n - len(ring))
+
+    # Sample at evenly spaced arc-length positions
+    resampled = []
+    seg_i = 0
+    for k in range(n):
+        target = total * k / n
+        # Advance segment pointer
+        while seg_i < len(ring) - 1 and cum[seg_i + 1] < target - 1e-12:
+            seg_i += 1
+        t = 0.0
+        seg_len = cum[seg_i + 1] - cum[seg_i]
+        if seg_len > 1e-12:
+            t = (target - cum[seg_i]) / seg_len
+        x0, y0 = ring[seg_i % len(ring)]
+        x1, y1 = ring[(seg_i + 1) % len(ring)]
+        resampled.append((x0 + t * (x1 - x0), y0 + t * (y1 - y0)))
+
+    return resampled
+
+
 def _tessellate_sectioned_spine(
-    spine_curve: ifcopenshell.entity_instance,
-    cross_sections: list[ifcopenshell.entity_instance],
-    positions: list[ifcopenshell.entity_instance],
+    cross_sections: list["ifcopenshell.entity_instance"],
+    positions: list["ifcopenshell.entity_instance"],
     segments: int = 8,
 ) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
     """Tessellate IfcSectionedSpine data to vertices and face indices.
@@ -622,233 +929,152 @@ def _tessellate_sectioned_spine(
     Converts the mathematical definition of a sectioned spine into a mesh.
     Returns vertices (3D points) and face indices (triangles/quads).
 
+    Adjacent sections with different vertex counts are handled by resampling
+    both rings to ``lcm(n_prev, n_curr)`` vertices so every vertex is stitched
+    without gaps.
+
     Args:
-        spine_curve: IfcCompositeCurve (must have resolvable points)
         cross_sections: List of IfcProfileDef
         positions: List of IfcAxis2Placement3D
-        segments: Number of segments per profile (for roundness)
+        segments: Number of segments per profile (for circles/curves)
 
     Returns:
         Tuple of (vertices: list of (x, y, z), faces: list of index tuples)
     """
-    import numpy as np
+    import math as _math
 
     from ifckit.geometry import Vec
 
-    # Build axis frames at each position and extract spine points from origins
+    # Build axis frames at each position
     axis_frames = []
-    spine_points = []
     for axis in positions:
         origin = axis.Location.Coordinates
         z_axis = axis.Axis.DirectionRatios if axis.Axis else (0, 0, 1)
         x_axis = axis.RefDirection.DirectionRatios if axis.RefDirection else (1, 0, 0)
 
-        # Normalize
         z_vec = Vec(*z_axis).normalized()
         x_vec = Vec(*x_axis).normalized()
-        y_vec = z_vec.cross(x_vec).normalized()  # cross product
+        y_vec = z_vec.cross(x_vec).normalized()
 
-        origin_vec = Vec(*origin)
         axis_frames.append(
             {
-                "origin": origin_vec,
+                "origin": Vec(*origin),
                 "x": x_vec,
                 "y": y_vec,
                 "z": z_vec,
             }
         )
-        spine_points.append((origin_vec.x, origin_vec.y, origin_vec.z))
 
-    # Extract profile points
-    profile_rings = []
+    # Extract and normalise profile rings to CCW
+    profile_rings: list[list[tuple[float, float]]] = []
     for prof_def in cross_sections:
-        if prof_def.is_a() == "IfcRectangleProfileDef":
-            x_dim = prof_def.XDim
-            y_dim = prof_def.YDim
-            # Create rectangle outline
-            pts = [
-                (-x_dim / 2, -y_dim / 2),
-                (x_dim / 2, -y_dim / 2),
-                (x_dim / 2, y_dim / 2),
-                (-x_dim / 2, y_dim / 2),
-            ]
-            profile_rings.append(pts)
-        elif prof_def.is_a() == "IfcCircleProfileDef":
-            r = prof_def.Radius
-            pts = [
-                (r * np.cos(2 * np.pi * i / segments), r * np.sin(2 * np.pi * i / segments))
-                for i in range(segments)
-            ]
-            profile_rings.append(pts)
-        elif prof_def.is_a() == "IfcIShapeProfileDef":
-            w = prof_def.OverallWidth
-            h = prof_def.OverallDepth
-            tw = prof_def.WebThickness
-            tf = prof_def.FlangeThickness
-            hw = w / 2
-            hh = h / 2
-            htw = tw / 2
-            # I-shape outline — 12 vertices tracing the outer boundary
-            pts = [
-                (-hw, -hh),       # bottom-left
-                (hw, -hh),        # bottom-right
-                (hw, -hh + tf),   # bottom flange top-right
-                (htw, -hh + tf),  # web bottom-right
-                (htw, hh - tf),   # web top-right
-                (hw, hh - tf),    # top flange bottom-right
-                (hw, hh),         # top-right
-                (-hw, hh),        # top-left
-                (-hw, hh - tf),   # top flange bottom-left
-                (-htw, hh - tf),  # web top-left
-                (-htw, -hh + tf), # web bottom-left
-                (-hw, -hh + tf),  # bottom flange top-left
-            ]
-            profile_rings.append(pts)
-        elif prof_def.is_a() == "IfcDerivedProfileDef":
-            # Extract parent profile points and apply transformation
-            parent = prof_def.ParentProfile
-            # Recursively extract parent profile points
-            if parent.is_a() == "IfcRectangleProfileDef":
-                x_dim = parent.XDim
-                y_dim = parent.YDim
-                pts = [
-                    (-x_dim / 2, -y_dim / 2),
-                    (x_dim / 2, -y_dim / 2),
-                    (x_dim / 2, y_dim / 2),
-                    (-x_dim / 2, y_dim / 2),
-                ]
-            elif parent.is_a() == "IfcCircleProfileDef":
-                r = parent.Radius
-                pts = [
-                    (
-                        r * np.cos(2 * np.pi * i / segments),
-                        r * np.sin(2 * np.pi * i / segments),
-                    )
-                    for i in range(segments)
-                ]
-            else:
-                pts = [(0, 0), (1, 0), (1, 1), (0, 1)]
-
-            # Apply transformation operator
-            op = prof_def.Operator
-            if op and op.is_a() == "IfcCartesianTransformationOperator2D":
-                # Axis1 and Axis2 define scale/rotation
-                # LocalOrigin defines offset
-                origin = op.LocalOrigin.Coordinates
-                # Default Axis1=(1,0), Axis2=(0,1) if not specified
-                a1 = op.Axis1.DirectionRatios if op.Axis1 else (1, 0)
-                a2 = op.Axis2.DirectionRatios if op.Axis2 else (0, 1)
-                # Scale factor
-                scale = getattr(op, "Scale", None) or 1.0
-                transformed = []
-                for u, v in pts:
-                    x = origin[0] + scale * (a1[0] * u + a2[0] * v)
-                    y = origin[1] + scale * (a1[1] * u + a2[1] * v)
-                    transformed.append((x, y))
-                pts = transformed
-
-            profile_rings.append(pts)
-        elif prof_def.is_a() in (
-            "IfcArbitraryClosedProfileDef",
-            "IfcArbitraryProfileDefWithVoids",
-        ):
-            # Extract outer curve points
-            outer = prof_def.OuterCurve
-            if outer.is_a() == "IfcPolyline":
-                pts = [(pt.Coordinates[0], pt.Coordinates[1]) for pt in outer.Points]
-                # Remove closing point if present (last == first)
-                if (
-                    len(pts) > 1
-                    and abs(pts[0][0] - pts[-1][0]) < 1e-6
-                    and abs(pts[0][1] - pts[-1][1]) < 1e-6
-                ):
-                    pts = pts[:-1]
-                profile_rings.append(pts)
-            else:
-                profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
-        else:
-            # Fallback: use arbitrary small profile
-            profile_rings.append([(0, 0), (1, 0), (1, 1), (0, 1)])
-
-    # Ensure all profile rings are CCW
-    for r in range(len(profile_rings)):
-        _area = (
+        pts = _profile_def_to_pts(prof_def, segments=segments)
+        # Ensure CCW winding
+        area = (
             sum(
-                (
-                    profile_rings[r][i][0] * profile_rings[r][(i + 1) % len(profile_rings[r])][1]
-                    - profile_rings[r][(i + 1) % len(profile_rings[r])][0] * profile_rings[r][i][1]
-                )
-                for i in range(len(profile_rings[r]))
+                pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1]
+                for i in range(len(pts))
             )
             / 2.0
         )
-        if _area < 0:
-            profile_rings[r] = list(reversed(profile_rings[r]))
+        if area < 0:
+            pts = list(reversed(pts))
+        profile_rings.append(pts)
 
     # Build mesh vertices and faces
-    vertices = []
-    faces = []
-    section_vertex_offsets = []  # Track starting index of each section
+    vertices: list[tuple[float, float, float]] = []
+    faces: list[tuple[int, ...]] = []
+    section_vertex_offsets: list[int] = []
 
     for section_idx in range(len(positions)):
         frame = axis_frames[section_idx]
         profile_pts = profile_rings[section_idx]
 
-        # Record starting index for this section
         section_vertex_offsets.append(len(vertices))
 
-        # Transform 2D profile to 3D at this position
-        # Profile sits in YZ plane (perpendicular to spine direction Z)
+        # Transform 2D profile to 3D at this position.
+        # The plane's Z-axis is the extrusion direction (spine tangent);
+        # the profile lies in the plane spanned by X and Y.
         for x2d, y2d in profile_pts:
-            y_comp = frame["y"] * x2d
-            z_comp = frame["z"] * y2d
-            pt_3d = frame["origin"] + y_comp + z_comp
+            pt_3d = frame["origin"] + frame["x"] * x2d + frame["y"] * y2d
             vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
 
-        # Connect to previous section
+        # Stitch to previous section
         if section_idx > 0:
-            prev_start = section_vertex_offsets[section_idx - 1]
+            prev_idx = section_idx - 1
+            prev_start = section_vertex_offsets[prev_idx]
             curr_start = section_vertex_offsets[section_idx]
-            prev_ring_size = len(profile_rings[section_idx - 1])
-            curr_ring_size = len(profile_pts)
+            prev_ring = profile_rings[prev_idx]
+            curr_ring = profile_pts
 
-            # Create quad faces linking previous and current section
-            for i in range(min(prev_ring_size, curr_ring_size)):
-                i_next = (i + 1) % min(prev_ring_size, curr_ring_size)
+            n_prev = len(prev_ring)
+            n_curr = len(curr_ring)
 
-                v_prev = prev_start + i
-                v_prev_next = prev_start + i_next
-                v_curr = curr_start + i
-                v_curr_next = curr_start + i_next
+            if n_prev == n_curr:
+                # Same count — straight quad strip
+                n = n_prev
+                for i in range(n):
+                    i_next = (i + 1) % n
+                    faces.append(
+                        (
+                            prev_start + i,
+                            prev_start + i_next,
+                            curr_start + i_next,
+                            curr_start + i,
+                        )
+                    )
+            else:
+                # Different counts — resample both rings to lcm(n_prev, n_curr)
+                # and add virtual (interpolated) vertices for the stitching rows.
+                n_stitch = (n_prev * n_curr) // _math.gcd(n_prev, n_curr)
+                prev_resampled = _resample_ring(prev_ring, n_stitch)
+                curr_resampled = _resample_ring(curr_ring, n_stitch)
 
-                # Quad face (ensure correct winding)
-                faces.append((v_prev, v_prev_next, v_curr_next, v_curr))
+                # Emit interpolated vertices for prev and curr resampled rings
+                prev_frame = axis_frames[prev_idx]
+                prev_stitch_start = len(vertices)
+                for x2d, y2d in prev_resampled:
+                    pt_3d = prev_frame["origin"] + prev_frame["y"] * x2d + prev_frame["z"] * y2d
+                    vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
 
-    # Add end caps (first and last section rings)
+                curr_stitch_start = len(vertices)
+                for x2d, y2d in curr_resampled:
+                    pt_3d = frame["origin"] + frame["y"] * x2d + frame["z"] * y2d
+                    vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
+
+                for i in range(n_stitch):
+                    i_next = (i + 1) % n_stitch
+                    faces.append(
+                        (
+                            prev_stitch_start + i,
+                            prev_stitch_start + i_next,
+                            curr_stitch_start + i_next,
+                            curr_stitch_start + i,
+                        )
+                    )
+
+    # End caps: first and last section rings
     if len(section_vertex_offsets) >= 2:
-        first_start = section_vertex_offsets[0]
-        first_ring_size = len(profile_rings[0])
-        last_section = len(section_vertex_offsets) - 1
-        last_start = section_vertex_offsets[last_section]
-        last_ring_size = len(profile_rings[last_section])
+        for is_first in (True, False):
+            if is_first:
+                start = section_vertex_offsets[0]
+                pts = profile_rings[0]
+            else:
+                last = len(section_vertex_offsets) - 1
+                start = section_vertex_offsets[last]
+                pts = profile_rings[last]
 
-        for ring_size, start, pts in [
-            (first_ring_size, first_start, profile_rings[0]),
-            (last_ring_size, last_start, profile_rings[last_section]),
-        ]:
-            if ring_size == 4:
-                # Quad cap — single face
-                # Front cap uses reversed winding
-                if start == first_start:
+            n = len(pts)
+            if n == 4:
+                # Single quad cap
+                if is_first:
                     faces.append((start, start + 3, start + 2, start + 1))
                 else:
                     faces.append((start, start + 1, start + 2, start + 3))
             else:
-                # Ear-clipping for non-rectangular profiles
                 tris = _triangulate_polygon(pts)
                 for tri in tris:
-                    if start == first_start:
-                        # Reverse winding for front cap
+                    if is_first:
                         faces.append((start + tri[2], start + tri[1], start + tri[0]))
                     else:
                         faces.append((start + tri[0], start + tri[1], start + tri[2]))
@@ -862,19 +1088,24 @@ def sectioned_spine(
     cross_sections: list[ifcopenshell.entity_instance],
     positions: list[ifcopenshell.entity_instance],
 ) -> ifcopenshell.entity_instance:
-    """Create IfcSectionedSpine or IfcPolygonalFaceSet fallback.
+    """Tessellate a sectioned spine to IfcTriangulatedFaceSet.
 
-    Creates a solid by sweeping cross-sectional profiles along a spine curve.
-    Since IfcOpenShell doesn't support IfcSectionedSpine rendering, this
-    tessellates to IfcPolygonalFaceSet for Bonsai compatibility.
+    Creates a solid by sweeping cross-sectional profiles along a spine.
+    Since IfcOpenShell/Bonsai does not support native IfcSectionedSpine
+    rendering, this tessellates to an explicit triangle mesh.
+
+    The ``spine_curve`` argument is accepted for API symmetry with the IFC
+    schema but the tessellation is driven by the ``positions`` axis frames,
+    which are authoritative for vertex placement.
 
     Args:
-        spine_curve: IfcCompositeCurve (3D curve/boog)
-        cross_sections: LIST of IfcProfileDef (profielen op elke positie)
-        positions: LIST of IfcAxis2Placement3D (posities langs curve)
+        spine_curve: IfcCompositeCurve — kept for schema symmetry, not used
+            in tessellation.
+        cross_sections: List of IfcProfileDef (one per position).
+        positions: List of IfcAxis2Placement3D (one per cross-section).
 
     Returns:
-        IfcPolygonalFaceSet entity
+        IfcTriangulatedFaceSet entity.
     """
     if len(cross_sections) != len(positions):
         raise ValueError(
@@ -884,8 +1115,8 @@ def sectioned_spine(
     if len(cross_sections) < 2:
         raise ValueError("At least 2 cross-sections are required")
 
-    # Tessellate to mesh
-    vertices, faces = _tessellate_sectioned_spine(spine_curve, cross_sections, positions)
+    # Tessellate to mesh (spine_curve not used — positions are authoritative)
+    vertices, faces = _tessellate_sectioned_spine(cross_sections, positions)
 
     # CoordList expects [[x1, y1, z1], [x2, y2, z2], ...]
     coord_list = [[_round_coord(v[0]), _round_coord(v[1]), _round_coord(v[2])] for v in vertices]

@@ -83,6 +83,7 @@ class IBeamProfile(Profile):
         self.anchor = anchor.lower()
         self.name = name
         self._validate()
+        super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
     def _validate(self) -> None:

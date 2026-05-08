@@ -134,6 +134,7 @@ class PolygonProfile(Profile):
                 raise ValueError(f"Cannot interpret point {p!r} as (x, y)")
         if len(self.points) < 3:
             raise ValueError("PolygonProfile requires at least 3 points")
+        super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
@@ -212,6 +213,7 @@ class RoundedPolygonProfile(Profile):
         self.radii = radii
         self.name = name
         self.arc_segments = int(arc_segments)
+        super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
     def _build_outline(self) -> List[Tuple[float, float]]:
@@ -380,6 +382,7 @@ class RectangleProfile(Profile):
         self.x_dim = float(x_dim)
         self.y_dim = float(y_dim)
         self.name = name
+        super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
     @property
@@ -462,6 +465,7 @@ class CircleProfile(Profile):
             raise ValueError("radius must be positive")
         self.radius = float(radius)
         self.name = name
+        super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
     @property
@@ -546,6 +550,7 @@ class HollowCircleProfile(Profile):
         self.radius = float(radius)
         self.wall_thickness = float(wall_thickness)
         self.name = name
+        super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
     @property

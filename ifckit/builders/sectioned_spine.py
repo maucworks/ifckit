@@ -5,7 +5,7 @@ ifckit.builders.sectioned_spine
 SectionedSpineBuilder: builds IfcSectionedSpine by sweeping
 cross-sectional profiles along a spine curve.
 
-Usage::
+Usage via registry::
 
     from ifckit.elements import PendingSectionedSpine
     from ifckit.geometry import Path, Plane, Vec
@@ -22,6 +22,11 @@ Usage::
         positions=positions,
         name="my_spine"
     )
+
+Low-level shape-rep access::
+
+    builder = SectionedSpineBuilder()
+    shape_rep = builder.build_shape_rep(ifc_file, pending, context)
 """
 
 from __future__ import annotations
@@ -49,10 +54,41 @@ def _guid():
 
 
 class SectionedSpineBuilder(BaseBuilder):
-    """Builder that creates IfcSectionedSpine."""
+    """Builder that tessellates a SectionedSpine to IfcBuildingElementProxy.
+
+    Two usage modes:
+
+    1. Via registry / ``build()``: returns an IfcBuildingElementProxy with
+       GlobalId, ObjectPlacement, and spatial containment — ready for Bonsai.
+
+    2. Low-level via ``build_shape_rep()``: returns only the
+       IfcShapeRepresentation, useful when the caller wants to embed the
+       geometry inside a larger product (e.g. a window fill).
+    """
 
     element_type = "sectioned_spine"
-    ifc_class = "IfcSectionedSpine"  # Used as generic geometric entity
+    ifc_class = "IfcBuildingElementProxy"  # actual IFC class created
+
+    # ------------------------------------------------------------------
+    # Public low-level API: shape-rep only
+    # ------------------------------------------------------------------
+
+    def build_shape_rep(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        """Return an IfcShapeRepresentation without creating a product.
+
+        Useful when the caller manages the product entity themselves and only
+        needs the tessellated geometry representation.
+        """
+        return self._make_shape_rep(ifc_file, pending, context)
+
+    # ------------------------------------------------------------------
+    # BaseBuilder contract
+    # ------------------------------------------------------------------
 
     def _create_geometry(
         self,
@@ -61,12 +97,77 @@ class SectionedSpineBuilder(BaseBuilder):
         container: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        # Validate element type
+        """Create IfcBuildingElementProxy with tessellated spine geometry.
+
+        Returns the product entity (as required by BaseBuilder.build).
+        """
         if pending.element_type != self.element_type:
             raise TypeError(
                 f"SectionedSpineBuilder expects {self.element_type!r}, got {pending.element_type!r}"
             )
 
+        shape_rep = self._make_shape_rep(ifc_file, pending, context)
+
+        # ObjectPlacement relative to container (absorbs storey elevation)
+        if container and getattr(container, "ObjectPlacement", None):
+            origin = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
+            z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
+            x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
+            axis = ifc_file.create_entity(
+                "IfcAxis2Placement3D", Location=origin, Axis=z, RefDirection=x
+            )
+            placement = ifc_file.create_entity(
+                "IfcLocalPlacement",
+                PlacementRelTo=container.ObjectPlacement,
+                RelativePlacement=axis,
+            )
+        else:
+            origin = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
+            z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
+            x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
+            axis = ifc_file.create_entity(
+                "IfcAxis2Placement3D", Location=origin, Axis=z, RefDirection=x
+            )
+            placement = ifc_file.create_entity(
+                "IfcLocalPlacement",
+                PlacementRelTo=None,
+                RelativePlacement=axis,
+            )
+
+        element = ifc_file.create_entity(
+            "IfcBuildingElementProxy",
+            GlobalId=_guid(),
+            Name=pending.name or "SectionedSpine",
+            Representation=product_definition_shape(ifc_file, shape_rep),
+            ObjectPlacement=placement,
+        )
+
+        # Contain in spatial structure
+        if container:
+            ifc_file.create_entity(
+                "IfcRelContainedInSpatialStructure",
+                GlobalId=_guid(),
+                RelatingStructure=container,
+                RelatedElements=[element],
+            )
+
+        # Write properties if any
+        if pending.properties:
+            write_psets(ifc_file, element, pending.properties)
+
+        return element
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _make_shape_rep(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        """Tessellate spine to IfcTriangulatedFaceSet and wrap in IfcShapeRepresentation."""
         # 1. Convert spine to IfcCompositeCurve
         spine_curve = directrix_from_path(ifc_file, pending.spine)
 
@@ -84,64 +185,18 @@ class SectionedSpineBuilder(BaseBuilder):
             )
             pos_entities.append(pos_entity)
 
-        # 4. Create IfcSectionedSpine
-        spine = _sectioned_spine(
+        # 4. Tessellate → IfcTriangulatedFaceSet
+        face_set = _sectioned_spine(
             ifc_file,
             spine_curve,
             profile_defs,
             pos_entities,
         )
 
-        # 5. Create shape representation with Tessellation type
-        # (IfcPolygonalFaceSet uses "Tessellation" representation type)
-        shape_rep = shape_representation(
+        # 5. Wrap in IfcShapeRepresentation (Tessellation type)
+        return shape_representation(
             ifc_file,
             context,
-            spine,
+            face_set,
             rep_type="Tessellation",
         )
-
-        return shape_rep
-
-    def _create_element(
-        self,
-        ifc_file: ifcopenshell.file,
-        pending: PendingElement,
-        container: ifcopenshell.entity_instance,
-        geometry: ifcopenshell.entity_instance,
-    ) -> ifcopenshell.entity_instance:
-        # Create ObjectPlacement at origin if no container
-        if container and container.ObjectPlacement:
-            placement = container.ObjectPlacement
-        else:
-            origin = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
-            z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
-            x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
-            axis = ifc_file.create_entity(
-                "IfcAxis2Placement3D", Location=origin, Axis=z, RefDirection=x
-            )
-            placement = ifc_file.create_entity(
-                "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis
-            )
-
-        element = ifc_file.create_entity(
-            "IfcBuildingElementProxy",
-            GlobalId=_guid(),
-            Name=pending.name or "SectionedSpine",
-            Representation=product_definition_shape(ifc_file, geometry),
-            ObjectPlacement=placement,
-        )
-
-        # Contain in spatial structure if container provided
-        if container:
-            ifc_file.create_entity(
-                "IfcRelContainedInSpatialStructure",
-                RelatingStructure=container,
-                RelatedElements=[element],
-            )
-
-        # Write properties if any
-        if pending.properties:
-            write_psets(ifc_file, element, pending.properties)
-
-        return element

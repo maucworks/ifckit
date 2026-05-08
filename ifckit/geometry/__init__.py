@@ -152,6 +152,17 @@ class Vec:
         cos_a = self.normalized() @ other.normalized()
         return math.acos(max(-1.0, min(1.0, cos_a)))
 
+    def bisect_to(self, other: "Vec") -> "Vec":
+        """
+        Return the normalized bisector direction between self and other.
+
+        self and other should be direction vectors (non-zero).
+        Returns a normalized Vec pointing in the averaged direction.
+        For collinear vectors pointing opposite directions (sum ≈ 0),
+        returns a zero Vec — caller must handle this case.
+        """
+        return (self.normalized() + other.normalized()).normalized()
+
     def signed_angle_to(self, other: "Vec", axis: "Vec") -> float:
         """Signed angle in radians around axis, right-hand rule (-pi..pi)."""
         n = axis.normalized()
@@ -228,16 +239,38 @@ class Plane:
         return cls(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
 
     @classmethod
-    def from_origin_and_normal(cls, origin: "Vec", normal: "Vec") -> "Plane":
+    def from_origin_and_normal(
+        cls,
+        origin: "Vec",
+        normal: "Vec",
+        ref_direction: Optional["Vec"] = None,
+    ) -> "Plane":
         """
         Construct a plane from an origin and normal (z_axis = normal).
-        x_axis is derived by finding the least-parallel world axis.
+
+        Args:
+            origin:  Point on the plane.
+            normal:  Z-axis (normal to the plane).  For sectioned spine this is
+                     the extrusion direction / spine tangent.
+            ref_direction:  Optional reference direction for the X-axis.  The
+                     X-axis is the projection of ref_direction onto the plane
+                     (made orthogonal to normal).  When omitted, the least-aligned
+                     world axis is chosen (can cause XY flipping when normal
+                     changes gradually).
         """
         n = normal.normalized()
-        # pick world axis least aligned with n to derive x
+        if ref_direction is not None:
+            # Project ref_direction onto the plane (Gram-Schmidt against n)
+            r = ref_direction.normalized()
+            x = (r - n * (r @ n)).normalized()
+            # If projection is degenerate (ref_direction parallel to n), fall through
+            if x.length() > 0.1:
+                y = (n**x).normalized()
+                return cls(origin, x, y)
+        # Fallback: pick world axis least aligned with n
         world_axes = [Vec(1, 0, 0), Vec(0, 1, 0), Vec(0, 0, 1)]
         ref = min(world_axes, key=lambda a: abs(n @ a))
-        x = (n**ref).normalized()  # n × ref: right-handed, perpendicular to n
+        x = (n**ref).normalized()
         y = (n**x).normalized()
         return cls(origin, x, y)
 

@@ -64,6 +64,25 @@ class DerivedProfile(Profile):
         self.scale = scale
         self.scale_x = scale_x
         self.scale_y = scale_y
+        super().__init__()
+
+    def get_profile_points(self):
+        """Apply this derived transform to the parent's outline points."""
+        import math as _math
+
+        pts = self.parent.get_profile_points()
+        sx = self.scale_x if self.scale_x is not None else self.scale
+        sy = self.scale_y if self.scale_y is not None else self.scale
+        rad = _math.radians(self.rotation)
+        c = _math.cos(rad)
+        s = _math.sin(rad)
+        result = []
+        for x, y in pts:
+            xs, ys = x * sx, y * sy
+            xr = c * xs - s * ys + self.offset_x
+            yr = s * xs + c * ys + self.offset_y
+            result.append((xr, yr))
+        return result
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         """Create IfcDerivedProfileDef."""

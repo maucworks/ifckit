@@ -17,6 +17,11 @@ Section profiles
 ----------------
     IBeamProfile            — symmetric I/H section → IfcIShapeProfileDef
     LBeamProfile            — L-section (angle)     → IfcLShapeProfileDef
+    TShapeProfile           — T-section             → IfcTShapeProfileDef
+    ZShapeProfile           — Z-section             → IfcZShapeProfileDef
+    CShapeProfile           — C/lipped-channel      → IfcCShapeProfileDef
+    TrapeziumProfile        — general trapezium     → IfcTrapeziumProfileDef
+    CompositeProfile        — composition           → IfcCompositeProfileDef
 
 Steel lookup
 ------------
@@ -33,7 +38,10 @@ Examples::
     from ifckit.profiles import (
         PolygonProfile, RoundedPolygonProfile,
         RectangleProfile, CircleProfile, HollowCircleProfile,
-        IBeamProfile, LBeamProfile, SteelProfile, Profile,
+        IBeamProfile, LBeamProfile,
+        TShapeProfile, ZShapeProfile, CShapeProfile,
+        TrapeziumProfile, CompositeProfile,
+        SteelProfile, Profile,
     )
 
     # Rounded footprint for a wall/slab/space:
@@ -53,6 +61,13 @@ from ifckit.profiles.base import Profile
 from ifckit.profiles.derived import DerivedProfile
 from ifckit.profiles.i_beam import IBeamProfile
 from ifckit.profiles.l_beam import LBeamProfile
+from ifckit.profiles.sections import (
+    CompositeProfile,
+    CShapeProfile,
+    TrapeziumProfile,
+    TShapeProfile,
+    ZShapeProfile,
+)
 from ifckit.profiles.shapes import (
     CircleProfile,
     HollowCircleProfile,
@@ -76,6 +91,11 @@ __all__ = [
     # Section profiles
     "IBeamProfile",
     "LBeamProfile",
+    "TShapeProfile",
+    "ZShapeProfile",
+    "CShapeProfile",
+    "TrapeziumProfile",
+    "CompositeProfile",
     # Steel lookup
     "SteelProfile",
 ]

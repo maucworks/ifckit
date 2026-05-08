@@ -4,10 +4,21 @@ ifckit.profiles.base
 
 Abstract base class for all profile types in ifckit.
 
+``Profile`` inherits from ``Path`` — a Profile IS a planar, closed Path in
+the XY plane (Z = 0).  This means every Profile can be used anywhere a Path
+is expected (sweep directrix, hole curve, Rhino preview, etc.) without any
+conversion step.
+
 Every concrete profile must implement:
-  - ``to_ifc(ifc_file)``   → an IfcProfileDef entity
-  - ``to_dict()``           → JSON-serializable dict (must include ``"profile_type"``)
-  - ``from_dict(d)``        → classmethod reconstructing from that dict
+  - ``get_profile_points()``  → list of (x, y) tuples (open ring, no closing dup)
+  - ``to_ifc(ifc_file)``      → an IfcProfileDef entity
+  - ``to_dict()``             → JSON-serializable dict (must include ``"profile_type"``)
+  - ``from_dict(d)``          → classmethod reconstructing from that dict
+
+Path segments are built lazily from ``get_profile_points()`` the first time
+any Path property (``segments``, ``is_closed``, ``length``, …) is accessed.
+This keeps subclass ``__init__`` free of boilerplate while ensuring full
+Path compatibility.
 
 Profile transform
 -----------------
@@ -18,13 +29,10 @@ All profiles support three optional transform parameters that are applied
       CCW rotation of the cross-section around its local origin.
 
   offset_x  (float, metres, default 0.0)
-      Additional translation along the local profile X-axis (horizontal
-      in the cross-section plane, i.e. perpendicular to the beam axis in
-      the strong-axis direction).
+      Additional translation along the local profile X-axis.
 
   offset_y  (float, metres, default 0.0)
-      Additional translation along the local profile Y-axis (vertical in
-      the cross-section plane, i.e. the weak-axis direction).
+      Additional translation along the local profile Y-axis.
 
 These map to the two degrees of freedom in ``IfcAxis2Placement2D``:
   - ``Location``     ← anchor_offset + (offset_x, offset_y)
@@ -49,20 +57,36 @@ Usage::
 
     # IFC output:
     ifc_entity = profile.to_ifc(ifc_file)
+
+    # Path usage — works directly, no conversion:
+    path = RectangleProfile(100, 50)
+    assert path.is_planar
+    assert path.is_closed
+    for seg in path.segments:
+        print(seg)
 """
 
 from __future__ import annotations
 
 import math
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+from ifckit.geometry import Path, Plane, Vec
 
 if TYPE_CHECKING:
     import ifcopenshell
 
+# XY plane — the canonical plane for all 2D profiles
+_XY_PLANE = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
 
-class RegisterProfileType(type(ABC)):
-    """Metaclass that auto-registers profile classes by their ``profile_type`` string."""
+
+class RegisterProfileType(type(Path)):
+    """Metaclass that auto-registers profile classes by their ``profile_type`` string.
+
+    Inherits from ``type(Path)`` (which is plain ``type``) so it is compatible
+    with ``Path`` as a base class without a metaclass conflict.
+    """
 
     _registry: Dict[str, "RegisterProfileType"] = {}
 
@@ -74,24 +98,80 @@ class RegisterProfileType(type(ABC)):
         return cls
 
 
-class Profile(ABC, metaclass=RegisterProfileType):
+class Profile(Path, metaclass=RegisterProfileType):
     """
     Abstract base class for all ifckit profile types.
 
-    Subclasses must set a class-level ``profile_type`` string (used for
-    serialization dispatch) and implement the three abstract methods below.
+    A Profile IS a Path — it is always planar (XY plane, Z = 0) and always
+    closed.  All Path methods (``segments``, ``is_planar``, ``is_closed``,
+    ``length``, ``sample()``, ``holes``, ``with_hole()``, …) work directly on
+    any Profile instance without conversion.
 
-    The optional *rotation*, *offset_x*, *offset_y* transform is applied
-    centrally — subclasses do not need to handle it themselves.
+    Subclasses must set a class-level ``profile_type`` string (used for
+    serialization dispatch) and implement the abstract methods below.
     """
 
     profile_type: Optional[str] = None  # overridden in each concrete subclass
 
-    # Transform defaults — subclasses may set these in __init__ by calling
-    # _init_transform(rotation, offset_x, offset_y) or by setting the attrs.
+    # Transform defaults — subclasses set these via _init_transform()
     rotation: float = 0.0
     offset_x: float = 0.0
     offset_y: float = 0.0
+
+    def __init__(self) -> None:
+        # Initialise Path in the XY plane so is_planar is authoritatively True
+        super().__init__(plane=_XY_PLANE)
+        # Segment list is populated lazily on first access via _ensure_segments()
+        self._segments_built: bool = False
+
+    # ------------------------------------------------------------------
+    # Lazy segment population
+    # ------------------------------------------------------------------
+
+    def _ensure_segments(self) -> None:
+        """Populate Path segments from get_profile_points() if not done yet."""
+        if self._segments_built:
+            return
+        self._segments_built = True
+        pts = self.get_profile_points()
+        if len(pts) < 2:
+            return
+        vecs = [Vec(x, y, 0.0) for x, y in pts]
+        # Build closed ring of Line segments
+        self._segments = []
+        for i in range(len(vecs)):
+            self._segments.append(
+                __import__("ifckit.geometry", fromlist=["Line"]).Line(
+                    vecs[i], vecs[(i + 1) % len(vecs)]
+                )
+            )
+
+    @property
+    def segments(self):
+        self._ensure_segments()
+        return list(self._segments)
+
+    # ------------------------------------------------------------------
+    # Path property overrides — enforce planar + closed invariants
+    # ------------------------------------------------------------------
+
+    @property
+    def is_planar(self) -> bool:
+        """Always True — profiles are by definition planar."""
+        return True
+
+    @property
+    def is_closed(self) -> bool:
+        """Always True — profiles are by definition closed."""
+        return True
+
+    # ------------------------------------------------------------------
+    # to_path — identity (Profile IS a Path)
+    # ------------------------------------------------------------------
+
+    def to_path(self) -> "Profile":
+        """Return self — Profile already IS a Path."""
+        return self
 
     # ------------------------------------------------------------------
     # Transform helpers (called by subclass __init__ and builders)
@@ -103,10 +183,13 @@ class Profile(ABC, metaclass=RegisterProfileType):
         offset_x: float = 0.0,
         offset_y: float = 0.0,
     ) -> None:
-        """Store the three transform parameters.  Call from subclass __init__."""
+        """Store the three transform parameters. Call from subclass __init__."""
         self.rotation = float(rotation)
         self.offset_x = float(offset_x)
         self.offset_y = float(offset_y)
+        # Invalidate cached segments when transform changes
+        self._segments_built = False
+        self._segments = []
 
     def _apply_transform(self, points: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
         """
@@ -133,15 +216,6 @@ class Profile(ABC, metaclass=RegisterProfileType):
         """
         Build an ``IfcAxis2Placement2D`` that combines the subclass anchor
         offset with the user-supplied rotation and offset_x/offset_y.
-
-        Args:
-            ifc_file:  The IFC file to create entities in.
-            anchor_x:  X offset already required by the subclass anchor system
-                       (e.g. ``IBeamProfile._origin_offset()``).
-            anchor_y:  Y offset already required by the subclass anchor system.
-
-        Returns:
-            An ``IfcAxis2Placement2D`` entity.
         """
         loc_x = anchor_x + self.offset_x
         loc_y = anchor_y + self.offset_y
@@ -159,7 +233,7 @@ class Profile(ABC, metaclass=RegisterProfileType):
         return ifc_file.create_entity("IfcAxis2Placement2D", Location=location)
 
     # ------------------------------------------------------------------
-    # Transform serialization helpers (use in to_dict / from_dict)
+    # Transform serialization helpers
     # ------------------------------------------------------------------
 
     def _transform_dict(self) -> Dict[str, float]:
@@ -184,13 +258,23 @@ class Profile(ABC, metaclass=RegisterProfileType):
     # ------------------------------------------------------------------
 
     @abstractmethod
+    def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return profile outline as (x, y) tuples (open ring, no closing duplicate).
+
+        This is the single source of truth for the 2D outline used by both
+        the Path segment builder and the IFC tessellation pipeline.
+        Subclasses must implement this.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not implement get_profile_points().")
+
+    @abstractmethod
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         """Return an IfcProfileDef entity for this profile."""
         raise NotImplementedError
 
     @abstractmethod
     def to_dict(self) -> Dict[str, Any]:
-        """Return a JSON-serializable dict.  Must include ``"profile_type"``."""
+        """Return a JSON-serializable dict. Must include ``"profile_type"``."""
         raise NotImplementedError
 
     @classmethod
@@ -202,11 +286,8 @@ class Profile(ABC, metaclass=RegisterProfileType):
     @property
     def area(self) -> Optional[float]:
         """
-        Return the cross-sectional area in m² (or whatever unit the profile uses).
-
-        Returns ``None`` if the profile type does not support area calculation
-        (e.g. PolygonProfile without explicit geometry).  Concrete subclasses
-        should override this.
+        Return the cross-sectional area (same units as profile dimensions).
+        Returns ``None`` if not overridden by the subclass.
         """
         return None
 
@@ -221,10 +302,6 @@ class Profile(ABC, metaclass=RegisterProfileType):
 
         Looks up ``d["profile_type"]`` in the profile registry and delegates
         to the matching subclass ``from_dict()``.
-
-        Raises:
-            KeyError:   if ``"profile_type"`` is missing from ``d``.
-            ValueError: if the profile_type is not registered.
         """
         key = d["profile_type"]
         registry = RegisterProfileType._registry
@@ -233,39 +310,3 @@ class Profile(ABC, metaclass=RegisterProfileType):
                 f"Unknown profile_type {key!r}. Registered types: {sorted(registry.keys())}"
             )
         return registry[key].from_dict(d)
-
-    # ------------------------------------------------------------------
-    # Optional: backwards-compat point-list interface
-    # ------------------------------------------------------------------
-
-    def get_profile_points(self) -> List[Tuple[float, float]]:
-        """
-        Return the profile outline as a list of (x, y) tuples.
-
-        Legacy interface consumed by ``_coerce_profile()`` in
-        ``ifckit.elements.structural``.  Concrete shape profiles should
-        override this so they remain compatible with the existing builder
-        pipeline until full IFC-native output is wired through.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement get_profile_points(). Use to_ifc() directly."
-        )
-
-    def to_path(self) -> Any:
-        """Return the profile outline as a closed ``ifckit.geometry.Path`` in the XY plane (Z=0).
-
-        Converts ``get_profile_points()`` → a ``Path`` of ``Line`` segments,
-        closed by connecting the last point back to the first.  The result can
-        be passed directly to ``rhinokit.path_to_rhino_curve()``.
-        """
-        from ifckit.geometry import Path, Vec
-
-        pts = self.get_profile_points()  # [(x, y), ...]
-        if not pts:
-            raise ValueError(f"{type(self).__name__}.get_profile_points() returned no points")
-
-        vecs = [Vec(x, y, 0.0) for x, y in pts]
-        path = Path()
-        for i in range(len(vecs)):
-            path.add_line(vecs[i], vecs[(i + 1) % len(vecs)])
-        return path
