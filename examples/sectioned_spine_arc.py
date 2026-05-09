@@ -143,14 +143,14 @@ def build_s_curve() -> None:
     Spine control points:
         (0, 0, 0) → (1500, 0, 0) → (1500, 3000, 0) → (3000, 3000, 0)
 
-    fillet(1, 1500) rounds the first corner (right turn).
-    fillet(3, 1500) rounds the second corner (left turn) — index 3 because
+    fillet(1, 1000) rounds the first corner (right turn).
+    fillet(3, 1000) rounds the second corner (left turn) — index 3 because
     the first fillet added one segment, shifting the second corner by +2.
     """
     pts = [Vec(0, 0, 0), Vec(1500, 0, 0), Vec(1500, 3000, 0), Vec(3000, 3000, 0)]
     spine = Path.from_pts(pts)
-    spine.fillet(1, 1500)   # first corner: between seg[0] and seg[1]
-    spine.fillet(3, 1500)   # second corner: shifted to seg[3] after first fillet
+    spine.fillet(1, 1000)   # first corner: between seg[0] and seg[1]
+    spine.fillet(3, 1000)   # second corner: shifted to seg[3] after first fillet
 
     starter = Plane(pts[0], Vec(1, 0, 0), Vec(0, 0, 1))
     profile = CShapeProfile(depth=150, width=60, wall_thickness=6, girth=20)
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     print("\n2. Line + fillet + line (IBeamProfile H200 B100, R=1500):")
     build_line_fillet_line()
 
-    print("\n3. S-curve — two opposite fillets (CShapeProfile 150×60, R=1500):")
+    print("\n3. S-curve — two opposite fillets (CShapeProfile 150×60, R=1000):")
     build_s_curve()
 
     print("\n4. Complex 3D path — 7 corners filleted (RectangleProfile 150×300, R=300):")
