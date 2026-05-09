@@ -5,41 +5,6 @@ Visual reference for each example.  Click the link to preview in the
 
 ---
 
-## `quickstart.py`
-
-Minimal wall with an opening and a window.  Good starting point for
-understanding the basic ifckit API.
-
-[Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fquickstart.ifc)
-
----
-
-## `quickstart_bridge.py`
-
-A simple 3-span bridge: two abutments, two piers, prestressed concrete
-I-girders, and a deck slab.
-
-[Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fquickstart_bridge.ifc)
-
----
-
-## `simple_building.py`
-
-A two-storey building with walls, columns, beams, and slabs.
-
-[Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fsimple_building.ifc)
-
----
-
-## `simple_bridge.py`
-
-Detailed bridge with IfcAlignment, IfcBridge, IfcBridgePart, and swept
-beam geometry (IfcExtrudedAreaSolid).
-
-[Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fsimple_bridge.ifc)
-
----
-
 ## `build_hello_wall.py`
 
 JSON-driven build: reads `hello_wall.json` and constructs walls with
