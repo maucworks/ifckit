@@ -1293,6 +1293,37 @@ def _tessellate_sectioned_spine(
                     faces,
                 )
 
+    # Closing barrel: last section back to first (closed spines)
+    if closed and len(section_offsets) >= 2:
+        last_outer_start, last_inner_starts = section_offsets[-1]
+        last_outer, last_inners = profile_ring_sets[-1]
+        last_frame = axis_frames[-1]
+        first_outer_start, first_inner_starts = section_offsets[0]
+        first_outer, first_inners = profile_ring_sets[0]
+        first_frame = axis_frames[0]
+
+        _stitch_rings(
+            last_outer_start,
+            first_outer_start,
+            last_outer,
+            first_outer,
+            last_frame,
+            first_frame,
+            vertices,
+            faces,
+        )
+        for hole_idx in range(min(len(last_inner_starts), len(first_inner_starts))):
+            _stitch_rings(
+                first_inner_starts[hole_idx],
+                last_inner_starts[hole_idx],
+                first_inners[hole_idx],
+                last_inners[hole_idx],
+                first_frame,
+                last_frame,
+                vertices,
+                faces,
+            )
+
     # End caps: first and last section (only for open spines)
     if not closed and len(section_offsets) >= 2:
         for is_first in (True, False):
