@@ -306,9 +306,21 @@ class SectionedSpineBuilder(BaseBuilder):
         # 4. Compute upvector frames with miter scales
         field = upvector_frames(pts, world_up, closed=is_closed)
 
-        # 5. Build profile list with miter-scaled copies
+        # 5. Build profile list with miter-scaled copies.
+        #    For closed paths: extract only the vertex-mitered
+        #    (P_mit) frames — midpoints are a frame-helper, not output.
+        if is_closed:
+            n_orig = len(pts)
+            mit_indices = [4 * i + 2 for i in range(n_orig)]
+            vtx_frames = [field.frames[i] for i in mit_indices]
+            vtx_scales = [field.scales[i] for i in mit_indices]
+        else:
+            vtx_frames = field.frames
+            vtx_scales = field.scales
+
         profiles: list[Profile] = []
-        for i, (scale, axis) in enumerate(field.scales):
+        for _scale, axis in vtx_scales:
+            scale = _scale
             if scale == 1.0:
                 profiles.append(profile)
             elif axis == "x":
@@ -320,7 +332,7 @@ class SectionedSpineBuilder(BaseBuilder):
         pending = PendingSectionedSpine(
             spine=spine,
             profiles=profiles,
-            positions=field.frames,
+            positions=vtx_frames,
             name=name,
             profile_segments=profile_segments,
             closed=is_closed,
