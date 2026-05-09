@@ -8,8 +8,9 @@ barrels, all four corners properly miter-scaled.
 Produces three IFC files in examples/output/:
 
   1. closed_rect_ibeam.ifc      — I-beam (H200) on a flat rectangle
-  2. closed_rect_channel.ifc    — channel section (CShape 150x60) on a flat rectangle
-  3. closed_3d_ibeam.ifc        — I-beam on a 3D rectangular frame
+  2. closed_rect_channel.ifc    — channel section on a flat square
+  3. closed_3d_ibeam.ifc        — I-beam on a 3D frame, P6 filleted (R=400)
+  4. closed_3d_filleted.ifc     — I-beam on a 3D frame, all 6 corners filleted
 
 Usage:
     python examples/closed_polyline_ibeam.py
@@ -124,13 +125,45 @@ def build_3d_ibeam() -> None:
         Vec(0, 3000, 0),
         Vec(0, 0, 0),
     ]
-    pts = pts[:-1]  # remove explicit duplicate — from_pts(closed=True) adds it
+    pts = pts[:-1]
     spine = Path.from_pts(pts, closed=True)
-    spine.fillet(6, 400)  # round the corner at Vec(0, 3000, 0) — R=400mm
+    spine.fillet(6, 400)  # P6: corner between P5→P6 (-Z) and P6→P0 (-Y)
     mid = (pts[0] + pts[1]) * 0.5
     starter = Plane(mid, Vec(1, 0, 0), Vec(0, 0, 1))
     profile = IBeamProfile(height=200, width=100, flange_thickness=12, web_thickness=7)
     _build_and_save(spine, profile, starter, "closed_3d_ibeam", "closed_3d_ibeam.ifc")
+
+
+# ---------------------------------------------------------------------------
+# 4. 3D frame — all corners filleted
+# ---------------------------------------------------------------------------
+
+
+def build_3d_all_filleted() -> None:
+    """I-beam on a 3D frame with R=400 fillets on all 6 addressable corners.
+
+    The wrap-around corner at P0 (closing seg → seg[0]) stays sharp —
+    it cannot be addressed by index in a closed path.
+    """
+    pts = [
+        Vec(0, 0, 0),
+        Vec(4000, 0, 0),
+        Vec(4000, 0, 2000),
+        Vec(4000, 3000, 2000),
+        Vec(4000, 3000, 3000),
+        Vec(0, 3000, 3000),
+        Vec(0, 3000, 0),
+        Vec(0, 0, 0),
+    ]
+    pts = pts[:-1]
+    spine = Path.from_pts(pts, closed=True)
+    # Fillet from highest index down — earlier indices stay valid
+    for idx in range(6, 0, -1):
+        spine.fillet(idx, 400)
+    mid = (pts[0] + pts[1]) * 0.5
+    starter = Plane(mid, Vec(1, 0, 0), Vec(0, 0, 1))
+    profile = IBeamProfile(height=200, width=100, flange_thickness=12, web_thickness=7)
+    _build_and_save(spine, profile, starter, "closed_3d_filleted", "closed_3d_filleted.ifc")
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +185,9 @@ if __name__ == "__main__":
 
     print("\n3. 3D frame — IBeamProfile H200:")
     build_3d_ibeam()
+
+    print("\n4. 3D frame — all 6 corners filleted (R=400):")
+    build_3d_all_filleted()
 
     print(
         "\nDone. Open the .ifc files in Bonsai / any IFC viewer."
