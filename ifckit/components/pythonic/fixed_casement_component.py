@@ -9,13 +9,11 @@ from ifckit.builders._geom import (
     axis2placement3d,
     extrude_profile,
     profile_from_points,
-    sectioned_spine,
 )
+from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.components import EvaluatedComponent, WindowComponent, component
-from ifckit.geometry import Path, Vec
-from ifckit.geometry.frames import upvector_frames
+from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles import RectangleProfile
-from ifckit.profiles.derived import DerivedProfile
 
 ALUMINUM_FRAME = {
     "color": {"r": 0.8, "g": 0.8, "b": 0.8},
@@ -73,7 +71,17 @@ class FixedCasementComponent(WindowComponent):
 
         # ── Lining: closed sectioned-spine with rectangular profile ───
         if lt > 0 and ld > 0:
-            lining_solid = self._build_lining(ifc_file, wx, wy, lt, ld)
+            a_step = float(params.get("angle_step_deg", 5.0))
+            p_segs = int(params.get("profile_segments", 16))
+            lining_solid = self._build_lining(
+                ifc_file,
+                wx,
+                wy,
+                lt,
+                ld,
+                angle_step_deg=a_step,
+                profile_segments=p_segs,
+            )
             comps.append(
                 EvaluatedComponent(
                     solid=lining_solid,
@@ -127,16 +135,15 @@ class FixedCasementComponent(WindowComponent):
     # ── Lining via closed sectioned-spine ─────────────────────────
 
     @staticmethod
-    def _build_lining(ifc_file, wx, wy, lt, ld):
+    def _build_lining(
+        ifc_file, wx, wy, lt, ld, angle_step_deg: float = 3.0, profile_segments: int = 16
+    ):
         """Build lining as a closed sectioned-spine sweep.
 
         Spine = closed rectangle at the centerline of the frame
         (offset *lt/2* inward from the outer boundary).
-
-        Profile = Rectangle(lt × ld): width = frame thickness in the wall
-        plane, height = frame depth along Z (world_up).
+        Profile = Rectangle(lt × ld): frame cross-section.
         """
-        # Centerline vertices: offset = lt/2 inward from outer boundary
         off = lt / 2
         spine = Path.from_pts(
             [
@@ -147,50 +154,16 @@ class FixedCasementComponent(WindowComponent):
             ],
             closed=True,
         )
-
-        base_profile = RectangleProfile(lt, ld)
-
-        # Extract control points (strip trailing duplicate for closed paths)
-        segs = spine._segments
-        pts = [seg.start for seg in segs]
-        last = segs[-1].end
-        if not (pts and pts[0].equals(last)):
-            pts.append(last)
-
-        # Compute frames with miter detection
-        world_up = Vec(0, 0, 1)
-        field = upvector_frames(pts, world_up, closed=True)
-
-        # Extract vertex-mitered frames only (midpoints are helpers)
-        n_orig = len(pts)
-        mit_indices = [4 * i + 2 for i in range(n_orig)]
-        vtx_frames = [field.frames[i] for i in mit_indices]
-        vtx_scales = [field.scales[i] for i in mit_indices]
-
-        # Build miter-scaled profile copies
-        profiles = []
-        for scale, axis in vtx_scales:
-            if scale == 1.0:
-                profiles.append(base_profile)
-            elif axis == "x":
-                profiles.append(DerivedProfile(base_profile, scale_y=scale))
-            else:
-                profiles.append(DerivedProfile(base_profile, scale_x=scale))
-
-        # Convert to IFC entities
-        profile_defs = [p.to_ifc(ifc_file) for p in profiles]
-        pos_entities = [
-            axis2placement3d(ifc_file, f.origin, f.z_axis, f.x_axis) for f in vtx_frames
-        ]
-        spine_curve = spine.directrix(ifc_file)
-
-        return sectioned_spine(
+        # spine.fillet(1, 5 * lt)  # uncomment to round corners
+        starter = Plane(Vec(off, off, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        profile = RectangleProfile(lt, ld)
+        return SectionedSpineBuilder().tessellate_spine(
             ifc_file,
-            spine_curve,
-            profile_defs,
-            pos_entities,
-            profile_segments=32,
-            closed=True,
+            spine=spine,
+            profile=profile,
+            starter_plane=starter,
+            angle_step_deg=angle_step_deg,
+            profile_segments=profile_segments,
         )
 
 

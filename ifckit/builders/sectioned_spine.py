@@ -61,7 +61,7 @@ from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 from ifckit.elements.sectioned_spine import PendingSectionedSpine
-from ifckit.geometry import Path, Plane, Vec, upvector_frames
+from ifckit.geometry import Path, Plane, upvector_frames
 from ifckit.profiles import DerivedProfile, Profile
 
 
@@ -87,6 +87,36 @@ class SectionedSpineBuilder(BaseBuilder):
     ifc_class = "IfcBuildingElementProxy"  # actual IFC class created
 
     # ------------------------------------------------------------------
+    # Public low-level API: face-set only (no product, no shape rep)
+    # ------------------------------------------------------------------
+
+    def build_face_set(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+    ) -> ifcopenshell.entity_instance:
+        """Return the raw ``IfcTriangulatedFaceSet`` — geometry only.
+
+        Unlike ``build()`` or ``build_shape_rep()``, this creates neither a
+        product entity nor an ``IfcShapeRepresentation``.  Use it when the
+        caller manages the representation themselves, e.g. inside a component
+        graph that assembles multiple solids into one window/door.
+        """
+        spine_curve = directrix_from_path(ifc_file, pending.spine)
+        profile_defs = [p.to_ifc(ifc_file) for p in pending.profiles]
+        pos_entities = [
+            axis2placement3d(ifc_file, pl.origin, pl.z_axis, pl.x_axis) for pl in pending.positions
+        ]
+        return _sectioned_spine(
+            ifc_file,
+            spine_curve,
+            profile_defs,
+            pos_entities,
+            profile_segments=getattr(pending, "profile_segments", 32),
+            closed=getattr(pending, "closed", False),
+        )
+
+    # ------------------------------------------------------------------
     # Public low-level API: shape-rep only
     # ------------------------------------------------------------------
 
@@ -96,12 +126,18 @@ class SectionedSpineBuilder(BaseBuilder):
         pending: PendingElement,
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
-        """Return an IfcShapeRepresentation without creating a product.
+        """Return an ``IfcShapeRepresentation`` without creating a product.
 
         Useful when the caller manages the product entity themselves and only
         needs the tessellated geometry representation.
         """
-        return self._make_shape_rep(ifc_file, pending, context)
+        face_set = self.build_face_set(ifc_file, pending)
+        return shape_representation(
+            ifc_file,
+            context,
+            face_set,
+            rep_type="Tessellation",
+        )
 
     # ------------------------------------------------------------------
     # BaseBuilder contract
@@ -225,31 +261,96 @@ class SectionedSpineBuilder(BaseBuilder):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _points_from_path(spine: Path, angle_step_deg: float = 5.0) -> list[Vec]:
-        """Extract sample points from a Path, supporting both Line and Arc segments.
+    def _make_pending(
+        spine: Path,
+        profile: Profile,
+        starter_plane: Plane,
+        angle_step_deg: float = 5.0,
+        profile_segments: int = 32,
+        name: str = "",
+    ) -> PendingSectionedSpine:
+        """Extract points, compute frames, build mitered profiles.
 
-        For polyline-only paths, returns the exact control vertices (no loss
-        of precision).  For paths containing Arc segments the path is sampled
-        at ``angle_step_deg`` resolution so that arc curvature is preserved.
+        Returns a ``PendingSectionedSpine`` ready to pass to
+        ``build_face_set()``, ``build_shape_rep()``, or ``build()``.
         """
+        # 1. Extract control/sample points from path (Arc-aware)
         from ifckit.geometry import Arc as _Arc
 
-        segs = spine._segments
-        if not segs:
-            raise ValueError("Spine path has no segments")
-
-        has_arc = any(isinstance(s, _Arc) for s in segs)
+        has_arc = any(isinstance(s, _Arc) for s in spine._segments) if spine._segments else False
         if has_arc:
-            # Let Path.sample() handle arc discretisation with deduplication
-            return spine.sample(angle_step_deg).points
+            pts = spine.sample(angle_step_deg).points
+        else:
+            segs = spine._segments
+            pts = [seg.start for seg in segs]
+            last = segs[-1].end
+            if not (pts and pts[0].equals(last)):
+                pts.append(last)
 
-        # Pure polyline — exact vertices
-        pts = [seg.start for seg in segs]
-        last = segs[-1].end
-        # For closed paths the last point duplicates the first — strip it
-        if not (pts and pts[0].equals(last)):
-            pts.append(last)
-        return pts
+        # 2. Detect closed loop
+        is_closed = getattr(spine, "is_closed", False)
+
+        # 3. World-up direction from starter plane
+        world_up = starter_plane.y_axis
+
+        # 4. Compute frames with miter scales
+        field = upvector_frames(pts, world_up, closed=is_closed)
+
+        # 5. Extract vertex-mitered frames (midpoints are helpers)
+        if is_closed:
+            n_orig = len(pts)
+            mit_indices = [4 * i + 2 for i in range(n_orig)]
+            vtx_frames = [field.frames[i] for i in mit_indices]
+            vtx_scales = [field.scales[i] for i in mit_indices]
+        else:
+            vtx_frames = field.frames
+            vtx_scales = field.scales
+
+        # 6. Build miter-scaled profile list
+        profiles: list[Profile] = []
+        for _s, axis in vtx_scales:
+            scale = _s
+            if scale == 1.0:
+                profiles.append(profile)
+            elif axis == "x":
+                profiles.append(DerivedProfile(profile, scale_y=scale))
+            else:
+                profiles.append(DerivedProfile(profile, scale_x=scale))
+
+        return PendingSectionedSpine(
+            spine=spine,
+            profiles=profiles,
+            positions=vtx_frames,
+            name=name,
+            profile_segments=profile_segments,
+            closed=is_closed,
+        )
+
+    def tessellate_spine(
+        self,
+        ifc_file: ifcopenshell.file,
+        spine: Path,
+        profile: Profile,
+        starter_plane: Plane,
+        angle_step_deg: float = 5.0,
+        profile_segments: int = 32,
+        name: str = "",
+    ) -> ifcopenshell.entity_instance:
+        """One-shot: return only the ``IfcTriangulatedFaceSet``.
+
+        Like ``build_from_spine()`` but skips product creation —
+        returns the raw tessellated mesh.  Ideal for component graphs
+        that embed the geometry into a larger product (e.g. window lining).
+        """
+        pending = self._make_pending(
+            spine,
+            profile,
+            starter_plane,
+            angle_step_deg=angle_step_deg,
+            profile_segments=profile_segments,
+            name=name,
+        )
+        return self.build_face_set(ifc_file, pending)
 
     def build_from_spine(
         self,
@@ -270,7 +371,6 @@ class SectionedSpineBuilder(BaseBuilder):
 
         The starter plane's ``.y_axis`` is used as the \"world-up\"
         direction — profile Y stays as close to this as the path allows.
-        No holonomic twist accumulates across orthogonal-plane corners.
 
         Arc segments are supported: pass a ``Path`` built with
         ``path.add_arc(center, normal, start, angle)`` and the arc is
@@ -294,47 +394,12 @@ class SectionedSpineBuilder(BaseBuilder):
             ``IfcBuildingElementProxy`` with tessellated sectioned-spine
             geometry, object placement, and spatial containment.
         """
-        # 1. Extract control/sample points from path (Arc-aware)
-        pts = self._points_from_path(spine, angle_step_deg=angle_step_deg)
-
-        # 2. Detect closed loop
-        is_closed = getattr(spine, "is_closed", False)
-
-        # 3. World-up direction from starter plane
-        world_up = starter_plane.y_axis
-
-        # 4. Compute upvector frames with miter scales
-        field = upvector_frames(pts, world_up, closed=is_closed)
-
-        # 5. Build profile list with miter-scaled copies.
-        #    For closed paths: extract only the vertex-mitered
-        #    (P_mit) frames — midpoints are a frame-helper, not output.
-        if is_closed:
-            n_orig = len(pts)
-            mit_indices = [4 * i + 2 for i in range(n_orig)]
-            vtx_frames = [field.frames[i] for i in mit_indices]
-            vtx_scales = [field.scales[i] for i in mit_indices]
-        else:
-            vtx_frames = field.frames
-            vtx_scales = field.scales
-
-        profiles: list[Profile] = []
-        for _scale, axis in vtx_scales:
-            scale = _scale
-            if scale == 1.0:
-                profiles.append(profile)
-            elif axis == "x":
-                profiles.append(DerivedProfile(profile, scale_y=scale))
-            else:
-                profiles.append(DerivedProfile(profile, scale_x=scale))
-
-        # 6. Create pending element and build
-        pending = PendingSectionedSpine(
-            spine=spine,
-            profiles=profiles,
-            positions=vtx_frames,
-            name=name,
+        pending = self._make_pending(
+            spine,
+            profile,
+            starter_plane,
+            angle_step_deg=angle_step_deg,
             profile_segments=profile_segments,
-            closed=is_closed,
+            name=name,
         )
         return self.build(ifc_file, pending, storey, context)
