@@ -139,7 +139,7 @@ class DerivedProfile(Profile):
                 Axis1=operator.Axis1,
                 Axis2=operator.Axis2,
                 LocalOrigin=operator.LocalOrigin,
-                Scale=operator.Scale,
+                Scale=sx,
                 Scale2=sy,
             )
 
