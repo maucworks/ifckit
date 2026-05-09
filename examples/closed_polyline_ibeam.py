@@ -19,6 +19,7 @@ Visual check in Bonsai / any IFC viewer:
   - No end caps (the loop is closed).
   - Seam (at segment 0 midpoint) is invisible.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,9 +43,7 @@ def _make_storey(ifc_file: ifcopenshell.file, project) -> ifcopenshell.entity_in
     z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
     x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
     axis = ifc_file.create_entity("IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x)
-    place = ifc_file.create_entity(
-        "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis
-    )
+    place = ifc_file.create_entity("IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis)
     storey = ifc_file.create_entity(
         "IfcBuildingStorey", GlobalId=_guid(), Name="Storey", ObjectPlacement=place
     )
@@ -84,6 +83,7 @@ def _build_and_save(spine, profile, starter, name, filename, angle_step_deg=3.0)
 # 1. Flat rectangle — I-beam
 # ---------------------------------------------------------------------------
 
+
 def build_rect_ibeam() -> None:
     """I-beam profile on a 4 m x 3 m flat rectangle in the XY plane."""
     pts = [Vec(0, 0, 0), Vec(4000, 0, 0), Vec(4000, 3000, 0), Vec(0, 3000, 0)]
@@ -96,6 +96,7 @@ def build_rect_ibeam() -> None:
 # ---------------------------------------------------------------------------
 # 2. Flat rectangle — channel
 # ---------------------------------------------------------------------------
+
 
 def build_rect_channel() -> None:
     """Channel profile on a 2 m x 2 m square."""
@@ -110,8 +111,9 @@ def build_rect_channel() -> None:
 # 3. 3D rectangular frame — I-beam
 # ---------------------------------------------------------------------------
 
+
 def build_3d_ibeam() -> None:
-    """I-beam on a 3D frame: rises in Z at two corners."""
+    """I-beam on a 3D frame: rises in Z at two corners, filleted at P6."""
     pts = [
         Vec(0, 0, 0),
         Vec(4000, 0, 0),
@@ -124,7 +126,7 @@ def build_3d_ibeam() -> None:
     ]
     pts = pts[:-1]  # remove explicit duplicate — from_pts(closed=True) adds it
     spine = Path.from_pts(pts, closed=True)
-    # starter at mid-segment between P0 and P1
+    spine.fillet(6, 400)  # round the corner at Vec(0, 3000, 0) — R=400mm
     mid = (pts[0] + pts[1]) * 0.5
     starter = Plane(mid, Vec(1, 0, 0), Vec(0, 0, 1))
     profile = IBeamProfile(height=200, width=100, flange_thickness=12, web_thickness=7)
