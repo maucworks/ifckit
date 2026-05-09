@@ -136,7 +136,13 @@ class FixedCasementComponent(WindowComponent):
 
     @staticmethod
     def _build_lining(
-        ifc_file, wx, wy, lt, ld, angle_step_deg: float = 3.0, profile_segments: int = 16
+        ifc_file,
+        wx,
+        wy,
+        lt,
+        ld,
+        angle_step_deg: float = 3.0,
+        profile_segments: int = 16,
     ):
         """Build lining as a closed sectioned-spine sweep.
 
@@ -154,7 +160,8 @@ class FixedCasementComponent(WindowComponent):
             ],
             closed=True,
         )
-        # spine.fillet(1, 5 * lt)  # uncomment to round corners
+
+        spine.fillet(1, 5 * lt)  # uncomment to round corners
         starter = Plane(Vec(off, off, 0), Vec(1, 0, 0), Vec(0, 0, 1))
         profile = RectangleProfile(lt, ld)
         return SectionedSpineBuilder().tessellate_spine(
