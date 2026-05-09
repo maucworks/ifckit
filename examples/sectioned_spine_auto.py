@@ -66,12 +66,15 @@ def main():
         Vec(2000, 1000, 1000),
         Vec(2000, 0, 1000),
         Vec(3000, 0, 1000),
+        Vec(4000, 1000, 1000),
+        Vec(5000, 1000, 500),
+        Vec(6000, 0, 00),
     ]
     spine = Path.from_pts(pts)
 
     # The starter plane provides the initial cross-section orientation.
     # Its .x_axis is used as the reference direction for parallel transport.
-    starter = Plane(pts[0], Vec(0, 1, 0), Vec(0, 0, 1))
+    starter = Plane(pts[0], Vec(0, 0, 1), Vec(0, 1, 0))
 
     profile = RectangleProfile(150, 300)  # single profile, cloned + scaled
 

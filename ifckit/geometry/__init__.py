@@ -1148,6 +1148,74 @@ def _points_from_arg(
     return list(path_or_points)
 
 
+def _connection_length(
+    prev_x: "Vec",
+    prev_y: "Vec",
+    curr_x: "Vec",
+    curr_y: "Vec",
+    origin_shift: "Vec",
+) -> float:
+    """Sum of vertex-to-vertex distances between two consecutive sections.
+
+    Uses a unit-square profile (4 vertices) to measure connection stretch.
+    The actual profile dimensions scale this equally for both orientations,
+    so the relative ordering is preserved.
+    """
+    # Unit square vertices: corners at (±0.5, ±0.5)
+    total = 0.0
+    for x2d, y2d in [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]:
+        prev = prev_x * x2d + prev_y * y2d
+        curr = curr_x * x2d + curr_y * y2d + origin_shift
+        diff = curr - prev
+        total += math.sqrt(diff @ diff)
+    return total
+
+
+def _unflip_frames(
+    pts: List["Vec"],
+    frames: List["Plane"],
+) -> List["Plane"]:
+    """Post-process frames to correct orientation discontinuities between sections.
+
+    At each frame (i ≥ 1), tests all four right-handed orientations reachable
+    by 90° increments around Z (the section normal):
+
+        (+X, +Y)   — current
+        (-X, -Y)   — 180° flip
+        (-Y, +X)   — 90° CCW around Z
+        (+Y, -X)   — 90° CW  around Z
+
+    Keeps the orientation with the shortest connection length to the previous
+    section, so corresponding vertices stay on the same side of the spine and
+    unwarranted 90° or 180° twists are corrected.
+    """
+    n = len(frames)
+    if n < 2:
+        return frames
+    result = [frames[0]]
+    for i in range(1, n):
+        prev = result[i - 1]
+        curr = frames[i]
+        origin_shift = pts[i] - pts[i - 1]
+
+        cx, cy = curr.x_axis, curr.y_axis
+        candidates = [
+            (cx, cy),  # 0°
+            (-cx, -cy),  # 180°
+            (-cy, cx),  # 90° CCW around Z
+            (cy, -cx),  # 90° CW  around Z
+        ]
+        best_x, best_y = cx, cy
+        best_d = _connection_length(prev.x_axis, prev.y_axis, cx, cy, origin_shift)
+        for nx, ny in candidates[1:]:
+            d = _connection_length(prev.x_axis, prev.y_axis, nx, ny, origin_shift)
+            if d < best_d:
+                best_d = d
+                best_x, best_y = nx, ny
+        result.append(Plane(curr.origin, best_x, best_y))
+    return result
+
+
 def _compute_miter_scales(
     pts: List["Vec"],
     frames: List["Plane"],
@@ -1276,6 +1344,9 @@ def transport_frames(
         y = curr_z**x  # Y = Z × X
         frames.append(Plane(pts[i], x.normalized(), y.normalized()))
 
+    # -- rectify orientation flips by comparing vertex connections -----
+    frames = _unflip_frames(pts, frames)
+
     if miter_scale:
         scales = _compute_miter_scales(pts, frames)
     else:
@@ -1352,6 +1423,9 @@ def fixed_ref_frames(
 
         frames.append(Plane(pts[i], x, y))
 
+    # -- rectify orientation flips by comparing vertex connections -----
+    frames = _unflip_frames(pts, frames)
+
     if miter_scale:
         scales = _compute_miter_scales(pts, frames)
     else:
@@ -1420,6 +1494,9 @@ def upvector_frames(
         prev_y = y
 
         frames.append(Plane(pts[i], x, y))
+
+    # -- rectify orientation flips by comparing vertex connections -----
+    frames = _unflip_frames(pts, frames)
 
     if miter_scale:
         scales = _compute_miter_scales(pts, frames)
