@@ -62,6 +62,7 @@ class PendingSectionedSpine(PendingElement):
         style: Optional = None,
         properties: Optional = None,
         profile_segments: int = 32,
+        closed: bool = False,
     ):
         super().__init__(
             name=name,
@@ -72,6 +73,7 @@ class PendingSectionedSpine(PendingElement):
         self.profiles = profiles
         self.positions = positions
         self.profile_segments = profile_segments
+        self.closed = closed
 
         # Validation
         if len(profiles) != len(positions):

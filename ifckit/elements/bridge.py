@@ -30,6 +30,7 @@ def _element_from_dict(d: Dict[str, Any]) -> PendingElement:
 # AlignmentSegment
 # ---------------------------------------------------------------------------
 
+
 class AlignmentSegment:
     """
     A single segment of a horizontal alignment — either a straight tangent
@@ -88,6 +89,7 @@ class AlignmentSegment:
 # PendingAlignment
 # ---------------------------------------------------------------------------
 
+
 class PendingAlignment(PendingElement):
     """
     A horizontal alignment composed of ordered AlignmentSegment objects.
@@ -112,16 +114,14 @@ class PendingAlignment(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingAlignment":
-        segments = [
-            AlignmentSegment.from_dict(s)
-            for s in cls._require(d, "segments")
-        ]
+        segments = [AlignmentSegment.from_dict(s) for s in cls._require(d, "segments")]
         return cls(segments=segments, name=d.get("name", ""))
 
 
 # ---------------------------------------------------------------------------
 # BridgePartType
 # ---------------------------------------------------------------------------
+
 
 class BridgePartType(enum.Enum):
     DECK = "DECK"
@@ -133,6 +133,7 @@ class BridgePartType(enum.Enum):
 # ---------------------------------------------------------------------------
 # PendingBridgePart
 # ---------------------------------------------------------------------------
+
 
 class PendingBridgePart(PendingElement):
     """
@@ -171,11 +172,7 @@ class PendingBridgePart(PendingElement):
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBridgePart":
         part_type = BridgePartType(cls._require(d, "part_type"))
         elements = [_element_from_dict(e) for e in d.get("elements", [])]
-        alignment = (
-            PendingAlignment.from_dict(d["alignment"])
-            if "alignment" in d
-            else None
-        )
+        alignment = PendingAlignment.from_dict(d["alignment"]) if "alignment" in d else None
         return cls(
             part_type=part_type,
             elements=elements,
@@ -187,6 +184,7 @@ class PendingBridgePart(PendingElement):
 # ---------------------------------------------------------------------------
 # PendingBridge
 # ---------------------------------------------------------------------------
+
 
 class PendingBridge(PendingElement):
     """
@@ -220,9 +218,5 @@ class PendingBridge(PendingElement):
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBridge":
         parts = [PendingBridgePart.from_dict(p) for p in cls._require(d, "parts")]
-        alignment = (
-            PendingAlignment.from_dict(d["alignment"])
-            if "alignment" in d
-            else None
-        )
+        alignment = PendingAlignment.from_dict(d["alignment"]) if "alignment" in d else None
         return cls(parts=parts, alignment=alignment, name=d.get("name", ""))

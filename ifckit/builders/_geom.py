@@ -1099,6 +1099,7 @@ def _tessellate_sectioned_spine(
     cross_sections: list["ifcopenshell.entity_instance"],
     positions: list["ifcopenshell.entity_instance"],
     segments: int = 8,
+    closed: bool = False,
 ) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
     """Tessellate IfcSectionedSpine data to vertices and face indices.
 
@@ -1292,8 +1293,8 @@ def _tessellate_sectioned_spine(
                     faces,
                 )
 
-    # End caps: first and last section
-    if len(section_offsets) >= 2:
+    # End caps: first and last section (only for open spines)
+    if not closed and len(section_offsets) >= 2:
         for is_first in (True, False):
             cap_idx = 0 if is_first else len(section_offsets) - 1
             outer_start, inner_starts = section_offsets[cap_idx]
@@ -1367,22 +1368,19 @@ def sectioned_spine(
     cross_sections: list[ifcopenshell.entity_instance],
     positions: list[ifcopenshell.entity_instance],
     profile_segments: int = 32,
+    closed: bool = False,
 ) -> ifcopenshell.entity_instance:
     """Tessellate a sectioned spine to IfcTriangulatedFaceSet.
 
     Creates a solid by sweeping cross-sectional profiles along a spine.
-    Since IfcOpenShell/Bonsai does not support native IfcSectionedSpine
-    rendering, this tessellates to an explicit triangle mesh.
-
-    The ``spine_curve`` argument is accepted for API symmetry with the IFC
-    schema but the tessellation is driven by the ``positions`` axis frames,
-    which are authoritative for vertex placement.
 
     Args:
-        spine_curve: IfcCompositeCurve — kept for schema symmetry, not used
-            in tessellation.
+        spine_curve: IfcCompositeCurve — kept for schema symmetry.
         cross_sections: List of IfcProfileDef (one per position).
         positions: List of IfcAxis2Placement3D (one per cross-section).
+        profile_segments: Circle discretisation count.
+        closed: If True, the spine is a closed loop — no end caps are
+                added and the mesh is marked as closed.
 
     Returns:
         IfcTriangulatedFaceSet entity.
@@ -1397,7 +1395,7 @@ def sectioned_spine(
 
     # Tessellate to mesh (spine_curve not used — positions are authoritative)
     vertices, faces = _tessellate_sectioned_spine(
-        cross_sections, positions, segments=profile_segments
+        cross_sections, positions, segments=profile_segments, closed=closed
     )
 
     # CoordList expects [[x1, y1, z1], [x2, y2, z2], ...]
@@ -1417,7 +1415,7 @@ def sectioned_spine(
     return f.create_entity(
         "IfcTriangulatedFaceSet",
         Coordinates=f.create_entity("IfcCartesianPointList3D", CoordList=coord_list),
-        Closed=False,
+        Closed=closed,
         CoordIndex=[[idx + 1 for idx in tri] for tri in tris],
     )
 

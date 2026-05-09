@@ -102,6 +102,7 @@ class Path:
         """
         Sample the entire path into a "Polyline".
         Consecutive segment endpoints are deduplicated.
+        For closed paths the trailing duplicate of the start point is removed.
         """
         pts: List["Vec"] = []
         for seg in self._segments:
@@ -112,6 +113,9 @@ class Path:
             if pts and pts[-1].equals(seg_pts[0]):
                 seg_pts = seg_pts[1:]
             pts.extend(seg_pts)
+        # Closed path: last point == first point → strip trailing duplicate
+        if len(pts) > 1 and pts[0].equals(pts[-1]):
+            pts = pts[:-1]
         return Polyline(pts)
 
     def start_point(self) -> Optional["Vec"]:

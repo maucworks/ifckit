@@ -209,6 +209,7 @@ class SectionedSpineBuilder(BaseBuilder):
             profile_defs,
             pos_entities,
             profile_segments=getattr(pending, "profile_segments", 32),
+            closed=getattr(pending, "closed", False),
         )
 
         # 5. Wrap in IfcShapeRepresentation (Tessellation type)
@@ -244,7 +245,10 @@ class SectionedSpineBuilder(BaseBuilder):
 
         # Pure polyline — exact vertices
         pts = [seg.start for seg in segs]
-        pts.append(segs[-1].end)
+        last = segs[-1].end
+        # For closed paths the last point duplicates the first — strip it
+        if not (pts and pts[0].equals(last)):
+            pts.append(last)
         return pts
 
     def build_from_spine(
@@ -293,30 +297,32 @@ class SectionedSpineBuilder(BaseBuilder):
         # 1. Extract control/sample points from path (Arc-aware)
         pts = self._points_from_path(spine, angle_step_deg=angle_step_deg)
 
-        # 2. World-up direction from starter plane
+        # 2. Detect closed loop
+        is_closed = getattr(spine, "is_closed", False)
+
+        # 3. World-up direction from starter plane
         world_up = starter_plane.y_axis
 
-        # 3. Compute upvector frames with miter scales
-        field = upvector_frames(pts, world_up)
+        # 4. Compute upvector frames with miter scales
+        field = upvector_frames(pts, world_up, closed=is_closed)
 
-        # 4. Build profile list with miter-scaled copies
+        # 5. Build profile list with miter-scaled copies
         profiles: list[Profile] = []
         for i, (scale, axis) in enumerate(field.scales):
             if scale == 1.0:
                 profiles.append(profile)
             elif axis == "x":
-                # rotation around X → miter along Y → scale Y
                 profiles.append(DerivedProfile(profile, scale_y=scale))
             else:
-                # rotation around Y → miter along X → scale X
                 profiles.append(DerivedProfile(profile, scale_x=scale))
 
-        # 5. Create pending element and build
+        # 6. Create pending element and build
         pending = PendingSectionedSpine(
             spine=spine,
             profiles=profiles,
             positions=field.frames,
             name=name,
             profile_segments=profile_segments,
+            closed=is_closed,
         )
         return self.build(ifc_file, pending, storey, context)
