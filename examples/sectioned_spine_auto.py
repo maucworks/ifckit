@@ -74,7 +74,7 @@ def main():
 
     # The starter plane provides the initial cross-section orientation.
     # Its .x_axis is used as the reference direction for parallel transport.
-    starter = Plane(pts[0], Vec(0, 0, 1), Vec(0, 1, 0))
+    starter = Plane(pts[0], Vec(0, 0, 1), Vec(0, -1, 0))
 
     profile = RectangleProfile(150, 300)  # single profile, cloned + scaled
 

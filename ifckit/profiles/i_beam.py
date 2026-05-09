@@ -84,7 +84,7 @@ class IBeamProfile(Profile):
         self.name = name
         self._validate()
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     def _validate(self) -> None:
         if self.height <= 0:
@@ -200,13 +200,13 @@ class IBeamProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "IBeamProfile":
-        r, ox, oy = cls._transform_from_dict(d)
+        r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="s")
         return cls(
             height=d["height"],
             width=d["width"],
             web_thickness=d["web_thickness"],
             flange_thickness=d["flange_thickness"],
-            anchor=d.get("anchor", "s"),
+            anchor=d.get("anchor", anch),
             name=d.get("name", "I-Profile"),
             rotation=r,
             offset_x=ox,

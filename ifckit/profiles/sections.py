@@ -38,7 +38,7 @@ class TShapeProfile(Profile):
 
     IFC native: ``IfcTShapeProfileDef``.
 
-    Natural origin at bottom-centre of web (the stem tip).
+    Natural origin at bottom-centre of web (the stem tip). Default anchor 's'.
 
     Args:
         depth:            Total height (flange face to web tip), m.
@@ -46,6 +46,7 @@ class TShapeProfile(Profile):
         web_thickness:    Web (stem) thickness, m.
         flange_thickness: Flange thickness, m.
         name:             Optional profile name.
+        anchor:           Origin anchor (default 's' = bottom-centre).
         rotation:         CCW rotation (rad).
         offset_x:         X translation (m).
         offset_y:         Y translation (m).
@@ -60,6 +61,7 @@ class TShapeProfile(Profile):
         web_thickness: float = 0.01,
         flange_thickness: float = 0.015,
         name: Optional[str] = None,
+        anchor: str = "s",
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
@@ -78,19 +80,26 @@ class TShapeProfile(Profile):
         self.flange_thickness = float(flange_thickness)
         self.name = name
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     @property
     def area(self) -> float:
         web_h = self.depth - self.flange_thickness
         return self.flange_width * self.flange_thickness + web_h * self.web_thickness
 
+    def _bbox(self) -> Tuple[float, float]:
+        return self.flange_width, self.depth
+
+    def _bbox_sw(self) -> Tuple[float, float]:
+        # natural origin at bottom-centre → sw is at (-fw/2, 0)
+        return -self.flange_width / 2, 0.0
+
     def get_profile_points(self) -> List[Tuple[float, float]]:
         hw = self.flange_width / 2
         htw = self.web_thickness / 2
         d = self.depth
         tf = self.flange_thickness
-        # origin at bottom-centre; flange at top
+        # natural origin at bottom-centre; flange at top
         pts = [
             (-htw, 0.0),
             (htw, 0.0),
@@ -101,10 +110,19 @@ class TShapeProfile(Profile):
             (-hw, d - tf),
             (-htw, d - tf),
         ]
-        return self._apply_transform(pts)
+        return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = self._ifc_placement_2d(ifc_file)
+        # IfcTShapeProfileDef origin is at bounding-box centre.
+        # Our natural origin is at bottom-centre, so IFC origin is depth/2 above ours.
+        # The IFC bbox sw is at (-fw/2, -depth/2) in IFC coords.
+        # We pass bbox_sw in IFC coords (shifted by +depth/2 from our natural coords).
+        ifc_bbox_sw = (-self.flange_width / 2, -self.depth / 2)
+        pos = self._ifc_placement_2d(
+            ifc_file,
+            bbox=self._bbox(),
+            bbox_sw=ifc_bbox_sw,
+        )
         return ifc_file.create_entity(
             "IfcTShapeProfileDef",
             ProfileType="AREA",
@@ -136,13 +154,14 @@ class TShapeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "TShapeProfile":
-        r, ox, oy = cls._transform_from_dict(d)
+        r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="s")
         return cls(
             depth=d["depth"],
             flange_width=d["flange_width"],
             web_thickness=d["web_thickness"],
             flange_thickness=d["flange_thickness"],
             name=d.get("name"),
+            anchor=anch,
             rotation=r,
             offset_x=ox,
             offset_y=oy,
@@ -160,7 +179,7 @@ class ZShapeProfile(Profile):
 
     IFC native: ``IfcZShapeProfileDef``.
 
-    Origin at centroid of web.
+    Natural origin at centroid of web. Default anchor 'c'.
 
     Args:
         depth:            Web height (m).
@@ -168,6 +187,7 @@ class ZShapeProfile(Profile):
         web_thickness:    Web thickness (m).
         flange_thickness: Flange thickness (m).
         name:             Optional profile name.
+        anchor:           Origin anchor (default 'c' = bounding-box centre).
     """
 
     profile_type = "z_shape"
@@ -179,6 +199,7 @@ class ZShapeProfile(Profile):
         web_thickness: float = 0.008,
         flange_thickness: float = 0.012,
         name: Optional[str] = None,
+        anchor: str = "c",
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
@@ -197,12 +218,25 @@ class ZShapeProfile(Profile):
         self.flange_thickness = float(flange_thickness)
         self.name = name
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     @property
     def area(self) -> float:
         web_h = self.depth - 2 * self.flange_thickness
         return 2 * self.flange_width * self.flange_thickness + web_h * self.web_thickness
+
+    def _bbox(self) -> Tuple[float, float]:
+        fw = self.flange_width
+        tw = self.web_thickness
+        # X spans from -(fw - tw/2) to (fw - tw/2) — anti-symmetric Z
+        w = 2 * (fw - tw / 2)
+        return w, self.depth
+
+    def _bbox_sw(self) -> Tuple[float, float]:
+        fw = self.flange_width
+        tw = self.web_thickness
+        # natural origin at web centroid (0,0); x_min = tw/2 - fw
+        return tw / 2 - fw, -self.depth / 2
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """Z-shape: bottom flange goes right, top flange goes left."""
@@ -212,16 +246,7 @@ class ZShapeProfile(Profile):
         tf = self.flange_thickness
         htw = tw / 2
         hd = d / 2
-        # CCW winding, origin at web centroid
-        pts = [
-            (-htw, -hd),
-            (fw - htw, -hd),
-            (fw - htw, -hd + tf),
-            (htw, -hd + tf),
-            (htw, hd - tf),
-            (fw + htw, hd - tf),  # wrong — correct below
-        ]
-        # Rebuild carefully: Z goes bottom-right, top-left
+        # CCW winding, natural origin at web centroid
         pts = [
             (-htw, -hd),  # bottom-left of web
             (fw - htw, -hd),  # bottom-right of bottom flange
@@ -232,10 +257,16 @@ class ZShapeProfile(Profile):
             (htw - fw, hd),  # outer-left of top flange
             (-htw, hd),  # top-left of web
         ]
-        return self._apply_transform(pts)
+        return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = self._ifc_placement_2d(ifc_file)
+        # IfcZShapeProfileDef is centred at geometric centroid = (0,0) = natural origin.
+        # IFC bbox sw = natural bbox_sw.
+        pos = self._ifc_placement_2d(
+            ifc_file,
+            bbox=self._bbox(),
+            bbox_sw=self._bbox_sw(),
+        )
         return ifc_file.create_entity(
             "IfcZShapeProfileDef",
             ProfileType="AREA",
@@ -264,13 +295,14 @@ class ZShapeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "ZShapeProfile":
-        r, ox, oy = cls._transform_from_dict(d)
+        r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             depth=d["depth"],
             flange_width=d["flange_width"],
             web_thickness=d["web_thickness"],
             flange_thickness=d["flange_thickness"],
             name=d.get("name"),
+            anchor=anch,
             rotation=r,
             offset_x=ox,
             offset_y=oy,
@@ -288,7 +320,7 @@ class CShapeProfile(Profile):
 
     IFC native: ``IfcCShapeProfileDef``.
 
-    Symmetric about Y-axis. Origin at web centroid.
+    Symmetric about Y-axis. Origin at left-edge, vertically centred. Default anchor 'w'.
 
     Args:
         depth:            Overall height (m).
@@ -296,6 +328,7 @@ class CShapeProfile(Profile):
         wall_thickness:   Uniform wall thickness (m).
         girth:            Lip length (m). Default 0 = no lip.
         name:             Optional profile name.
+        anchor:           Origin anchor (default 'w' = left-edge, mid-height).
     """
 
     profile_type = "c_shape"
@@ -307,6 +340,7 @@ class CShapeProfile(Profile):
         wall_thickness: float = 0.003,
         girth: float = 0.0,
         name: Optional[str] = None,
+        anchor: str = "w",
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
@@ -325,7 +359,7 @@ class CShapeProfile(Profile):
         self.girth = float(girth)
         self.name = name
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     @property
     def area(self) -> float:
@@ -338,6 +372,13 @@ class CShapeProfile(Profile):
         lips = 2 * g * t
         return web + flanges + lips
 
+    def _bbox(self) -> Tuple[float, float]:
+        return self.width, self.depth
+
+    def _bbox_sw(self) -> Tuple[float, float]:
+        # natural origin at left-edge, vertically centred → sw = (0, -depth/2)
+        return 0.0, -self.depth / 2
+
     def get_profile_points(self) -> List[Tuple[float, float]]:
         d = self.depth
         w = self.width
@@ -345,8 +386,6 @@ class CShapeProfile(Profile):
         g = self.girth
         hd = d / 2
         # Outer closed profile (simplified — no inner void for get_profile_points)
-        # Build as a solid outline going around the C shape outer/inner boundary
-        # Outer face: left side going up, top flange right, right lip down, etc.
         if g > 0:
             pts = [
                 (0.0, -hd),  # bottom inner-left
@@ -363,11 +402,6 @@ class CShapeProfile(Profile):
                 (0.0, hd),  # top outer-left
             ]
         else:
-            pts = [
-                (0.0, -hd),
-                (w, -hd),
-                (w - t, -hd + t) if False else (w, -hd),  # placeholder
-            ]
             # Simple C without lip
             pts = [
                 (0.0, -hd),
@@ -379,10 +413,13 @@ class CShapeProfile(Profile):
                 (w, hd),
                 (0.0, hd),
             ]
-        return self._apply_transform(pts)
+        return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = self._ifc_placement_2d(ifc_file)
+        # IfcCShapeProfileDef is centred. Our natural origin is left-edge, vert centred.
+        # IFC bbox sw is (-width/2, -depth/2).
+        ifc_bbox_sw = (-self.width / 2, -self.depth / 2)
+        pos = self._ifc_placement_2d(ifc_file, bbox=self._bbox(), bbox_sw=ifc_bbox_sw)
         return ifc_file.create_entity(
             "IfcCShapeProfileDef",
             ProfileType="AREA",
@@ -410,13 +447,14 @@ class CShapeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CShapeProfile":
-        r, ox, oy = cls._transform_from_dict(d)
+        r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="w")
         return cls(
             depth=d["depth"],
             width=d["width"],
             wall_thickness=d["wall_thickness"],
             girth=d.get("girth", 0.0),
             name=d.get("name"),
+            anchor=anch,
             rotation=r,
             offset_x=ox,
             offset_y=oy,
@@ -434,7 +472,7 @@ class TrapeziumProfile(Profile):
 
     IFC native: ``IfcTrapeziumProfileDef``.
 
-    Bottom edge centred on X-axis.
+    Natural origin at bottom-centre of bottom edge. Default anchor 's'.
 
     Args:
         bottom_x_dim:   Width of bottom edge (m).
@@ -443,6 +481,7 @@ class TrapeziumProfile(Profile):
         top_x_offset:   Horizontal offset of top edge midpoint from bottom
                         edge midpoint (m).  0 = symmetric trapezium.
         name:           Optional profile name.
+        anchor:         Origin anchor (default 's' = bottom-centre).
     """
 
     profile_type = "trapezium"
@@ -454,6 +493,7 @@ class TrapeziumProfile(Profile):
         y_dim: float = 0.2,
         top_x_offset: float = 0.0,
         name: Optional[str] = None,
+        anchor: str = "s",
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
@@ -470,11 +510,18 @@ class TrapeziumProfile(Profile):
         self.top_x_offset = float(top_x_offset)
         self.name = name
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     @property
     def area(self) -> float:
         return (self.bottom_x_dim + self.top_x_dim) / 2 * self.y_dim
+
+    def _bbox(self) -> Tuple[float, float]:
+        return self.bottom_x_dim, self.y_dim
+
+    def _bbox_sw(self) -> Tuple[float, float]:
+        # natural origin at bottom-centre → sw = (-bottom/2, 0)
+        return -self.bottom_x_dim / 2, 0.0
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         hb = self.bottom_x_dim / 2
@@ -486,10 +533,12 @@ class TrapeziumProfile(Profile):
             (ox + ht, self.y_dim),
             (ox - ht, self.y_dim),
         ]
-        return self._apply_transform(pts)
+        return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
-        pos = self._ifc_placement_2d(ifc_file)
+        # IfcTrapeziumProfileDef: origin at bottom-centre, same as natural origin.
+        # IFC bbox sw = (-bottom/2, 0) — same as _bbox_sw().
+        pos = self._ifc_placement_2d(ifc_file, bbox=self._bbox(), bbox_sw=self._bbox_sw())
         return ifc_file.create_entity(
             "IfcTrapeziumProfileDef",
             ProfileType="AREA",
@@ -516,13 +565,14 @@ class TrapeziumProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "TrapeziumProfile":
-        r, ox, oy = cls._transform_from_dict(d)
+        r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="s")
         return cls(
             bottom_x_dim=d["bottom_x_dim"],
             top_x_dim=d["top_x_dim"],
             y_dim=d["y_dim"],
             top_x_offset=d.get("top_x_offset", 0.0),
             name=d.get("name"),
+            anchor=anch,
             rotation=r,
             offset_x=ox,
             offset_y=oy,

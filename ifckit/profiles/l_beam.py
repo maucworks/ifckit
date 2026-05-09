@@ -84,7 +84,7 @@ class LBeamProfile(Profile):
         self.name = name
         self._validate()
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     def _validate(self) -> None:
         if self.height <= 0:
@@ -191,12 +191,12 @@ class LBeamProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "LBeamProfile":
-        r, ox, oy = cls._transform_from_dict(d)
+        r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="sw")
         return cls(
             height=d["height"],
             width=d["width"],
             thickness=d["thickness"],
-            anchor=d.get("anchor", "sw"),
+            anchor=d.get("anchor", anch),
             name=d.get("name", "L-Profile"),
             rotation=r,
             offset_x=ox,

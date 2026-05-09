@@ -26,7 +26,7 @@ def default_registry() -> BuilderRegistry:
     registry.register(ExtrudedElementBuilder("basic_beam", "IfcBeam"))
     registry.register(ExtrudedElementBuilder("basic_column", "IfcColumn"))
     registry.register(RevolvedBeamBuilder())
-    # Skip SectionedSpineBuilder for now - register manually when needed
+    registry.register(SectionedSpineBuilder())
     return registry
 
 

@@ -8,6 +8,14 @@ Framework-agnostic IFC builder library for architecture and infrastructure.
 Build valid IFC files in pure Python — no CAD host required.
 Works standalone, from Grasshopper, or via the JSON/CLI interface.
 
+Files created can be viewed in its companion [IfcViewer](https://github.com/maucworks/web-ifc-viewer)
+
+**Live: [maucworks.github.io/web-ifc-viewer](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fweb-ifc-viewer%2Frefs%2Fheads%2Fmaster%2Fres%2Ftest.ifc)**
+
+![IFC Viewer](res/Screenshot%202026-05-02%20at%2016.20.20.png)
+
+
+
 ## Install
 
 ```bash

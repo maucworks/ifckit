@@ -83,6 +83,7 @@ class SectionedSpineBuilder(BaseBuilder):
     """
 
     element_type = "sectioned_spine"
+    entity_type = "sectioned_spine"  # BuilderRegistry key
     ifc_class = "IfcBuildingElementProxy"  # actual IFC class created
 
     # ------------------------------------------------------------------
@@ -207,6 +208,7 @@ class SectionedSpineBuilder(BaseBuilder):
             spine_curve,
             profile_defs,
             pos_entities,
+            profile_segments=getattr(pending, "profile_segments", 32),
         )
 
         # 5. Wrap in IfcShapeRepresentation (Tessellation type)
@@ -222,11 +224,25 @@ class SectionedSpineBuilder(BaseBuilder):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _points_from_path(spine: Path) -> list[Vec]:
-        """Extract control points from a polyline Path."""
+    def _points_from_path(spine: Path, angle_step_deg: float = 5.0) -> list[Vec]:
+        """Extract sample points from a Path, supporting both Line and Arc segments.
+
+        For polyline-only paths, returns the exact control vertices (no loss
+        of precision).  For paths containing Arc segments the path is sampled
+        at ``angle_step_deg`` resolution so that arc curvature is preserved.
+        """
+        from ifckit.geometry import Arc as _Arc
+
         segs = spine._segments
         if not segs:
             raise ValueError("Spine path has no segments")
+
+        has_arc = any(isinstance(s, _Arc) for s in segs)
+        if has_arc:
+            # Let Path.sample() handle arc discretisation with deduplication
+            return spine.sample(angle_step_deg).points
+
+        # Pure polyline — exact vertices
         pts = [seg.start for seg in segs]
         pts.append(segs[-1].end)
         return pts
@@ -240,6 +256,8 @@ class SectionedSpineBuilder(BaseBuilder):
         storey: ifcopenshell.entity_instance,
         context: ifcopenshell.entity_instance,
         name: str = "",
+        angle_step_deg: float = 5.0,
+        profile_segments: int = 32,
     ) -> ifcopenshell.entity_instance:
         """Build a sectioned spine from minimal inputs.
 
@@ -250,23 +268,30 @@ class SectionedSpineBuilder(BaseBuilder):
         direction — profile Y stays as close to this as the path allows.
         No holonomic twist accumulates across orthogonal-plane corners.
 
+        Arc segments are supported: pass a ``Path`` built with
+        ``path.add_arc(center, normal, start, angle)`` and the arc is
+        discretised at ``angle_step_deg`` resolution before frame
+        computation.
+
         Args:
-            ifc_file:      Open IFC file.
-            spine:         Spine path (polyline from ``Path.from_pts()``).
-            profile:       Base cross-section profile (single instance,
-                           automatically cloned and miter-scaled).
-            starter_plane: Initial frame at the path start.  Its ``.y_axis``
-                           is the world-up direction for the cross-section.
-            storey:        Spatial container (``IfcBuildingStorey``).
-            context:       Geometry context (``IfcGeometricRepresentationSubContext``).
-            name:          Optional element name.
+            ifc_file:       Open IFC file.
+            spine:          Spine path (polyline or mixed Line+Arc).
+            profile:        Base cross-section profile (single instance,
+                            automatically cloned and miter-scaled).
+            starter_plane:  Initial frame at the path start.  Its ``.y_axis``
+                            is the world-up direction for the cross-section.
+            storey:         Spatial container (``IfcBuildingStorey``).
+            context:        Geometry context.
+            name:           Optional element name.
+            angle_step_deg: Arc discretisation resolution in degrees
+                            (default 5°; smaller = finer mesh).
 
         Returns:
             ``IfcBuildingElementProxy`` with tessellated sectioned-spine
             geometry, object placement, and spatial containment.
         """
-        # 1. Extract control points from path
-        pts = self._points_from_path(spine)
+        # 1. Extract control/sample points from path (Arc-aware)
+        pts = self._points_from_path(spine, angle_step_deg=angle_step_deg)
 
         # 2. World-up direction from starter plane
         world_up = starter_plane.y_axis
@@ -292,5 +317,6 @@ class SectionedSpineBuilder(BaseBuilder):
             profiles=profiles,
             positions=field.frames,
             name=name,
+            profile_segments=profile_segments,
         )
         return self.build(ifc_file, pending, storey, context)

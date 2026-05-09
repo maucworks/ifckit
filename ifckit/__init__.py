@@ -74,7 +74,7 @@ from ifckit.handles import (  # noqa: E402
     StoreyHandle,
 )
 from ifckit.profiles import IBeamProfile, LBeamProfile  # noqa: E402
-from ifckit.schema import IfcSchema, LengthUnit  # noqa: E402
+from ifckit.schema import IfcSchema, LengthUnit, TessellationDetail  # noqa: E402
 from ifckit.validator import ValidationResult, validate  # noqa: E402
 
 try:
@@ -109,6 +109,7 @@ __all__ = [
     "upvector_frames",
     "IfcSchema",
     "LengthUnit",
+    "TessellationDetail",
     "IfcModel",
     "PendingWall",
     "PendingSlab",

@@ -22,17 +22,20 @@ Path compatibility.
 
 Profile transform
 -----------------
-All profiles support three optional transform parameters that are applied
-**on top of** any internal anchor offset:
+All profiles support four optional transform parameters:
+
+  anchor    (str, default 'c')
+      Compass position where (0, 0) sits relative to the bounding box:
+      sw/s/se/w/c/e/nw/n/ne.  Applied first, before rotation and offset.
 
   rotation  (float, radians, default 0.0)
-      CCW rotation of the cross-section around its local origin.
+      CCW rotation of the cross-section around the anchor point.
 
   offset_x  (float, metres, default 0.0)
-      Additional translation along the local profile X-axis.
+      Additional translation along the local profile X-axis (after anchor + rotation).
 
   offset_y  (float, metres, default 0.0)
-      Additional translation along the local profile Y-axis.
+      Additional translation along the local profile Y-axis (after anchor + rotation).
 
 These map to the two degrees of freedom in ``IfcAxis2Placement2D``:
   - ``Location``     ← anchor_offset + (offset_x, offset_y)
@@ -73,6 +76,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from ifckit.geometry import Path, Plane, Vec
+from ifckit.profiles.anchor import VALID_ANCHORS, anchor_offset
 
 if TYPE_CHECKING:
     import ifcopenshell
@@ -117,6 +121,7 @@ class Profile(Path, metaclass=RegisterProfileType):
     rotation: float = 0.0
     offset_x: float = 0.0
     offset_y: float = 0.0
+    anchor: str = "c"  # default; subclasses override via _init_transform()
 
     def __init__(self) -> None:
         # Initialise Path in the XY plane so is_planar is authoritatively True
@@ -182,43 +187,125 @@ class Profile(Path, metaclass=RegisterProfileType):
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
+        anchor: str = "c",
     ) -> None:
-        """Store the three transform parameters. Call from subclass __init__."""
+        """Store the transform parameters. Call from subclass __init__.
+
+        Args:
+            rotation: CCW rotation around the anchor point (radians).
+            offset_x: Additional X translation applied after anchor + rotation.
+            offset_y: Additional Y translation applied after anchor + rotation.
+            anchor:   One of the 9 compass keys (sw/s/se/w/c/e/nw/n/ne).
+                      Determines where (0, 0) sits relative to the bounding box.
+                      Subclasses should pass their natural default (e.g. 'c' for
+                      centred profiles, 's' for bottom-centre, 'sw' for L-shapes).
+        """
+        if anchor not in VALID_ANCHORS:
+            raise ValueError(f"anchor must be one of {sorted(VALID_ANCHORS)}, got {anchor!r}")
         self.rotation = float(rotation)
         self.offset_x = float(offset_x)
         self.offset_y = float(offset_y)
+        self.anchor = anchor
         # Invalidate cached segments when transform changes
         self._segments_built = False
         self._segments = []
 
-    def _apply_transform(self, points: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    def _apply_transform(
+        self,
+        points: List[Tuple[float, float]],
+        bbox: Optional[Tuple[float, float]] = None,
+        bbox_sw: Optional[Tuple[float, float]] = None,
+    ) -> List[Tuple[float, float]]:
         """
-        Apply (rotation, offset_x, offset_y) to a list of (x, y) tuples.
+        Apply anchor shift → rotation → (offset_x, offset_y) to (x, y) tuples.
 
-        Used by ``get_profile_points()`` implementations in polyline-based
-        profiles so the transform is reflected in the raw point coordinates.
+        The anchor shift moves the origin so that (0, 0) lands at the requested
+        compass position on the profile bounding box.
 
-        The order is: rotate first (around origin), then translate.
+        Args:
+            points:   Raw profile points in the profile's natural coordinate frame.
+            bbox:     ``(width, height)`` of the bounding box.  Required when
+                      anchor differs from the subclass natural origin.
+            bbox_sw:  ``(x_min, y_min)`` of the bounding box sw corner in the
+                      natural frame.  When omitted, ``(-width/2, -height/2)`` is
+                      assumed (i.e. the natural origin is the bounding-box centre).
+                      Pass this when the natural origin is NOT at the centre (e.g.
+                      TShapeProfile whose origin is at bottom-centre, so sw = ``(-w/2, 0)``).
         """
-        if self.rotation == 0.0 and self.offset_x == 0.0 and self.offset_y == 0.0:
+        dx, dy = 0.0, 0.0
+        if bbox is not None:
+            w, h = bbox
+            raw_dx, raw_dy = anchor_offset(self.anchor, w, h)
+            if bbox_sw is not None:
+                # anchor_offset gives shift from sw corner; bbox_sw is where sw is
+                # in natural coords.  Total shift = raw shift - current natural position of sw.
+                sw_x, sw_y = bbox_sw
+                # We want origin at: sw + (fx*w, fy*h)
+                # raw_dx = -fx*w, raw_dy = -fy*h
+                # So desired origin shift = -(sw_x - raw_dx) = raw_dx - sw_x ... no.
+                # anchor_offset(anchor, w, h) returns (dx,dy) such that if you ADD (dx,dy)
+                # to points whose sw corner is at (0,0), the anchor lands at (0,0).
+                # But our sw corner is at bbox_sw, not (0,0).
+                # Correction: shift by raw_dx - sw_x, raw_dy - sw_y to account for the
+                # natural offset of sw from the natural origin.
+                dx = raw_dx - sw_x
+                dy = raw_dy - sw_y
+            else:
+                dx, dy = raw_dx, raw_dy
+
+        no_rotate = self.rotation == 0.0
+        no_shift = self.offset_x == 0.0 and self.offset_y == 0.0
+        if dx == 0.0 and dy == 0.0 and no_rotate and no_shift:
             return points
+
         c = math.cos(self.rotation)
         s = math.sin(self.rotation)
-        dx, dy = self.offset_x, self.offset_y
-        return [(c * x - s * y + dx, s * x + c * y + dy) for x, y in points]
+        tx, ty = self.offset_x, self.offset_y
+        result = []
+        for x, y in points:
+            # 1. apply anchor shift
+            x += dx
+            y += dy
+            # 2. rotate around the shifted origin
+            xr = c * x - s * y
+            yr = s * x + c * y
+            # 3. apply user offset
+            result.append((xr + tx, yr + ty))
+        return result
 
     def _ifc_placement_2d(
         self,
         ifc_file: "ifcopenshell.file",
         anchor_x: float = 0.0,
         anchor_y: float = 0.0,
+        bbox: Optional[Tuple[float, float]] = None,
+        bbox_sw: Optional[Tuple[float, float]] = None,
     ) -> "ifcopenshell.entity_instance":
         """
-        Build an ``IfcAxis2Placement2D`` that combines the subclass anchor
-        offset with the user-supplied rotation and offset_x/offset_y.
+        Build an ``IfcAxis2Placement2D`` combining anchor, subclass offset and
+        user rotation/offset_x/offset_y.
+
+        Args:
+            anchor_x, anchor_y: Subclass-supplied structural anchor expressed in
+                the IFC parametric origin's coordinate frame.
+            bbox:     ``(width, height)`` — resolves compass anchor to a shift.
+            bbox_sw:  ``(x_min, y_min)`` sw corner in the natural frame.
+                      When omitted, ``(-w/2, -h/2)`` is assumed (centred origin).
         """
-        loc_x = anchor_x + self.offset_x
-        loc_y = anchor_y + self.offset_y
+        ax, ay = anchor_x, anchor_y
+        if bbox is not None:
+            w, h = bbox
+            raw_dx, raw_dy = anchor_offset(self.anchor, w, h)
+            if bbox_sw is not None:
+                sw_x, sw_y = bbox_sw
+                ax += raw_dx - sw_x
+                ay += raw_dy - sw_y
+            else:
+                ax += raw_dx
+                ay += raw_dy
+
+        loc_x = ax + self.offset_x
+        loc_y = ay + self.offset_y
 
         location = ifc_file.create_entity("IfcCartesianPoint", Coordinates=[loc_x, loc_y])
 
@@ -236,21 +323,25 @@ class Profile(Path, metaclass=RegisterProfileType):
     # Transform serialization helpers
     # ------------------------------------------------------------------
 
-    def _transform_dict(self) -> Dict[str, float]:
-        """Return {rotation, offset_x, offset_y} — include in to_dict()."""
+    def _transform_dict(self) -> Dict[str, Any]:
+        """Return {rotation, offset_x, offset_y, anchor} — include in to_dict()."""
         return {
             "rotation": self.rotation,
             "offset_x": self.offset_x,
             "offset_y": self.offset_y,
+            "anchor": self.anchor,
         }
 
     @staticmethod
-    def _transform_from_dict(d: Dict[str, Any]) -> Tuple[float, float, float]:
-        """Extract (rotation, offset_x, offset_y) from a dict, with defaults."""
+    def _transform_from_dict(
+        d: Dict[str, Any], default_anchor: str = "c"
+    ) -> Tuple[float, float, float, str]:
+        """Extract (rotation, offset_x, offset_y, anchor) from a dict, with defaults."""
         return (
             float(d.get("rotation", 0.0)),
             float(d.get("offset_x", 0.0)),
             float(d.get("offset_y", 0.0)),
+            str(d.get("anchor", default_anchor)),
         )
 
     # ------------------------------------------------------------------

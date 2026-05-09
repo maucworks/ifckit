@@ -612,6 +612,50 @@ def _triangulate_polygon(
     return triangles
 
 
+def _apply_axis2placement2d(
+    pts: list[tuple[float, float]],
+    position: "ifcopenshell.entity_instance | None",
+) -> list[tuple[float, float]]:
+    """Apply an IfcAxis2Placement2D to a list of 2D points.
+
+    IFC parametric profile types carry an optional ``Position``
+    (IfcAxis2Placement2D) that defines a local-to-profile-origin transform:
+    translation + rotation.  Native profile generators produce points in the
+    IFC *parametric* origin (centroid / flange base as defined by the spec),
+    so this transform must be applied to recover the final profile outline.
+
+    Args:
+        pts:      List of (x, y) tuples in parametric profile coordinates.
+        position: IfcAxis2Placement2D entity, or ``None`` (identity).
+
+    Returns:
+        Transformed list of (x, y) tuples.
+    """
+    if position is None:
+        return pts
+
+    # Translation
+    loc = position.Location
+    tx = loc.Coordinates[0] if loc else 0.0
+    ty = loc.Coordinates[1] if loc else 0.0
+
+    # Rotation: RefDirection gives the local X-axis in world 2D.
+    # If absent, it defaults to (1, 0).
+    ref = position.RefDirection
+    if ref:
+        rx, ry = ref.DirectionRatios[0], ref.DirectionRatios[1]
+    else:
+        rx, ry = 1.0, 0.0
+
+    # Local Y-axis = perp(local X) = (-ry, rx)
+    result = []
+    for u, v in pts:
+        x = tx + rx * u - ry * v
+        y = ty + ry * u + rx * v
+        result.append((x, y))
+    return result
+
+
 def _profile_def_to_pts(
     prof_def: "ifcopenshell.entity_instance",
     segments: int = 8,
@@ -643,14 +687,16 @@ def _profile_def_to_pts(
     if ifc_class == "IfcRectangleProfileDef":
         hw = prof_def.XDim / 2
         hh = prof_def.YDim / 2
-        return [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+        pts = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
-    if ifc_class == "IfcCircleProfileDef":
+    if ifc_class in ("IfcCircleProfileDef", "IfcCircleHollowProfileDef"):
         r = prof_def.Radius
-        return [
+        pts = [
             (r * np.cos(2 * np.pi * i / segments), r * np.sin(2 * np.pi * i / segments))
             for i in range(segments)
         ]
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcIShapeProfileDef":
         hw = prof_def.OverallWidth / 2
@@ -658,7 +704,7 @@ def _profile_def_to_pts(
         htw = prof_def.WebThickness / 2
         tf = prof_def.FlangeThickness
         # 12-vertex CCW outline
-        return [
+        pts = [
             (-hw, -hh),
             (hw, -hh),
             (hw, -hh + tf),
@@ -672,6 +718,7 @@ def _profile_def_to_pts(
             (-htw, -hh + tf),
             (-hw, -hh + tf),
         ]
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcDerivedProfileDef":
         # Recursively extract parent points
@@ -775,7 +822,7 @@ def _profile_def_to_pts(
             (t, d),
             (0.0, d),
         ]
-        return pts
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcTShapeProfileDef":
         d = prof_def.Depth
@@ -794,7 +841,7 @@ def _profile_def_to_pts(
             (-hw, d - tf),
             (-htw, d - tf),
         ]
-        return pts
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcZShapeProfileDef":
         d = prof_def.Depth
@@ -813,7 +860,7 @@ def _profile_def_to_pts(
             (htw - fw, hd),
             (-htw, hd),
         ]
-        return pts
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcCShapeProfileDef":
         d = prof_def.Depth
@@ -847,7 +894,7 @@ def _profile_def_to_pts(
                 (w, hd),
                 (0.0, hd),
             ]
-        return pts
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcTrapeziumProfileDef":
         hb = prof_def.BottomXDim / 2
@@ -860,7 +907,7 @@ def _profile_def_to_pts(
             (ox + ht, y),
             (ox - ht, y),
         ]
-        return pts
+        return _apply_axis2placement2d(pts, getattr(prof_def, "Position", None))
 
     if ifc_class == "IfcCompositeProfileDef":
         pts = []
@@ -870,11 +917,140 @@ def _profile_def_to_pts(
 
     raise ValueError(
         f"Unsupported IfcProfileDef type {ifc_class!r}. "
-        "Supported: IfcRectangleProfileDef, IfcCircleProfileDef, IfcIShapeProfileDef, "
-        "IfcDerivedProfileDef, IfcArbitraryClosedProfileDef, IfcArbitraryProfileDefWithVoids, "
-        "IfcTShapeProfileDef, IfcZShapeProfileDef, IfcCShapeProfileDef, "
-        "IfcTrapeziumProfileDef, IfcLShapeProfileDef, IfcCompositeProfileDef."
+        "Supported: IfcRectangleProfileDef, IfcCircleProfileDef, IfcCircleHollowProfileDef, "
+        "IfcIShapeProfileDef, IfcDerivedProfileDef, IfcArbitraryClosedProfileDef, "
+        "IfcArbitraryProfileDefWithVoids, IfcTShapeProfileDef, IfcZShapeProfileDef, "
+        "IfcCShapeProfileDef, IfcTrapeziumProfileDef, IfcLShapeProfileDef, "
+        "IfcCompositeProfileDef."
     )
+
+
+def _profile_def_to_rings(
+    prof_def: "ifcopenshell.entity_instance",
+    segments: int = 32,
+) -> tuple[list[tuple[float, float]], list[list[tuple[float, float]]]]:
+    """Extract outer and inner rings from any IfcProfileDef.
+
+    Returns a tuple ``(outer, inners)`` where:
+    - ``outer`` is a CCW list of (x, y) tuples (open ring, last ≠ first).
+    - ``inners`` is a list of CW inner-void rings (holes), each a list of
+      (x, y) tuples.  Empty for solid profiles.
+
+    Handles ``IfcCircleHollowProfileDef`` and
+    ``IfcArbitraryProfileDefWithVoids`` in addition to all types supported
+    by :func:`_profile_def_to_pts`.
+    """
+    import math as _math
+
+    import numpy as np
+
+    ifc_class = prof_def.is_a()
+
+    # --- Hollow circle (tube / CHS) ---
+    if ifc_class == "IfcCircleHollowProfileDef":
+        r_outer = prof_def.Radius
+        r_inner = r_outer - prof_def.WallThickness
+        pos = getattr(prof_def, "Position", None)
+
+        outer_pts = [
+            (r_outer * np.cos(2 * np.pi * i / segments), r_outer * np.sin(2 * np.pi * i / segments))
+            for i in range(segments)
+        ]
+        # Inner ring: CW (reversed CCW circle)
+        inner_pts = [
+            (r_inner * np.cos(2 * np.pi * i / segments), r_inner * np.sin(2 * np.pi * i / segments))
+            for i in range(segments - 1, -1, -1)
+        ]
+        outer_pts = _apply_axis2placement2d(outer_pts, pos)
+        inner_pts = _apply_axis2placement2d(inner_pts, pos)
+        return outer_pts, [inner_pts]
+
+    # --- Arbitrary profile with voids ---
+    if ifc_class == "IfcArbitraryProfileDefWithVoids":
+        # Outer ring via the existing extractor
+        outer_pts = _profile_def_to_pts(prof_def, segments=segments)
+
+        inner_rings: list[list[tuple[float, float]]] = []
+        for void_curve in prof_def.InnerCurves:
+            void_pts: list[tuple[float, float]] = []
+            if void_curve.is_a() == "IfcPolyline":
+                void_pts = [(pt.Coordinates[0], pt.Coordinates[1]) for pt in void_curve.Points]
+                if (
+                    len(void_pts) > 1
+                    and abs(void_pts[0][0] - void_pts[-1][0]) < 1e-6
+                    and abs(void_pts[0][1] - void_pts[-1][1]) < 1e-6
+                ):
+                    void_pts = void_pts[:-1]
+            elif void_curve.is_a() == "IfcCircle":
+                r = void_curve.Radius
+                c = void_curve.Position
+                cx = c.Location.Coordinates[0] if c and c.Location else 0.0
+                cy = c.Location.Coordinates[1] if c and c.Location else 0.0
+                void_pts = [
+                    (
+                        cx + r * _math.cos(2 * _math.pi * i / segments),
+                        cy + r * _math.sin(2 * _math.pi * i / segments),
+                    )
+                    for i in range(segments)
+                ]
+
+            if not void_pts:
+                continue
+
+            # Ensure CW winding for holes
+            area = (
+                sum(
+                    void_pts[i][0] * void_pts[(i + 1) % len(void_pts)][1]
+                    - void_pts[(i + 1) % len(void_pts)][0] * void_pts[i][1]
+                    for i in range(len(void_pts))
+                )
+                / 2.0
+            )
+            if area > 0:
+                void_pts = list(reversed(void_pts))
+            inner_rings.append(void_pts)
+
+        return outer_pts, inner_rings
+
+    # --- All other solid profiles ---
+    outer_pts = _profile_def_to_pts(prof_def, segments=segments)
+    return outer_pts, []
+
+
+def _stitch_annulus(
+    outer: list[tuple[float, float]],
+    inner: list[tuple[float, float]],
+) -> tuple[list[tuple[float, float]], list[tuple[float, float]], list[tuple[int, int, int, int]]]:
+    """Stitch two 2D rings into an annular quad strip.
+
+    Both rings must be open (last ≠ first).  ``outer`` is CCW; ``inner`` is
+    CW (hole).  Both are resampled to ``lcm(n_o, n_i)`` vertices so every
+    edge is covered exactly.
+
+    Returns:
+        ``(outer_resampled, inner_resampled, quads)`` where each quad is
+        ``(o_i, o_next, i_next, i_i)`` — CCW when viewed from the front.
+        Indices are local: 0..n_stitch-1 for outer, n_stitch..2*n_stitch-1
+        for inner.  The caller must offset into the real vertex buffer.
+    """
+    import math as _math
+
+    n_o = len(outer)
+    n_i = len(inner)
+    if n_o < 2 or n_i < 2:
+        return outer, inner, []
+
+    n_stitch = (n_o * n_i) // _math.gcd(n_o, n_i)
+    outer_r = _resample_ring(outer, n_stitch)
+    inner_r = _resample_ring(inner, n_stitch)
+
+    quads = []
+    for i in range(n_stitch):
+        i_next = (i + 1) % n_stitch
+        # outer CCW, inner CW → quad winds CCW viewed from cap normal
+        quads.append((i, i_next, n_stitch + i_next, n_stitch + i))
+
+    return outer_r, inner_r, quads
 
 
 def _resample_ring(ring: list[tuple[float, float]], n: int) -> list[tuple[float, float]]:
@@ -965,119 +1141,222 @@ def _tessellate_sectioned_spine(
             }
         )
 
-    # Extract and normalise profile rings to CCW
-    profile_rings: list[list[tuple[float, float]]] = []
+    # Extract and normalise profile rings.
+    # Each entry: (outer_ring_CCW, [inner_ring_CW, ...])
+    profile_ring_sets: list[tuple[list[tuple[float, float]], list[list[tuple[float, float]]]]] = []
     for prof_def in cross_sections:
-        pts = _profile_def_to_pts(prof_def, segments=segments)
-        # Ensure CCW winding
+        outer, inners = _profile_def_to_rings(prof_def, segments=segments)
+        # Ensure CCW winding on outer
         area = (
             sum(
-                pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1]
-                for i in range(len(pts))
+                outer[i][0] * outer[(i + 1) % len(outer)][1]
+                - outer[(i + 1) % len(outer)][0] * outer[i][1]
+                for i in range(len(outer))
             )
             / 2.0
         )
         if area < 0:
-            pts = list(reversed(pts))
-        profile_rings.append(pts)
+            outer = list(reversed(outer))
+        # Ensure CW winding on each inner ring
+        normalised_inners = []
+        for inner in inners:
+            iarea = (
+                sum(
+                    inner[i][0] * inner[(i + 1) % len(inner)][1]
+                    - inner[(i + 1) % len(inner)][0] * inner[i][1]
+                    for i in range(len(inner))
+                )
+                / 2.0
+            )
+            if iarea > 0:  # CW is negative; if positive, reverse
+                inner = list(reversed(inner))
+            normalised_inners.append(inner)
+        profile_ring_sets.append((outer, normalised_inners))
+
+    def _emit_ring_3d(
+        ring2d: list[tuple[float, float]],
+        frame: dict,
+    ) -> list[tuple[float, float, float]]:
+        """Project a 2D profile ring into 3D using a frame dict."""
+        result = []
+        for x2d, y2d in ring2d:
+            pt_3d = frame["origin"] + frame["x"] * x2d + frame["y"] * y2d
+            result.append((pt_3d.x, pt_3d.y, pt_3d.z))
+        return result
+
+    def _stitch_rings(
+        prev_start: int,
+        curr_start: int,
+        prev_ring: list[tuple[float, float]],
+        curr_ring: list[tuple[float, float]],
+        prev_frame: dict,
+        curr_frame: dict,
+        verts: list,
+        fcs: list,
+    ) -> None:
+        """Stitch two 2D rings (same or different vertex counts) into quads."""
+        n_prev = len(prev_ring)
+        n_curr = len(curr_ring)
+
+        if n_prev == n_curr:
+            n = n_prev
+            for i in range(n):
+                i_next = (i + 1) % n
+                fcs.append(
+                    (
+                        prev_start + i,
+                        prev_start + i_next,
+                        curr_start + i_next,
+                        curr_start + i,
+                    )
+                )
+        else:
+            n_stitch = (n_prev * n_curr) // _math.gcd(n_prev, n_curr)
+            prev_resampled = _resample_ring(prev_ring, n_stitch)
+            curr_resampled = _resample_ring(curr_ring, n_stitch)
+
+            prev_stitch_start = len(verts)
+            for x2d, y2d in prev_resampled:
+                pt = prev_frame["origin"] + prev_frame["x"] * x2d + prev_frame["y"] * y2d
+                verts.append((pt.x, pt.y, pt.z))
+
+            curr_stitch_start = len(verts)
+            for x2d, y2d in curr_resampled:
+                pt = curr_frame["origin"] + curr_frame["x"] * x2d + curr_frame["y"] * y2d
+                verts.append((pt.x, pt.y, pt.z))
+
+            for i in range(n_stitch):
+                i_next = (i + 1) % n_stitch
+                fcs.append(
+                    (
+                        prev_stitch_start + i,
+                        prev_stitch_start + i_next,
+                        curr_stitch_start + i_next,
+                        curr_stitch_start + i,
+                    )
+                )
 
     # Build mesh vertices and faces
     vertices: list[tuple[float, float, float]] = []
     faces: list[tuple[int, ...]] = []
-    section_vertex_offsets: list[int] = []
+
+    # Per-section vertex offsets: (outer_start, [inner_start, ...])
+    section_offsets: list[tuple[int, list[int]]] = []
 
     for section_idx in range(len(positions)):
         frame = axis_frames[section_idx]
-        profile_pts = profile_rings[section_idx]
+        outer, inners = profile_ring_sets[section_idx]
 
-        section_vertex_offsets.append(len(vertices))
+        outer_start = len(vertices)
+        vertices.extend(_emit_ring_3d(outer, frame))
 
-        # Transform 2D profile to 3D at this position.
-        # The plane's Z-axis is the extrusion direction (spine tangent);
-        # the profile lies in the plane spanned by X and Y.
-        for x2d, y2d in profile_pts:
-            pt_3d = frame["origin"] + frame["x"] * x2d + frame["y"] * y2d
-            vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
+        inner_starts: list[int] = []
+        for inner in inners:
+            inner_starts.append(len(vertices))
+            vertices.extend(_emit_ring_3d(inner, frame))
+
+        section_offsets.append((outer_start, inner_starts))
 
         # Stitch to previous section
         if section_idx > 0:
             prev_idx = section_idx - 1
-            prev_start = section_vertex_offsets[prev_idx]
-            curr_start = section_vertex_offsets[section_idx]
-            prev_ring = profile_rings[prev_idx]
-            curr_ring = profile_pts
+            prev_outer, prev_inners = profile_ring_sets[prev_idx]
+            prev_outer_start, prev_inner_starts = section_offsets[prev_idx]
+            prev_frame = axis_frames[prev_idx]
 
-            n_prev = len(prev_ring)
-            n_curr = len(curr_ring)
+            # Outer barrel
+            _stitch_rings(
+                prev_outer_start,
+                outer_start,
+                prev_outer,
+                outer,
+                prev_frame,
+                frame,
+                vertices,
+                faces,
+            )
 
-            if n_prev == n_curr:
-                # Same count — straight quad strip
-                n = n_prev
-                for i in range(n):
-                    i_next = (i + 1) % n
-                    faces.append(
-                        (
-                            prev_start + i,
-                            prev_start + i_next,
-                            curr_start + i_next,
-                            curr_start + i,
-                        )
-                    )
-            else:
-                # Different counts — resample both rings to lcm(n_prev, n_curr)
-                # and add virtual (interpolated) vertices for the stitching rows.
-                n_stitch = (n_prev * n_curr) // _math.gcd(n_prev, n_curr)
-                prev_resampled = _resample_ring(prev_ring, n_stitch)
-                curr_resampled = _resample_ring(curr_ring, n_stitch)
+            # Inner barrels (one per hole, if both sections have matching holes)
+            for hole_idx, (prev_is, curr_is) in enumerate(zip(prev_inner_starts, inner_starts)):
+                prev_inner = prev_inners[hole_idx]
+                curr_inner = inners[hole_idx]
+                # Inner surface: reverse winding so normals point inward
+                _stitch_rings(
+                    curr_is,
+                    prev_is,
+                    curr_inner,
+                    prev_inner,
+                    frame,
+                    prev_frame,
+                    vertices,
+                    faces,
+                )
 
-                # Emit interpolated vertices for prev and curr resampled rings
-                prev_frame = axis_frames[prev_idx]
-                prev_stitch_start = len(vertices)
-                for x2d, y2d in prev_resampled:
-                    pt_3d = prev_frame["origin"] + prev_frame["y"] * x2d + prev_frame["z"] * y2d
-                    vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
-
-                curr_stitch_start = len(vertices)
-                for x2d, y2d in curr_resampled:
-                    pt_3d = frame["origin"] + frame["y"] * x2d + frame["z"] * y2d
-                    vertices.append((pt_3d.x, pt_3d.y, pt_3d.z))
-
-                for i in range(n_stitch):
-                    i_next = (i + 1) % n_stitch
-                    faces.append(
-                        (
-                            prev_stitch_start + i,
-                            prev_stitch_start + i_next,
-                            curr_stitch_start + i_next,
-                            curr_stitch_start + i,
-                        )
-                    )
-
-    # End caps: first and last section rings
-    if len(section_vertex_offsets) >= 2:
+    # End caps: first and last section
+    if len(section_offsets) >= 2:
         for is_first in (True, False):
-            if is_first:
-                start = section_vertex_offsets[0]
-                pts = profile_rings[0]
-            else:
-                last = len(section_vertex_offsets) - 1
-                start = section_vertex_offsets[last]
-                pts = profile_rings[last]
+            cap_idx = 0 if is_first else len(section_offsets) - 1
+            outer_start, inner_starts = section_offsets[cap_idx]
+            outer, inners = profile_ring_sets[cap_idx]
+            n = len(outer)
 
-            n = len(pts)
-            if n == 4:
-                # Single quad cap
-                if is_first:
-                    faces.append((start, start + 3, start + 2, start + 1))
-                else:
-                    faces.append((start, start + 1, start + 2, start + 3))
-            else:
-                tris = _triangulate_polygon(pts)
-                for tri in tris:
+            if not inners:
+                # Solid cap
+                if n == 4:
                     if is_first:
-                        faces.append((start + tri[2], start + tri[1], start + tri[0]))
+                        faces.append(
+                            (outer_start, outer_start + 3, outer_start + 2, outer_start + 1)
+                        )
                     else:
-                        faces.append((start + tri[0], start + tri[1], start + tri[2]))
+                        faces.append(
+                            (outer_start, outer_start + 1, outer_start + 2, outer_start + 3)
+                        )
+                else:
+                    tris = _triangulate_polygon(outer)
+                    for tri in tris:
+                        if is_first:
+                            faces.append(
+                                (outer_start + tri[2], outer_start + tri[1], outer_start + tri[0])
+                            )
+                        else:
+                            faces.append(
+                                (outer_start + tri[0], outer_start + tri[1], outer_start + tri[2])
+                            )
+            else:
+                # Annular cap — one hole (first inner ring only; extend for multi-void if needed)
+                inner = inners[0]
+                inner_starts[0]
+
+                # _stitch_annulus resamples both rings to lcm(n_o, n_i) and
+                # returns new 2D vertex lists + quads.  We emit fresh 3D
+                # vertices for these resampled rings using the frame at cap_idx.
+                cap_frame = axis_frames[cap_idx]
+                outer_r, inner_r, quads = _stitch_annulus(outer, inner)
+                n_stitch = len(outer_r)
+
+                outer_cap_start = len(vertices)
+                for x2d, y2d in outer_r:
+                    pt = cap_frame["origin"] + cap_frame["x"] * x2d + cap_frame["y"] * y2d
+                    vertices.append((pt.x, pt.y, pt.z))
+
+                inner_cap_start = len(vertices)
+                for x2d, y2d in inner_r:
+                    pt = cap_frame["origin"] + cap_frame["x"] * x2d + cap_frame["y"] * y2d
+                    vertices.append((pt.x, pt.y, pt.z))
+
+                def _resolve_annulus(idx: int) -> int:
+                    return (
+                        outer_cap_start + idx
+                        if idx < n_stitch
+                        else inner_cap_start + (idx - n_stitch)
+                    )
+
+                for quad in quads:
+                    a, b, c, d = (_resolve_annulus(q) for q in quad)
+                    if is_first:
+                        faces.append((d, c, b, a))  # flip winding for back face
+                    else:
+                        faces.append((a, b, c, d))
 
     return vertices, faces
 
@@ -1087,6 +1366,7 @@ def sectioned_spine(
     spine_curve: ifcopenshell.entity_instance,
     cross_sections: list[ifcopenshell.entity_instance],
     positions: list[ifcopenshell.entity_instance],
+    profile_segments: int = 32,
 ) -> ifcopenshell.entity_instance:
     """Tessellate a sectioned spine to IfcTriangulatedFaceSet.
 
@@ -1116,7 +1396,9 @@ def sectioned_spine(
         raise ValueError("At least 2 cross-sections are required")
 
     # Tessellate to mesh (spine_curve not used — positions are authoritative)
-    vertices, faces = _tessellate_sectioned_spine(cross_sections, positions)
+    vertices, faces = _tessellate_sectioned_spine(
+        cross_sections, positions, segments=profile_segments
+    )
 
     # CoordList expects [[x1, y1, z1], [x2, y2, z2], ...]
     coord_list = [[_round_coord(v[0]), _round_coord(v[1]), _round_coord(v[2])] for v in vertices]
