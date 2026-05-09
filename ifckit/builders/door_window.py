@@ -458,8 +458,9 @@ def _shift_solid_placement(
 ) -> None:
     """Recursively shift all leaf solid placements by (dx, dy, 0).
 
-    IfcBooleanResult has no Position attribute — recurse into operands
-    until we reach leaf solids that do (e.g. IfcExtrudedAreaSolid).
+    IfcBooleanResult has no Position attribute — recurse into operands.
+    Tessellated geometry (IfcTriangulatedFaceSet, etc.) is already in
+    world space and is skipped.
     """
     from ifckit.geometry import Vec
 
@@ -472,6 +473,8 @@ def _shift_solid_placement(
         oy = old_origin.Coordinates[1] + dy
         oz = old_origin.Coordinates[2]
         solid.Position = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
+    # IfcTriangulatedFaceSet and other tessellated geometry — coordinates
+    # are already in world space, no shift needed.
 
 
 def _relative_to_opening(

@@ -2,12 +2,20 @@
 Fixed Casement Component — Python Generative Window
 
 Alternative to fixed_casement.json. Creates a simple
-window with aluminum frame (with hole) and glazing panel.
+window with sectioned-spine lining and glazing panel.
 """
 
-from ifckit.builders._geom import axis2placement3d, extrude_profile, profile_from_points
+from ifckit.builders._geom import (
+    axis2placement3d,
+    extrude_profile,
+    profile_from_points,
+    sectioned_spine,
+)
 from ifckit.components import EvaluatedComponent, WindowComponent, component
 from ifckit.geometry import Path, Vec
+from ifckit.geometry.frames import upvector_frames
+from ifckit.profiles import RectangleProfile
+from ifckit.profiles.derived import DerivedProfile
 
 ALUMINUM_FRAME = {
     "color": {"r": 0.8, "g": 0.8, "b": 0.8},
@@ -30,24 +38,21 @@ OPENING_VOID = {
 
 @component("fixed_casement_component")
 class FixedCasementComponent(WindowComponent):
-    """Generative window: frame with fixed glazing."""
+    """Generative window: sectioned-spine frame with fixed glazing."""
 
     name = "fixed_casement_component"
 
     def build(self, ifc_file, plane, w, h, params):
-        lt = params.get("lining_thickness", 55)
-        ld = params.get("lining_depth", 70)
-        gd = params.get("panel_depth", 6)
-        wt = params.get("wall_thickness", 200)
+        lt = float(params.get("lining_thickness", 55))
+        ld = float(params.get("lining_depth", 70))
+        gd = float(params.get("panel_depth", 6))
+        wt = float(params.get("wall_thickness", 200))
+        wx = float(w)
+        wy = float(h)
 
         comps = []
 
-        wx = float(w)
-        wy = float(h)
-        ltx = float(lt)
-
-        # Opening void (for IfcOpeningElement - creates hole in wall)
-        # Depth is 2x wall_thickness to go through the wall
+        # ── Opening void ──────────────────────────────────────────────
         opening_profile = profile_from_points(
             ifc_file, [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]
         )
@@ -66,47 +71,23 @@ class FixedCasementComponent(WindowComponent):
             )
         )
 
-        # Lining with hole: outer rect minus inner rect (glazing opening)
-        # Using Path class like JSON evaluator does
-        outer_pts = [Vec(x, y, 0) for x, y in [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]]
-        outer_path = Path.from_pts(outer_pts, closed=True)
-
-        hole_x0 = ltx
-        hole_y0 = ltx
-        hole_x1 = wx - ltx
-        hole_y1 = wy - ltx
-
-        if hole_x1 > hole_x0 and hole_y1 > hole_y0:
-            hole_pts = [
-                Vec(x, y, 0)
-                for x, y in [
-                    (hole_x0, hole_y0),
-                    (hole_x1, hole_y0),
-                    (hole_x1, hole_y1),
-                    (hole_x0, hole_y1),
-                ]
-            ]
-            hole_path = Path.from_pts(hole_pts, closed=True)
-            outer_path = outer_path.with_hole(hole_path)
-
-        lining_profile = profile_from_points_from_path(ifc_file, outer_path)
-        lining_solid = extrude_profile(
-            ifc_file, lining_profile, depth=ld, extrude_direction=(0, 0, -1)
-        )
-        comps.append(
-            EvaluatedComponent(
-                solid=lining_solid,
-                role="Lining",
-                node_id="lining",
-                material=ALUMINUM_FRAME,
+        # ── Lining: closed sectioned-spine with rectangular profile ───
+        if lt > 0 and ld > 0:
+            lining_solid = self._build_lining(ifc_file, wx, wy, lt, ld)
+            comps.append(
+                EvaluatedComponent(
+                    solid=lining_solid,
+                    role="Lining",
+                    node_id="lining",
+                    material=ALUMINUM_FRAME,
+                )
             )
-        )
 
-        # Glazing - positioned at center of lining depth
-        glass_x0 = ltx
-        glass_y0 = ltx
-        glass_x1 = wx - ltx
-        glass_y1 = wy - ltx
+        # ── Glazing ───────────────────────────────────────────────────
+        glass_x0 = lt
+        glass_y0 = lt
+        glass_x1 = wx - lt
+        glass_y1 = wy - lt
 
         if glass_x1 > glass_x0 and glass_y1 > glass_y0:
             glass_profile = profile_from_points(
@@ -118,7 +99,6 @@ class FixedCasementComponent(WindowComponent):
                     (glass_x0, glass_y1),
                 ],
             )
-            # Position at center: -(ld/2 - gd/2) to match JSON (negative Z)
             z_offset = -(ld / 2 - gd / 2)
             glass_position = axis2placement3d(
                 ifc_file,
@@ -144,39 +124,74 @@ class FixedCasementComponent(WindowComponent):
 
         return comps
 
+    # ── Lining via closed sectioned-spine ─────────────────────────
 
-def profile_from_points_from_path(ifc_file, path: Path):
-    """Create IFC profile from Path (supports holes)."""
-    # Use IfcPolyline instead of CompositeCurve for better viewer compatibility
-    outer_points = [
-        ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0)) for seg in path.segments
-    ] + [
-        ifc_file.createIfcCartesianPoint((path.segments[0].start.x, path.segments[0].start.y, 0.0))
-    ]
-    outer_curve = ifc_file.createIfcPolyline(outer_points)
+    @staticmethod
+    def _build_lining(ifc_file, wx, wy, lt, ld):
+        """Build lining as a closed sectioned-spine sweep.
 
-    if path.holes:
-        # Create IfcArbitraryProfileDefWithVoids
-        inner_curves = []
-        for hole_path in path.holes:
-            inner_points = [
-                ifc_file.createIfcCartesianPoint((seg.start.x, seg.start.y, 0.0))
-                for seg in hole_path.segments
-            ] + [
-                ifc_file.createIfcCartesianPoint(
-                    (hole_path.segments[0].start.x, hole_path.segments[0].start.y, 0.0)
-                )
-            ]
-            inner_curve = ifc_file.createIfcPolyline(inner_points)
-            inner_curves.append(inner_curve)
+        Spine = closed rectangle at the centerline of the frame
+        (offset *lt/2* inward from the outer boundary).
 
-        return ifc_file.createIfcArbitraryProfileDefWithVoids(
-            ProfileType="AREA",
-            OuterCurve=outer_curve,
-            InnerCurves=inner_curves,
+        Profile = Rectangle(lt × ld): width = frame thickness in the wall
+        plane, height = frame depth along Z (world_up).
+        """
+        # Centerline vertices: offset = lt/2 inward from outer boundary
+        off = lt / 2
+        spine = Path.from_pts(
+            [
+                Vec(off, off, 0),
+                Vec(wx - off, off, 0),
+                Vec(wx - off, wy - off, 0),
+                Vec(off, wy - off, 0),
+            ],
+            closed=True,
         )
-    else:
-        return ifc_file.createIfcArbitraryClosedProfileDef(OuterCurve=outer_curve)
+
+        base_profile = RectangleProfile(lt, ld)
+
+        # Extract control points (strip trailing duplicate for closed paths)
+        segs = spine._segments
+        pts = [seg.start for seg in segs]
+        last = segs[-1].end
+        if not (pts and pts[0].equals(last)):
+            pts.append(last)
+
+        # Compute frames with miter detection
+        world_up = Vec(0, 0, 1)
+        field = upvector_frames(pts, world_up, closed=True)
+
+        # Extract vertex-mitered frames only (midpoints are helpers)
+        n_orig = len(pts)
+        mit_indices = [4 * i + 2 for i in range(n_orig)]
+        vtx_frames = [field.frames[i] for i in mit_indices]
+        vtx_scales = [field.scales[i] for i in mit_indices]
+
+        # Build miter-scaled profile copies
+        profiles = []
+        for scale, axis in vtx_scales:
+            if scale == 1.0:
+                profiles.append(base_profile)
+            elif axis == "x":
+                profiles.append(DerivedProfile(base_profile, scale_y=scale))
+            else:
+                profiles.append(DerivedProfile(base_profile, scale_x=scale))
+
+        # Convert to IFC entities
+        profile_defs = [p.to_ifc(ifc_file) for p in profiles]
+        pos_entities = [
+            axis2placement3d(ifc_file, f.origin, f.z_axis, f.x_axis) for f in vtx_frames
+        ]
+        spine_curve = spine.directrix(ifc_file)
+
+        return sectioned_spine(
+            ifc_file,
+            spine_curve,
+            profile_defs,
+            pos_entities,
+            profile_segments=32,
+            closed=True,
+        )
 
 
 FixedCasementComponent.register()
