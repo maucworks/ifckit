@@ -456,25 +456,23 @@ def _shift_solid_placement(
     dx: float,
     dy: float,
 ) -> None:
-    """Recursively shift all leaf solid placements by (dx, dy, 0).
-
-    IfcBooleanResult has no Position attribute — recurse into operands.
-    Tessellated geometry (IfcTriangulatedFaceSet, etc.) is already in
-    world space and is skipped.
-    """
+    """Recursively shift all leaf solid placements by (dx, dy, 0)."""
     from ifckit.geometry import Vec
 
     if solid.is_a("IfcBooleanResult"):
         _shift_solid_placement(ifc_file, solid.FirstOperand, dx, dy)
         _shift_solid_placement(ifc_file, solid.SecondOperand, dx, dy)
+    elif solid.is_a("IfcTriangulatedFaceSet"):
+        # Tessellated geometry: shift vertex coordinates directly
+        c = solid.Coordinates
+        shifted = [(pt[0] + dx, pt[1] + dy, pt[2]) for pt in c.CoordList]
+        solid.Coordinates = ifc_file.createIfcCartesianPointList3D(shifted)
     elif hasattr(solid, "Position"):
         old_origin = solid.Position.Location
         ox = old_origin.Coordinates[0] + dx
         oy = old_origin.Coordinates[1] + dy
         oz = old_origin.Coordinates[2]
         solid.Position = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
-    # IfcTriangulatedFaceSet and other tessellated geometry — coordinates
-    # are already in world space, no shift needed.
 
 
 def _relative_to_opening(
