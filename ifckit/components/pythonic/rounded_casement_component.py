@@ -12,25 +12,8 @@ from ifckit.builders._geom import (
 )
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.components import EvaluatedComponent, FillComponent
+from ifckit.components.materials import ALUMINUM, GLASS, VOID
 from ifckit.geometry import Path, Plane, Vec
-
-ALUMINUM_FRAME = {
-    "color": {"r": 0.8, "g": 0.8, "b": 0.8},
-    "transparency": 0.0,
-    "name": "Aluminum frame",
-}
-
-CLEAR_GLASS = {
-    "color": {"r": 0.9, "g": 0.95, "b": 1.0},
-    "transparency": 0.5,
-    "name": "Clear glass",
-}
-
-OPENING_VOID = {
-    "color": {"r": 0.5, "g": 0.5, "b": 0.5},
-    "transparency": 1.0,
-    "name": "Opening void",
-}
 
 
 class RoundedCasementComponent(FillComponent):
@@ -74,7 +57,7 @@ class RoundedCasementComponent(FillComponent):
                 solid=opening_solid,
                 role="Opening",
                 node_id="opening_void",
-                material=OPENING_VOID,
+                material=VOID,
             )
         )
 
@@ -95,7 +78,7 @@ class RoundedCasementComponent(FillComponent):
                     solid=lining_solid,
                     role="Lining",
                     node_id="lining",
-                    material=ALUMINUM_FRAME,
+                    material=ALUMINUM,
                 )
             )
 
@@ -128,7 +111,7 @@ class RoundedCasementComponent(FillComponent):
                     solid=glass_solid,
                     role="Glazing",
                     node_id="glazing",
-                    material=CLEAR_GLASS,
+                    material=GLASS,
                 )
             )
 

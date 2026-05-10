@@ -25,6 +25,7 @@ MijnComponent — Python generative component voor IfcPlate.
 from ifckit.builders._geom import axis2placement3d, extrude_profile, profile_from_points
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.components import EvaluatedComponent, FillComponent
+from ifckit.components.materials import ALUMINUM, GLASS, VOID
 from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles import RectangleProfile
 

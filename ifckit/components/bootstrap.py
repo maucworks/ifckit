@@ -19,27 +19,9 @@ TEMPLATE = '''\
 from ifckit.builders._geom import axis2placement3d, extrude_profile, profile_from_points
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.components import EvaluatedComponent, FillComponent
+from ifckit.components.materials import ALUMINUM, GLASS, VOID
 from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles import RectangleProfile
-
-
-ALUMINUM = {{
-    "color": {{"r": 0.8, "g": 0.8, "b": 0.8}},
-    "transparency": 0.0,
-    "name": "Aluminum frame",
-}}
-
-GLASS = {{
-    "color": {{"r": 0.9, "g": 0.95, "b": 1.0}},
-    "transparency": 0.5,
-    "name": "Clear glass",
-}}
-
-VOID = {{
-    "color": {{"r": 0.5, "g": 0.5, "b": 0.5}},
-    "transparency": 1.0,
-    "name": "Opening void",
-}}
 
 
 class {class_name}(FillComponent):
