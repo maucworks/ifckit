@@ -13,7 +13,6 @@ from ifckit.builders._geom import (
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.components import EvaluatedComponent, WindowComponent, component
 from ifckit.geometry import Path, Plane, Vec
-from ifckit.profiles import RectangleProfile
 
 ALUMINUM_FRAME = {
     "color": {"r": 0.8, "g": 0.8, "b": 0.8},
@@ -49,11 +48,21 @@ class FixedCasementComponent(WindowComponent):
         wy = float(h)
 
         comps = []
+        spine = Path.from_pts(
+            [
+                Vec(0, 0, 0),
+                Vec(wx, 0, 0),
+                Vec(wx, wy, 0),
+                Vec(0, wy, 0),
+            ],
+            Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+            closed=True,
+        )
+        spine.fillet([0, 1, 2, 3], wx / 2.1)
 
         # ── Opening void ──────────────────────────────────────────────
-        opening_profile = profile_from_points(
-            ifc_file, [(0.0, 0.0), (wx, 0.0), (wx, wy), (0.0, wy)]
-        )
+        opening_profile = profile_from_points(ifc_file, spine)
+
         opening_solid = extrude_profile(
             ifc_file,
             opening_profile,
@@ -75,8 +84,7 @@ class FixedCasementComponent(WindowComponent):
             p_segs = int(params.get("profile_segments", 16))
             lining_solid = self._build_lining(
                 ifc_file,
-                wx,
-                wy,
+                spine,
                 lt,
                 ld,
                 angle_step_deg=a_step,
@@ -98,15 +106,9 @@ class FixedCasementComponent(WindowComponent):
         glass_y1 = wy - lt
 
         if glass_x1 > glass_x0 and glass_y1 > glass_y0:
-            glass_profile = profile_from_points(
-                ifc_file,
-                [
-                    (glass_x0, glass_y0),
-                    (glass_x1, glass_y0),
-                    (glass_x1, glass_y1),
-                    (glass_x0, glass_y1),
-                ],
-            )
+            glass_spine = spine.offset(lt)
+            glass_profile = profile_from_points(ifc_file, glass_spine)
+
             z_offset = -(ld / 2 - gd / 2)
             glass_position = axis2placement3d(
                 ifc_file,
@@ -137,8 +139,7 @@ class FixedCasementComponent(WindowComponent):
     @staticmethod
     def _build_lining(
         ifc_file,
-        wx,
-        wy,
+        spine,
         lt,
         ld,
         angle_step_deg: float = 3.0,
@@ -150,20 +151,26 @@ class FixedCasementComponent(WindowComponent):
         (offset *lt/2* inward from the outer boundary).
         Profile = Rectangle(lt × ld): frame cross-section.
         """
-        off = lt / 2
-        spine = Path.from_pts(
+        starter = Plane(Vec(0, 0, 0), Vec(0, 0, 1), Vec(0, 1, 0))
+        # profile = RectangleProfile(ld, lt)
+        # profile.anchor = "w"
+
+        section = Path.from_pts(
             [
-                Vec(off, off, 0),
-                Vec(wx - off, off, 0),
-                Vec(wx - off, wy - off, 0),
-                Vec(off, wy - off, 0),
+                Vec(-ld / 2, 0, 0),
+                Vec(ld / 2, 0, 0),
+                Vec(ld / 2, lt / 5, 0),
+                Vec(ld / 3, lt, 0),
+                Vec(-ld / 3, lt, 0),
+                Vec(-ld / 2, lt / 5, 0),
             ],
+            Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
             closed=True,
         )
+        # section.fillet(1, 5 * lt)
+        profile = section.to_profile(name="section")
+        profile.anchor = "sw"
 
-        spine.fillet(1, 5 * lt)  # uncomment to round corners
-        starter = Plane(Vec(off, off, 0), Vec(1, 0, 0), Vec(0, 0, 1))
-        profile = RectangleProfile(lt, ld)
         return SectionedSpineBuilder().tessellate_spine(
             ifc_file,
             spine=spine,
