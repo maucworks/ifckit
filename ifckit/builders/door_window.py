@@ -869,12 +869,15 @@ def build_window_model_b(
     for comp in opening_components:
         _shift_solid_placement(ifc_file, comp.solid, dx, dy)
 
-    # Separate Opening components from Fill components by role
+    # Separate Opening/Projection components from Fill components by role
     opening_solids = []
+    projection_solids = []
     fill_components = []
     for comp in opening_components:
         if comp.role == "Opening":
             opening_solids.append(comp.solid)
+        elif comp.role == "Projection":
+            projection_solids.append(comp.solid)
         else:
             fill_components.append(comp)
 
@@ -892,6 +895,35 @@ def build_window_model_b(
             f"build_window_model_b: preset {pending.component_graph!r} "
             "produced no opening solid. Cannot create IfcOpeningElement."
         )
+
+    # Boolean-union Projection solids into the host wall's body representation
+    for proj_solid in projection_solids:
+        body_reps = [
+            r
+            for r in host_entity.Representation.Representations
+            if r.RepresentationIdentifier == "Body"
+        ]
+        if not body_reps:
+            continue
+        body_rep = body_reps[0]
+        items = list(body_rep.Items)
+        if not items:
+            continue
+        current = items[0]
+        for item in items[1:]:
+            current = ifc_file.create_entity(
+                "IfcBooleanResult",
+                Operator="UNION",
+                FirstOperand=current,
+                SecondOperand=item,
+            )
+        union = ifc_file.create_entity(
+            "IfcBooleanResult",
+            Operator="UNION",
+            FirstOperand=current,
+            SecondOperand=proj_solid,
+        )
+        body_rep.Items = [union]
 
     # Build window fill - either from components or with graph
     if fill_components:
