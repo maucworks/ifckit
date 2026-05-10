@@ -3,9 +3,8 @@ ifckit.elements.wall_graph
 =========================
 
 PendingWallGraph: a wall graph defined by vertices + edges, or by a
-Path.  The edges form an open graph (L, T, X junctions, …) or a
-continuous Path (open or closed, with optional arcs).  Each edge is
-extruded separately and boolean-union'd into one IfcWall.
+Path.  Path-based walls use offset geometry (single extrusion, no
+boolean tree).  Edge-based walls (with T/X junctions) use boolean union.
 """
 
 from __future__ import annotations
@@ -21,28 +20,29 @@ class PendingWallGraph(PendingElement):
     """
     A wall defined by a graph of edges or a continuous Path.
 
-    **Edge mode** (vertices + edges):
-        Each edge ``(vi, vj)`` produces an extruded rectangle of size
-        ``thickness × edge_length``, swept upward by ``height``.  All
-        extrusions are boolean-union'd into a single IfcWall.
+    **Path mode** (``path`` argument):
+        The wall centerline follows the Path.  The footprint is created
+        by offsetting the Path outward/inward by ``thickness / 2``.
+        Closed paths produce a single ``IfcExtrudedAreaSolid`` with a
+        void (no boolean tree).  Open paths fall back to segment-by-
+        segment extrusion with boolean union.
 
-    **Path mode** (path argument):
-        The Path's segments (Line or Arc) become the wall centerline.
-        Arcs are sampled to a polyline before extrusion.
-        Closed paths produce a continuous perimeter wall.
+    **Edge mode** (``vertices + edges``):
+        Each edge is extruded separately and boolean-union'd.  Required
+        for T-junctions and X-junctions where a single Path cannot
+        represent branching centerlines.
 
     Args:
-        vertices:   3D positions (edge mode).  Not used in path mode.
-        edges:      Edge index pairs (edge mode).  Not used in path mode.
-        path:       Continuous centerline Path (path mode).  Overrides
-                    vertices + edges when given.
-        plane:      Placement plane (Z = up).
+        vertices:   3D positions (edge mode).
+        edges:      Edge index pairs (edge mode).
+        path:       Continuous centerline Path (path mode).
+        plane:      Placement plane (Z = up).  Defaults to path._plane.
         thickness:  Wall thickness (mm).
         height:     Wall height (mm).
         name:       Element name.
         style:      Optional RenderStyle.
         properties: Optional UserProperties dict.
-        angle_step_deg: Arc sampling resolution (path mode only, default 5°).
+        angle_step_deg: Arc sampling resolution (default 5°).
     """
 
     element_type = "wall_graph"
@@ -61,14 +61,11 @@ class PendingWallGraph(PendingElement):
         angle_step_deg: float = 5.0,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
+        self.thickness = float(thickness)
+        self.height = float(height)
 
         if path is not None:
-            # ── Path mode ───────────────────────────────────
-            pts = path.sample(angle_step_deg).points
-            self.vertices = pts
-            self.edges = [(i, i + 1) for i in range(len(pts) - 1)]
-            if path.is_closed and len(pts) > 1:
-                self.edges.append((len(pts) - 1, 0))
+            self._path = path
             self.plane = (
                 plane
                 if plane is not None
@@ -77,18 +74,20 @@ class PendingWallGraph(PendingElement):
                 )
             )
             self.from_path = True
+            self.angle_step_deg = float(angle_step_deg)
+            # sampled vertices + edges for backward compat (used in previews etc.)
+            pts = path.sample(angle_step_deg).points
+            self.vertices = pts
+            self.edges = [(i, i + 1) for i in range(len(pts) - 1)]
+            if path.is_closed and len(pts) > 1:
+                self.edges.append((len(pts) - 1, 0))
         else:
-            # ── Edge mode ───────────────────────────────────
             self.vertices = list(vertices) if vertices else []
             self.edges = list(edges) if edges else []
             if plane is None:
                 raise ValueError("PendingWallGraph requires a plane in edge mode")
             self.plane = plane
             self.from_path = False
-
-        self.thickness = float(thickness)
-        self.height = float(height)
-        self.angle_step_deg = float(angle_step_deg)
 
     def to_dict(self) -> Dict:
         d: Dict = {
