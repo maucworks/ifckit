@@ -7,51 +7,95 @@ WallGraphBuilder: PendingWallGraph -> IfcWall.
 - **Path mode (closed):**  offsets the centerline outward/inward by
   ``thickness / 2`` and creates a single ``IfcExtrudedAreaSolid``
   with a void — a clean SweptSolid, no boolean tree.
-- **Path mode (open):**  samples the path to a polyline and creates
-  individual segment extrusions with boolean union.
-- **Edge mode:**  each edge is extruded separately and boolean-union'd
-  (required for T/X junctions).
+- **Path mode (open):**  samples the path to a polyline, offsets
+  left/right, intersects for mitered corners, extrudes single solid.
+- **Graph mode (edge mode):**  buffers all edges as a Shapely
+  MultiLineString by ``thickness / 2`` — handles T/X mitering and
+  capped open ends automatically — producing a single closed polygon
+  extruded as one ``IfcExtrudedAreaSolid`` with optional holes.
 """
 
 from __future__ import annotations
+
+import math
+import warnings
 
 import ifcopenshell
 import ifcopenshell.api
 
 from ifckit.builders._geom import (
+    _signed_area_2d,
     axis2placement3d,
     extrude_profile,
     local_placement,
     product_definition_shape,
     profile_from_points,
     shape_representation,
+    shapely_polygon_to_ifc_profile,
 )
 from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
 from ifckit.geometry import Vec
-from ifckit.profiles.shapes import RectangleProfile
+from ifckit.geometry.path import _line_line_intersect_2d
+
+try:
+    from shapely.geometry import LineString, MultiPolygon, Polygon
+    from shapely.ops import unary_union
+
+    _SHAPELY_AVAILABLE = True
+except ImportError:
+    _SHAPELY_AVAILABLE = False
 
 
-def _polygon_area(pts: list[tuple[float, float]]) -> float:
-    """Signed area of a 2D polygon (positive = CCW)."""
-    n = len(pts)
-    if n < 3:
-        return 0.0
-    return (
-        sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))
-        / 2.0
-    )
+def _junction_fill(
+    jx: float,
+    jy: float,
+    arm_directions: list[tuple[float, float]],
+    half_t: float,
+) -> "Polygon":
+    """Convex hull of ht-offset shoulder points for all arms.
+
+    For each arm direction (dx, dy) away from the junction,
+    compute the two perpendicular shoulder points at distance
+    half_t.  The convex hull of all shoulders (plus the junction
+    centre) fills the corner without rounding.
+    """
+    shoulders: list[tuple[float, float]] = [(jx, jy)]
+    for dx, dy in arm_directions:
+        L = math.hypot(dx, dy)
+        if L < 1e-12:
+            continue
+        ux, uy = dx / L, dy / L
+        px, py = -uy, ux  # perpendicular (left)
+        shoulders.append((jx + px * half_t, jy + py * half_t))
+        shoulders.append((jx - px * half_t, jy - py * half_t))
+    return Polygon(shoulders).convex_hull
 
 
-def _ll_intersect(p1: Vec, d1: Vec, p2: Vec, d2: Vec) -> Vec | None:
-    """Intersection of 2D lines ``p1 + t*d1`` and ``p2 + s*d2``."""
-    denom = d1.x * (-d2.y) - d1.y * (-d2.x)
-    if abs(denom) < 1e-12:
-        return None
-    dx, dy = p2.x - p1.x, p2.y - p1.y
-    t = (dx * (-d2.y) - dy * (-d2.x)) / denom
-    return Vec(p1.x + t * d1.x, p1.y + t * d1.y, p1.z + t * d1.z)
+def _miter_offset_segments(
+    segs: list[tuple[Vec, Vec]],
+    end_pt: Vec,
+) -> list[Vec]:
+    """Intersect consecutive offset segments for mitered corners.
+
+    Args:
+        segs:    List of (anchor_point, direction) pairs, one per segment.
+        end_pt:  The final cap point of the last segment.
+
+    Returns:
+        List of corner points forming one side of the wall footprint.
+    """
+    if not segs:
+        return []
+    result: list[Vec] = [segs[0][0]]
+    for i in range(1, len(segs)):
+        p1, d1 = segs[i - 1]
+        p2, d2 = segs[i]
+        ip = _line_line_intersect_2d(p1, d1, p2, d2)
+        result.append(ip if ip is not None else p2)
+    result.append(end_pt)
+    return result
 
 
 class WallGraphBuilder(BaseBuilder):
@@ -75,12 +119,17 @@ class WallGraphBuilder(BaseBuilder):
             if pending._path.is_closed:
                 try:
                     geometry, rep_type = self._build_from_path(ifc_file, pending)
-                except (ValueError, IndexError):
+                except ValueError as exc:
+                    warnings.warn(
+                        f"WallGraph: closed-path offset failed ({exc}); "
+                        "falling back to open-path extrusion.",
+                        stacklevel=2,
+                    )
                     geometry, rep_type = self._build_from_open_path(ifc_file, pending)
             else:
                 geometry, rep_type = self._build_from_open_path(ifc_file, pending)
         else:
-            geometry, rep_type = self._build_from_edges(ifc_file, pending)
+            geometry, rep_type = self._build_from_graph_offset(ifc_file, pending)
 
         shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
@@ -115,8 +164,8 @@ class WallGraphBuilder(BaseBuilder):
         outer = path.offset(-ht)
         inner = path.offset(+ht)
 
-        oa = abs(_polygon_area(outer.to_profile_points(plane=pending.plane)))
-        ia = abs(_polygon_area(inner.to_profile_points(plane=pending.plane)))
+        oa = abs(_signed_area_2d(outer.to_profile_points(plane=pending.plane)))
+        ia = abs(_signed_area_2d(inner.to_profile_points(plane=pending.plane)))
         if ia > oa:
             outer, inner = inner, outer
 
@@ -158,23 +207,8 @@ class WallGraphBuilder(BaseBuilder):
         right_end = pts[-1] - perp_last * ht
 
         # Intersect consecutive offset segments for mitered corners
-        def _intersect(
-            segs: list[tuple[Vec, Vec]],
-            end_pt: Vec,
-        ) -> list[Vec]:
-            if not segs:
-                return []
-            result: list[Vec] = [segs[0][0]]
-            for i in range(1, len(segs)):
-                p1, d1 = segs[i - 1]
-                p2, d2 = segs[i]
-                ip = _ll_intersect(p1, d1, p2, d2)
-                result.append(ip if ip is not None else p2)
-            result.append(end_pt)
-            return result
-
-        left_pts = _intersect(left_segs, left_end)
-        right_pts = _intersect(right_segs, right_end)
+        left_pts = _miter_offset_segments(left_segs, left_end)
+        right_pts = _miter_offset_segments(right_segs, right_end)
 
         # Closed footprint: left polyline + right polyline reversed
         footprint = left_pts + right_pts[::-1]
@@ -184,47 +218,171 @@ class WallGraphBuilder(BaseBuilder):
         solid = extrude_profile(ifc_file, profile, pending.height, position=pos)
         return solid, "SweptSolid"
 
-    # ── Edge mode ───────────────────────────────────────────────────
+    # ── Graph mode (offset-based) ────────────────────────────────────
 
     @staticmethod
-    def _build_from_edges(
+    def _build_from_graph_offset(
         ifc_file: ifcopenshell.file,
         pending: PendingElement,
     ) -> tuple[ifcopenshell.entity_instance, str]:
-        """Extrude each edge as a rectangle, boolean-union together."""
-        thickness = pending.thickness
-        height = pending.height
-        plane = pending.plane
+        """Buffer graph edges via Shapely → single closed polygon → one extrusion.
 
-        solids = []
+        Strategy: group edges into connected components, then per component:
+
+        - **Simple path / chain** (all degrees ≤ 2): order nodes into a
+          sequence and buffer as a single ``LineString``.  Shapely miters
+          every corner correctly with no "two rectangles" artefact.
+        - **Branching (T/X, degree ≥ 3)**: buffer each segment with flat
+          caps, then fill each junction vertex with a *shoulder polygon*
+          (convex hull of the ht-offset shoulder points of all arms).
+          This eliminates the notch that appears at acute-angle junctions
+          without introducing circular arcs or extra vertices.
+
+        All component polygons are merged via ``unary_union``.  Interior
+        holes (enclosed courtyards) become ``IfcArbitraryProfileDefWithVoids``
+        voids automatically.
+        """
+        if not _SHAPELY_AVAILABLE:
+            raise ImportError(
+                "WallGraphBuilder (graph mode) requires shapely. "
+                "Install it with: pip install shapely"
+            )
+
+        plane = pending.plane
+        ht = pending.thickness / 2
+
+        # Project all vertices to plane-local 2D coords once.
+        local_pts: list[tuple[float, float]] = []
+        for v in pending.vertices:
+            loc = plane.to_local(v)
+            local_pts.append((loc.x, loc.y))
+
+        # Collect valid edges (skip zero-length segments).
+        valid_edges: list[tuple[int, int]] = []
         for vi, vj in pending.edges:
             p0 = pending.vertices[vi]
             p1 = pending.vertices[vj]
-            seg_dir = (p1 - p0).normalized()
-            seg_len = (p1 - p0).length()
-            if seg_len < 1e-6:
-                continue
-            mid = (p0 + p1) * 0.5
-            perp = seg_dir ** Vec(0, 0, 1)
+            if abs(p1 - p0) >= 1e-6:
+                valid_edges.append((vi, vj))
 
-            profile = RectangleProfile(thickness, seg_len)
-            prof_def = profile.to_ifc(ifc_file)
-            pos = axis2placement3d(ifc_file, origin=mid, z_axis=plane.z_axis, x_axis=perp)
-            solid = extrude_profile(ifc_file, prof_def, height, position=pos)
-            solids.append(solid)
-
-        if not solids:
+        if not valid_edges:
             raise ValueError("WallGraph: no valid segments to build.")
 
-        if len(solids) == 1:
-            return solids[0], "SweptSolid"
+        # ── Connected components via BFS (no external dependency) ──────
+        adjacency: dict[int, list[int]] = {}
+        for vi, vj in valid_edges:
+            adjacency.setdefault(vi, []).append(vj)
+            adjacency.setdefault(vj, []).append(vi)
 
-        geometry = solids[0]
-        for solid in solids[1:]:
-            geometry = ifc_file.create_entity(
-                "IfcBooleanResult",
-                Operator="UNION",
-                FirstOperand=geometry,
-                SecondOperand=solid,
+        visited: set[int] = set()
+        components: list[list[int]] = []
+        for start in adjacency:
+            if start in visited:
+                continue
+            queue = [start]
+            comp: list[int] = []
+            while queue:
+                node = queue.pop()
+                if node in visited:
+                    continue
+                visited.add(node)
+                comp.append(node)
+                queue.extend(adjacency[node])
+            components.append(comp)
+
+        # ── Per-component polygon ──────────────────────────────────────
+        component_polys: list[Polygon] = []
+
+        for comp_nodes in components:
+            comp_set = set(comp_nodes)
+            comp_edges = [(vi, vj) for vi, vj in valid_edges if vi in comp_set]
+
+            # Degree per node within this component
+            degree: dict[int, int] = {n: 0 for n in comp_nodes}
+            for vi, vj in comp_edges:
+                degree[vi] += 1
+                degree[vj] += 1
+
+            max_degree = max(degree.values())
+
+            if max_degree <= 2:
+                # Simple path or closed loop — order into one LineString.
+                endpoints = [n for n, d in degree.items() if d == 1]
+                start = endpoints[0] if endpoints else comp_nodes[0]
+
+                ordered: list[int] = [start]
+                prev = None
+                current = start
+                while True:
+                    neighbours = [n for n in adjacency[current] if n in comp_set and n != prev]
+                    if not neighbours:
+                        break
+                    nxt = neighbours[0]
+                    if nxt == ordered[0] and len(ordered) > 1:
+                        ordered.append(nxt)  # closed loop
+                        break
+                    ordered.append(nxt)
+                    prev, current = current, nxt
+
+                coords = [local_pts[n] for n in ordered]
+                poly = LineString(coords).buffer(ht, cap_style=2, join_style=2, mitre_limit=10.0)
+
+            else:
+                # Branching junction:
+                # 1. Buffer each segment individually with flat caps.
+                # 2. For every junction vertex (degree ≥ 3), add a shoulder
+                #    fill polygon so acute-angle notches are eliminated.
+                seg_polys: list[Polygon] = []
+                for vi, vj in comp_edges:
+                    seg = LineString([local_pts[vi], local_pts[vj]])
+                    seg_polys.append(seg.buffer(ht, cap_style=2, join_style=2, mitre_limit=10.0))
+
+                # Add shoulder fill for each branching vertex
+                junction_nodes = [n for n, d in degree.items() if d >= 3]
+                for jn in junction_nodes:
+                    jx, jy = local_pts[jn]
+                    # Arm directions: away from junction toward each neighbour
+                    arm_dirs: list[tuple[float, float]] = []
+                    for vi, vj in comp_edges:
+                        if vi == jn:
+                            nx, ny = local_pts[vj]
+                            arm_dirs.append((nx - jx, ny - jy))
+                        elif vj == jn:
+                            nx, ny = local_pts[vi]
+                            arm_dirs.append((nx - jx, ny - jy))
+                    fill = _junction_fill(jx, jy, arm_dirs, ht)
+                    seg_polys.append(fill)
+
+                poly = unary_union(seg_polys)
+
+            if isinstance(poly, MultiPolygon):
+                warnings.warn(
+                    "WallGraph: buffered component produced disconnected polygons; "
+                    "keeping only the largest piece. Check for zero-thickness joints.",
+                    stacklevel=4,
+                )
+                poly = max(poly.geoms, key=lambda g: g.area)
+
+            if isinstance(poly, Polygon) and not poly.is_empty:
+                component_polys.append(poly)
+
+        if not component_polys:
+            raise ValueError("WallGraph: Shapely buffer produced empty/invalid polygon.")
+
+        polygon = unary_union(component_polys)
+
+        if isinstance(polygon, MultiPolygon):
+            warnings.warn(
+                "WallGraph: merged wall polygon is disconnected; keeping only the largest piece. "
+                "Check that all wall components share vertices or overlap.",
+                stacklevel=3,
             )
-        return geometry, "Brep"
+            polygon = max(polygon.geoms, key=lambda g: g.area)
+
+        if not isinstance(polygon, Polygon) or polygon.is_empty:
+            raise ValueError("WallGraph: Shapely buffer produced empty/invalid polygon.")
+
+        profile = shapely_polygon_to_ifc_profile(ifc_file, polygon)
+        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), plane.z_axis, plane.x_axis)
+        solid = extrude_profile(ifc_file, profile, pending.height, position=pos)
+        return solid, "SweptSolid"

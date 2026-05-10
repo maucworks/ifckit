@@ -1,5 +1,10 @@
 """
-Wall Graph Demo — L, T, U, Arc, and closed-path walls.
+Wall Graph Demo — L, T, U, X, Arc, and closed-path walls.
+
+Edge-mode scenarios (1–4) now use Shapely offset-based geometry:
+all edges are buffered as a MultiLineString and merged into a single
+closed polygon → one IfcExtrudedAreaSolid per wall, no boolean trees.
+T- and X-junctions are handled by Shapely's miter join style.
 
 Usage:
     python examples/wall_graph_demo.py
@@ -36,13 +41,19 @@ XY = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
 
 
 # ---------------------------------------------------------------------------
-# 1. L-wall (edge mode)
+# 1. L-wall (graph mode — offset-based)
 # ---------------------------------------------------------------------------
 
 def build_l_wall() -> None:
+    verts = [
+        Vec(0, 0, 0),
+        Vec(5000, 0, 0),
+        Vec(3000, 3000, 0),
+        Vec(1000, -3000, 0),
+    ]
     pending = PendingWallGraph(
-        vertices=[Vec(0, 0, 0), Vec(5000, 0, 0), Vec(5000, 3000, 0)],
-        edges=[(0, 1), (1, 2)],
+        vertices=verts,
+        edges=[(0, 1), (1, 2), (1, 3)],
         plane=XY,
         thickness=200,
         height=3000,
@@ -52,13 +63,13 @@ def build_l_wall() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. T-wall (edge mode)
+# 2. T-wall (graph mode — offset-based, T-junction mitered by Shapely)
 # ---------------------------------------------------------------------------
 
 def build_t_wall() -> None:
     pending = PendingWallGraph(
         vertices=[Vec(0, 0, 0), Vec(6000, 0, 0), Vec(3000, 0, 0), Vec(3000, -3000, 0)],
-        edges=[(0, 1), (2, 3), (1, 2)],
+        edges=[(0, 1), (2, 3)],
         plane=XY,
         thickness=200,
         height=3000,
@@ -68,7 +79,7 @@ def build_t_wall() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. U-wall (edge mode)
+# 3. U-wall (graph mode — offset-based, open ends capped)
 # ---------------------------------------------------------------------------
 
 def build_u_wall() -> None:
@@ -81,6 +92,29 @@ def build_u_wall() -> None:
         name="U_wall",
     )
     _build_and_save(pending, "U-wall", "wall_graph_U.ifc")
+
+
+# ---------------------------------------------------------------------------
+# 4. X-wall (graph mode — offset-based, X-junction mitered by Shapely)
+# ---------------------------------------------------------------------------
+
+def build_x_wall() -> None:
+    """Cross-shaped (X) wall: 4 arms meeting at a central junction."""
+    pending = PendingWallGraph(
+        vertices=[
+            Vec(3000, 0, 0),    # 0 — south end
+            Vec(3000, 6000, 0), # 1 — north end
+            Vec(0, 3000, 0),    # 2 — west end
+            Vec(6000, 3000, 0), # 3 — east end
+            Vec(3000, 3000, 0), # 4 — center
+        ],
+        edges=[(0, 4), (4, 1), (2, 4), (4, 3)],
+        plane=XY,
+        thickness=200,
+        height=3000,
+        name="X_wall",
+    )
+    _build_and_save(pending, "X-wall", "wall_graph_X.ifc")
 
 
 # ---------------------------------------------------------------------------
@@ -156,16 +190,18 @@ if __name__ == "__main__":
     os.makedirs("output", exist_ok=True)
 
     print("=== Wall Graph Demo ===\n")
-    print("1. L-wall (edge mode):")
+    print("1. L-wall (graph mode — offset):")
     build_l_wall()
-    print("\n2. T-wall (edge mode):")
+    print("\n2. T-wall (graph mode — offset, T-junction):")
     build_t_wall()
-    print("\n3. U-wall (edge mode):")
+    print("\n3. U-wall (graph mode — offset, open ends capped):")
     build_u_wall()
-    print("\n4. Arc wall (path mode):")
+    print("\n4. X-wall (graph mode — offset, X-junction):")
+    build_x_wall()
+    print("\n5. Arc wall (path mode):")
     build_arc_wall()
-    print("\n5. Closed rect wall (path mode):")
+    print("\n6. Closed rect wall (path mode):")
     build_closed_rect_wall()
-    print("\n6. Closed rect with fillet (path mode):")
+    print("\n7. Closed rect with fillet (path mode):")
     build_fillet_rect_wall()
     print("\nDone.")

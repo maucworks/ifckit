@@ -1451,6 +1451,62 @@ def sectioned_spine(
     )
 
 
+def shapely_polygon_to_ifc_profile(
+    f: ifcopenshell.file,
+    polygon: Any,
+    profile_name: str | None = None,
+) -> ifcopenshell.entity_instance:
+    """Convert a Shapely Polygon to an IFC profile definition.
+
+    The exterior ring becomes the outer curve (CCW enforced).
+    Any interior rings (holes) become inner curves (CW enforced).
+
+    Returns:
+        ``IfcArbitraryClosedProfileDef`` when there are no holes,
+        ``IfcArbitraryProfileDefWithVoids`` when there are holes.
+    """
+    # Exterior ring — Shapely gives CCW for valid polygons, but enforce anyway
+    ext_coords = list(polygon.exterior.coords)
+    # Remove closing point (Shapely always closes: first == last)
+    if (
+        len(ext_coords) > 1
+        and abs(ext_coords[0][0] - ext_coords[-1][0]) < 1e-9
+        and abs(ext_coords[0][1] - ext_coords[-1][1]) < 1e-9
+    ):
+        ext_coords = ext_coords[:-1]
+    outer_polyline = _pts_to_polyline(f, ext_coords, ensure_ccw=True)
+
+    interior_rings = list(polygon.interiors)
+    if not interior_rings:
+        return f.create_entity(
+            "IfcArbitraryClosedProfileDef",
+            ProfileType="AREA",
+            ProfileName=profile_name,
+            OuterCurve=outer_polyline,
+        )
+
+    inner_polylines = []
+    for ring in interior_rings:
+        hole_coords = list(ring.coords)
+        if (
+            len(hole_coords) > 1
+            and abs(hole_coords[0][0] - hole_coords[-1][0]) < 1e-9
+            and abs(hole_coords[0][1] - hole_coords[-1][1]) < 1e-9
+        ):
+            hole_coords = hole_coords[:-1]
+        inner_polylines.append(
+            _pts_to_polyline(f, hole_coords, ensure_ccw=False, reverse_for_hole=True)
+        )
+
+    return f.create_entity(
+        "IfcArbitraryProfileDefWithVoids",
+        ProfileType="AREA",
+        ProfileName=profile_name,
+        OuterCurve=outer_polyline,
+        InnerCurves=inner_polylines,
+    )
+
+
 def get_body_context(
     ifc_file: ifcopenshell.file,
 ) -> ifcopenshell.entity_instance:
