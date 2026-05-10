@@ -338,9 +338,9 @@ class Path:
         """Round the corner at vertex *index* with a circular arc of given *radius*.
 
         The vertex at *index* is the shared endpoint between ``_segments[index-1]``
-        (incoming) and ``_segments[index]`` (outgoing).  For a path built with
-        ``Path.from_pts([P0, P1, ..., Pn])``, vertex *index* ``i`` corresponds to
-        point ``Pi`` — so valid indices are ``1 … n-1`` (interior vertices only).
+        (incoming) and ``_segments[index]`` (outgoing).  For closed paths,
+        *index* 0 addresses the wrap-around corner between the last and first
+        segments.
 
         Modifies the path **in place** and returns ``self`` so calls can be chained::
 
@@ -350,15 +350,15 @@ class Path:
         The method silently warns (via ``warnings.warn``) and leaves the path
         unchanged when the fillet cannot be applied:
 
-        * Index out of range (must be 1 … len(segments)-1).
+        * Index 0 on an open path (no wrap-around corner).
+        * Index out of range (must be 0 … len(segments)-1 for closed paths,
+          1 … len(segments)-1 for open paths).
         * Either adjacent segment is not a ``Line``.
         * The two lines are collinear (no corner to fillet).
-        * Either leg is too short to accommodate the tangent set-back for the
-          requested radius (``t = r / tan(half_angle)``).
+        * Either leg is too short to accommodate the tangent set-back.
 
         Args:
-            index:  Vertex index in path-point numbering (1 … n-1 for an
-                    open path built with ``from_pts``).
+            index:  Vertex index.  0 = wrap-around corner (closed paths only).
             radius: Fillet radius (same units as the path coordinates).
 
         Returns:
@@ -371,23 +371,33 @@ class Path:
 
         # ------------------------------------------------------------------
         # Guard: index must address an interior vertex between two segments.
-        # Segment[i-1].end == Segment[i].start is the shared corner.
+        # For open paths: 1 … n-1.
+        # For closed paths: 0 … n-1 (0 = wrap-around corner).
         # ------------------------------------------------------------------
-        if not (1 <= index <= n - 1):
+        if index == 0 and not self.is_closed:
+            _warnings.warn(
+                "fillet: index 0 (wrap-around corner) is only valid on closed paths.",
+                stacklevel=2,
+            )
+            return self
+
+        if not (0 <= index <= n - 1) or (index == 0 and n < 2):
             _warnings.warn(
                 f"fillet: index {index} is out of range — "
-                f"valid interior vertex indices are 1 … {n - 1} "
+                f"valid interior vertex indices are 0 … {n - 1} "
                 f"for a path with {n} segments.",
                 stacklevel=2,
             )
             return self
 
-        seg_in = segs[index - 1]
-        seg_out = segs[index]
+        # Resolve adjacent segments (wrap-around for index 0)
+        seg_in = segs[(index - 1) % n]
+        seg_out = segs[index % n]
+        corner = seg_in.end
 
         if not isinstance(seg_in, Line):
             _warnings.warn(
-                f"fillet: segment {index - 1} (incoming) is not a Line "
+                f"fillet: incoming segment is not a Line "
                 f"({type(seg_in).__name__}). Only Line–Line corners are supported.",
                 stacklevel=2,
             )
@@ -395,13 +405,11 @@ class Path:
 
         if not isinstance(seg_out, Line):
             _warnings.warn(
-                f"fillet: segment {index} (outgoing) is not a Line "
+                f"fillet: outgoing segment is not a Line "
                 f"({type(seg_out).__name__}). Only Line–Line corners are supported.",
                 stacklevel=2,
             )
             return self
-
-        corner = seg_in.end  # == seg_out.start
 
         # Guard: zero or negative radius is degenerate.
         if radius <= 0.0:
@@ -422,29 +430,23 @@ class Path:
         # ------------------------------------------------------------------
         # Collinearity check
         # ------------------------------------------------------------------
-        cos_away = d_in @ d_out  # cosine of angle between the two "away" directions
-        # cos_away ≈ -1 → straight (0° turn) — the away-directions point in
-        #              opposite directions, meaning the legs are collinear.
-        # cos_away ≈ +1 → 180° U-turn — degenerate.
+        cos_away = d_in @ d_out
         if cos_away < -1.0 + 1e-9:
             _warnings.warn(
-                f"fillet: segments {index - 1} and {index} are collinear "
-                f"(no corner at vertex {index}). Fillet skipped.",
+                f"fillet: segments at vertex {index} are collinear (no corner). Fillet skipped.",
                 stacklevel=2,
             )
             return self
         if cos_away > 1.0 - 1e-9:
             _warnings.warn(
-                f"fillet: segments {index - 1} and {index} form a 180° U-turn "
-                f"at vertex {index} — degenerate corner. Fillet skipped.",
+                f"fillet: segments at vertex {index} form a 180° U-turn "
+                f"— degenerate corner. Fillet skipped.",
                 stacklevel=2,
             )
             return self
 
         # Angle between the two away-directions, and its half:
-        # half_angle is always in (0°, 90°] for valid corners.
         half_angle = math.acos(max(-1.0, min(1.0, cos_away))) / 2.0
-        # Tangent set-back from corner to tangent point: t = r / tan(half_angle)
         tan_half = math.tan(half_angle)
         t = radius / tan_half if tan_half > 1e-12 else float("inf")
 
@@ -454,8 +456,8 @@ class Path:
         if t > seg_in.length + 1e-9:
             _warnings.warn(
                 f"fillet: radius {radius} requires a tangent set-back of {t:.3f} "
-                f"but the incoming segment (index {index - 1}) is only "
-                f"{seg_in.length:.3f} long. Fillet skipped.",
+                f"but the incoming segment is only {seg_in.length:.3f} long. "
+                f"Fillet skipped.",
                 stacklevel=2,
             )
             return self
@@ -463,8 +465,8 @@ class Path:
         if t > seg_out.length + 1e-9:
             _warnings.warn(
                 f"fillet: radius {radius} requires a tangent set-back of {t:.3f} "
-                f"but the outgoing segment (index {index}) is only "
-                f"{seg_out.length:.3f} long. Fillet skipped.",
+                f"but the outgoing segment is only {seg_out.length:.3f} long. "
+                f"Fillet skipped.",
                 stacklevel=2,
             )
             return self
@@ -475,17 +477,11 @@ class Path:
         tan_pt_in = corner + d_in * t  # tangent point on incoming leg
         tan_pt_out = corner + d_out * t  # tangent point on outgoing leg
 
-        # Arc normal: perpendicular to the plane spanned by the two legs.
-        # Use actual travel directions so that CCW turns give +Z (for XY paths).
         arc_normal = (dir_in**dir_out).normalized()
 
-        # Center: located on the inward bisector of the angle between the two
-        # away-directions, at distance r / sin(half_angle) from the corner.
-        # bisector = normalize(d_in + d_out) points from corner toward center.
         bisector = (d_in + d_out).normalized()
         center = corner + bisector * (radius / math.sin(half_angle))
 
-        # Sweep angle: signed angle from radial_in to radial_out around arc_normal.
         radial_in = (tan_pt_in - center).normalized()
         radial_out = (tan_pt_out - center).normalized()
         cos_sweep = max(-1.0, min(1.0, radial_in @ radial_out))
@@ -499,7 +495,16 @@ class Path:
         arc_seg = Arc(center, arc_normal, tan_pt_in, sweep)
         new_seg_out = Line(tan_pt_out, seg_out.end)
 
-        self._segments = segs[: index - 1] + [new_seg_in, arc_seg, new_seg_out] + segs[index + 1 :]
+        if index == 0:
+            # Wrap-around corner: replace segs[-1] and segs[0] with the
+            # three new segments.  segs[-1] → new_seg_in (truncated
+            # closing segment); segs[0] → [arc, new_seg_out].
+            self._segments[-1] = new_seg_in
+            self._segments[0:1] = [arc_seg, new_seg_out]
+        else:
+            self._segments = (
+                segs[: index - 1] + [new_seg_in, arc_seg, new_seg_out] + segs[index + 1 :]
+            )
         return self
 
     def reverse(self) -> "Path":

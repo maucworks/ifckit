@@ -15,6 +15,7 @@ Covers:
   - Path length and continuity after fillet
   - Symmetry: fillet from_pts([A,B,C]) gives same arc center as from_pts([C,B,A])
 """
+
 from __future__ import annotations
 
 import math
@@ -28,6 +29,7 @@ from ifckit.geometry import Arc, Line, Path, Vec
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _approx(a: float, b: float, tol: float = 1e-6) -> bool:
     return abs(a - b) < tol
@@ -46,8 +48,8 @@ def _right_angle_path(leg: float = 1000.0) -> Path:
 # Happy-path geometry tests
 # ---------------------------------------------------------------------------
 
-class TestFilletGeometry:
 
+class TestFilletGeometry:
     def test_returns_self(self):
         p = _right_angle_path()
         result = p.fillet(1, 100)
@@ -171,7 +173,7 @@ class TestFilletGeometry:
         # Arc normal should be perpendicular to both leg directions
         d_in = (Vec(0, 0, 0) - Vec(0, 0, 1000)).normalized()
         d_out = (Vec(1000, 0, 1000) - Vec(0, 0, 1000)).normalized()
-        plane_n = (d_in ** d_out).normalized()
+        plane_n = (d_in**d_out).normalized()
         # arc.normal must be parallel (or antiparallel) to plane_n
         assert _approx(abs(arc.normal @ plane_n), 1.0, tol=1e-6)
 
@@ -184,9 +186,9 @@ class TestFilletGeometry:
         """
         pts = [Vec(0, 0, 0), Vec(1000, 0, 0), Vec(1000, 1000, 0), Vec(2000, 1000, 0)]
         p = Path.from_pts(pts)
-        p.fillet(1, 80)   # first corner
+        p.fillet(1, 80)  # first corner
         # After first fillet: [Line, Arc, Line, Line] — second corner at index 3
-        p.fillet(3, 80)   # second corner
+        p.fillet(3, 80)  # second corner
         assert len(p._segments) == 5
         arc_count = sum(1 for s in p._segments if isinstance(s, Arc))
         assert arc_count == 2
@@ -206,8 +208,10 @@ class TestFilletGeometry:
         """
         side = 2000.0
         pts = [
-            Vec(0, 0, 0), Vec(side, 0, 0),
-            Vec(side, side, 0), Vec(0, side, 0),
+            Vec(0, 0, 0),
+            Vec(side, 0, 0),
+            Vec(side, side, 0),
+            Vec(0, side, 0),
         ]
         p = Path.from_pts(pts, closed=True)  # 4 Line segments
         p.fillet(1, 100).fillet(3, 100).fillet(5, 100)
@@ -240,15 +244,15 @@ class TestFilletGeometry:
 # Warning / failure modes
 # ---------------------------------------------------------------------------
 
-class TestFilletWarnings:
 
+class TestFilletWarnings:
     def test_index_zero_warns(self):
         p = _right_angle_path()
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             p.fillet(0, 100)
         assert len(w) == 1
-        assert "out of range" in str(w[0].message).lower()
+        assert "only valid on closed paths" in str(w[0].message).lower()
 
     def test_index_too_large_warns(self):
         p = _right_angle_path()  # 2 segments → valid interior: index 1
