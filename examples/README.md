@@ -5,6 +5,30 @@ Visual reference for each example.  Click the link to preview in the
 
 ---
 
+## `run_in_blender.py`
+
+Paste into Blender's **Scripting** workspace and press **Run Script**.
+
+Builds the same model as `hello_wall.json` using the Python API:
+one wall with four windows and one door (Model B component_graph).
+Saves `~/ifckit_blender_demo.ifc`, then imports the geometry into the
+active Blender scene.
+
+- If **Bonsai (BlenderBIM)** is installed: imports via `bpy.ops.bim.load_project()`.
+- Otherwise: imports directly as meshes via `ifcopenshell.geom.create_shape()`.
+
+The generated IFC is Bonsai-compatible — it can also be opened via
+**File → Import → IFC**.
+
+Requires ifckit in Blender's Python:
+
+```python
+import subprocess, sys
+subprocess.run([sys.executable, "-m", "pip", "install", "ifckit[ifc]"], check=True)
+```
+
+---
+
 ## `build_hello_wall.py`
 
 JSON-driven build: reads `hello_wall.json` and constructs walls with
