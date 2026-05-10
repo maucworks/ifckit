@@ -1,4 +1,5 @@
 """Tests for extended Path functionality (M8)."""
+
 import pytest
 from ifckit.geometry import Vec, Plane, Path, Line, Arc
 
@@ -171,8 +172,10 @@ class TestOffset:
         p = Path()
         p._segments.append(Arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), 1.57))
         p._segments.append(Line(p.end_point(), p.start_point()))
-        with pytest.raises(ValueError, match="Arc"):
-            p.offset(10)
+        # Arc segments are now sampled to polyline — offset succeeds
+        result = p.offset(5)
+        assert len(result._segments) >= 8
+        assert result.is_closed
 
     def test_offset_does_not_mutate_original(self):
         pl = Plane.world_xy()

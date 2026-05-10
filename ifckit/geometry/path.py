@@ -215,7 +215,7 @@ class Path:
     def from_pts(
         cls,
         pts: List["Vec"],
-        plane: Optional["Plane"] = None,
+        plane: Optional["Plane"] = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
         closed: bool = False,
     ) -> "Path":
         """Build a Path from a list of Vec points as consecutive Line segments.
@@ -646,30 +646,38 @@ class Path:
 
         return _directrix(ifc_file, self)
 
-    def offset(self, dist: float) -> "Path":
+    def offset(self, dist: float, angle_step_deg: float = 5.0) -> "Path":
         """Return a new inward-offset Path at distance dist.
 
-        Only works for closed paths made entirely of Line segments.
+        Supports closed paths with both Line and Arc segments.
+        Arc segments are sampled to a polyline approximation before
+        offsetting so that the algorithm works on a uniform polyline.
+
         Only correct for convex polygons in v1.
 
         Args:
             dist: Offset distance (positive = inward).
+            angle_step_deg: Arc sampling resolution in degrees
+                           (default 5°; smaller = finer, larger = faster).
 
         Returns:
             New Path with offset geometry. self is not modified.
 
         Raises:
             ValueError: If path is not closed.
-            ValueError: If any segment is an Arc.
             ValueError: If offset causes degenerate geometry (non-convex).
         """
         if not self.is_closed:
             raise ValueError("offset() requires a closed path")
-        for seg in self._segments:
-            if isinstance(seg, Arc):
-                raise ValueError("offset() does not support Arc segments in v1")
 
-        n = None
+        # Sample all segments (Line and Arc) to a polyline
+        pts = self.sample(angle_step_deg).points
+
+        if len(pts) < 3:
+            raise ValueError("offset() requires at least 3 points after sampling")
+
+        # Compute plane normal
+        n: "Vec | None" = None
         if self._plane is not None:
             n = self._plane.z_axis
         if n is None:
@@ -677,23 +685,24 @@ class Path:
         if n is None:
             raise ValueError("Cannot determine plane normal for offset")
 
-        segs = self._segments
-
-        shifted = []
-        for seg in segs:
-            direction = (seg.end - seg.start).normalized()
+        # Shift each edge perpendicular to its direction
+        shifted: "list[tuple[Vec, Vec]]" = []
+        for i in range(len(pts)):
+            p0 = pts[i]
+            p1 = pts[(i + 1) % len(pts)]
+            direction = (p1 - p0).normalized()
             inward_n = (n**direction).normalized()
             anchor = Vec(
-                seg.start.x + inward_n.x * dist,
-                seg.start.y + inward_n.y * dist,
-                seg.start.z + inward_n.z * dist,
+                p0.x + inward_n.x * dist,
+                p0.y + inward_n.y * dist,
+                p0.z + inward_n.z * dist,
             )
             shifted.append((anchor, direction))
 
-        new_pts = []
-        n_segs = len(shifted)
-        for i in range(n_segs):
-            prev_i = (i - 1) % n_segs
+        # Intersect consecutive shifted edges to find new vertex positions
+        new_pts: "list[Vec]" = []
+        for i in range(len(shifted)):
+            prev_i = (i - 1) % len(shifted)
             p1, d1 = shifted[prev_i]
             p2, d2 = shifted[i]
             pt = _line_line_intersect_2d(p1, d1, p2, d2)
