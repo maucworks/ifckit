@@ -523,6 +523,19 @@ class Path:
         self._segments = reversed_segs
         return self
 
+    def move(self, delta: "Vec") -> "Path":
+        """Translate all segment points by *delta*. Returns ``self``."""
+        new_segs = []
+        for seg in self._segments:
+            if isinstance(seg, Line):
+                new_segs.append(Line(seg.start + delta, seg.end + delta))
+            else:
+                new_segs.append(Arc(seg.center + delta, seg.normal, seg.start + delta, seg.angle))
+        self._segments = new_segs
+        if self._plane is not None:
+            self._plane = Plane(self._plane.origin + delta, self._plane.x_axis, self._plane.y_axis)
+        return self
+
     def make_planar(self, plane: Optional["Plane"] = None) -> "Path":
         """Project all segment points onto the given plane. Returns self.
 
