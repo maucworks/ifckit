@@ -334,37 +334,42 @@ class Path:
             self._segments.append(Line(ep, sp))
         return self
 
-    def fillet(self, index: int, radius: float) -> "Path":
-        """Round the corner at vertex *index* with a circular arc of given *radius*.
+    def fillet(self, index: "int | List[int]", radius: float) -> "Path":
+        """Round one or more corners with a circular arc of given *radius*.
 
-        The vertex at *index* is the shared endpoint between ``_segments[index-1]``
-        (incoming) and ``_segments[index]`` (outgoing).  For closed paths,
-        *index* 0 addresses the wrap-around corner between the last and first
-        segments.
+        The vertex at *index* is the shared endpoint between
+        ``_segments[index-1]`` (incoming) and ``_segments[index]``
+        (outgoing).  For closed paths, *index* 0 addresses the wrap-around
+        corner between the last and first segments.
 
-        Modifies the path **in place** and returns ``self`` so calls can be chained::
+        When *index* is a list, corners are processed in **descending**
+        order so that earlier entries stay valid after earlier fillets
+        have shifted subsequent segment indices::
 
-            path = Path.from_pts([...])
-            path.fillet(2, 100).fillet(4, 150)
+            rect = Path.from_pts([...], closed=True)
+            rect.fillet([0, 1, 2, 3], 20)  # all 4 corners, no index math
 
-        The method silently warns (via ``warnings.warn``) and leaves the path
-        unchanged when the fillet cannot be applied:
+        Modifies the path **in place** and returns ``self`` so calls can
+        be chained.
 
-        * Index 0 on an open path (no wrap-around corner).
-        * Index out of range (must be 0 … len(segments)-1 for closed paths,
-          1 … len(segments)-1 for open paths).
-        * Either adjacent segment is not a ``Line``.
-        * The two lines are collinear (no corner to fillet).
-        * Either leg is too short to accommodate the tangent set-back.
+        The method silently warns and skips invalid corners (out of range,
+        non-Line segments, collinear, too short).
 
         Args:
-            index:  Vertex index.  0 = wrap-around corner (closed paths only).
+            index:  Vertex index (int) or list of indices.  For lists,
+                    processed descending so lower indices stay valid.
             radius: Fillet radius (same units as the path coordinates).
 
         Returns:
             ``self`` (modified in place).
         """
         import warnings as _warnings
+
+        # ── List overload: process in descending order ──────────────
+        if isinstance(index, list):
+            for idx in sorted(index, reverse=True):
+                self.fillet(idx, radius)
+            return self
 
         segs = self._segments
         n = len(segs)
