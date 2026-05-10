@@ -536,6 +536,48 @@ class Path:
             self._plane = Plane(self._plane.origin + delta, self._plane.x_axis, self._plane.y_axis)
         return self
 
+    def rotate(self, degrees: float, center: "Optional[Vec]" = None) -> "Path":
+        """Rotate all segment points around *center* in the XY plane.
+
+        Args:
+            degrees: CCW rotation angle in degrees.
+            center:  Rotation pivot. Defaults to ``Vec(0, 0, 0)``.
+
+        Returns:
+            ``self`` (modified in place).
+        """
+        import math as _math
+
+        axis = Vec(0, 0, 1)
+        ctr = center if center is not None else Vec(0, 0, 0)
+        angle = _math.radians(degrees)
+        new_segs = []
+        for seg in self._segments:
+            if isinstance(seg, Line):
+                new_segs.append(
+                    Line(
+                        (seg.start - ctr).rotate_around(axis, angle) + ctr,
+                        (seg.end - ctr).rotate_around(axis, angle) + ctr,
+                    )
+                )
+            else:
+                new_segs.append(
+                    Arc(
+                        (seg.center - ctr).rotate_around(axis, angle) + ctr,
+                        seg.normal,
+                        (seg.start - ctr).rotate_around(axis, angle) + ctr,
+                        seg.angle,
+                    )
+                )
+        self._segments = new_segs
+        if self._plane is not None:
+            self._plane = Plane(
+                (self._plane.origin - ctr).rotate_around(axis, angle) + ctr,
+                self._plane.x_axis.rotate_around(axis, angle),
+                self._plane.y_axis.rotate_around(axis, angle),
+            )
+        return self
+
     def make_planar(self, plane: Optional["Plane"] = None) -> "Path":
         """Project all segment points onto the given plane. Returns self.
 
