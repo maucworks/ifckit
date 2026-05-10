@@ -45,6 +45,7 @@ Low-level shape-rep access::
 from __future__ import annotations
 
 import uuid
+from typing import Dict, Optional
 
 import ifcopenshell
 
@@ -268,8 +269,13 @@ class SectionedSpineBuilder(BaseBuilder):
         angle_step_deg: float = 5.0,
         profile_segments: int = 32,
         name: str = "",
+        profile_overrides: "Optional[Dict[int, Profile]]" = None,
     ) -> PendingSectionedSpine:
         """Extract points, compute frames, build mitered profiles.
+
+        When *profile_overrides* is given (dict mapping position index
+        to a Profile), those positions are built with the override
+        wrapped in the same miter scale as the base profile.
 
         Returns a ``PendingSectionedSpine`` ready to pass to
         ``build_face_set()``, ``build_shape_rep()``, or ``build()``.
@@ -307,15 +313,17 @@ class SectionedSpineBuilder(BaseBuilder):
             vtx_scales = field.scales
 
         # 6. Build miter-scaled profile list
+        overrides = profile_overrides or {}
         profiles: list[Profile] = []
-        for _s, axis in vtx_scales:
+        for i, (_s, axis) in enumerate(vtx_scales):
             scale = _s
+            p = overrides.get(i, profile)
             if scale == 1.0:
-                profiles.append(profile)
+                profiles.append(p)
             elif axis == "x":
-                profiles.append(DerivedProfile(profile, scale_y=scale))
+                profiles.append(DerivedProfile(p, scale_y=scale))
             else:
-                profiles.append(DerivedProfile(profile, scale_x=scale))
+                profiles.append(DerivedProfile(p, scale_x=scale))
 
         return PendingSectionedSpine(
             spine=spine,
@@ -324,6 +332,7 @@ class SectionedSpineBuilder(BaseBuilder):
             name=name,
             profile_segments=profile_segments,
             closed=is_closed,
+            profile_overrides=overrides,
         )
 
     def tessellate_spine(
@@ -335,6 +344,7 @@ class SectionedSpineBuilder(BaseBuilder):
         angle_step_deg: float = 5.0,
         profile_segments: int = 32,
         name: str = "",
+        profile_overrides: "Optional[Dict[int, Profile]]" = None,
     ) -> ifcopenshell.entity_instance:
         """One-shot: return only the ``IfcTriangulatedFaceSet``.
 
@@ -349,6 +359,7 @@ class SectionedSpineBuilder(BaseBuilder):
             angle_step_deg=angle_step_deg,
             profile_segments=profile_segments,
             name=name,
+            profile_overrides=profile_overrides,
         )
         return self.build_face_set(ifc_file, pending)
 
@@ -363,6 +374,7 @@ class SectionedSpineBuilder(BaseBuilder):
         name: str = "",
         angle_step_deg: float = 5.0,
         profile_segments: int = 32,
+        profile_overrides: "Optional[Dict[int, Profile]]" = None,
     ) -> ifcopenshell.entity_instance:
         """Build a sectioned spine from minimal inputs.
 
@@ -401,5 +413,6 @@ class SectionedSpineBuilder(BaseBuilder):
             angle_step_deg=angle_step_deg,
             profile_segments=profile_segments,
             name=name,
+            profile_overrides=profile_overrides,
         )
         return self.build(ifc_file, pending, storey, context)

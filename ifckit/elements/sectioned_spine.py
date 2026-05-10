@@ -7,7 +7,7 @@ different profiles at each position along the spine.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from ifckit.elements.base import PendingElement
 
@@ -63,6 +63,7 @@ class PendingSectionedSpine(PendingElement):
         properties: Optional = None,
         profile_segments: int = 32,
         closed: bool = False,
+        profile_overrides: Optional[Dict[int, "Profile"]] = None,
     ):
         super().__init__(
             name=name,
@@ -74,6 +75,7 @@ class PendingSectionedSpine(PendingElement):
         self.positions = positions
         self.profile_segments = profile_segments
         self.closed = closed
+        self.profile_overrides = profile_overrides if profile_overrides else {}
 
         # Validation
         if len(profiles) != len(positions):
