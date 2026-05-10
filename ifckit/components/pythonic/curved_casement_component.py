@@ -14,7 +14,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     sectioned_spine,
 )
-from ifckit.components import EvaluatedComponent, WindowComponent, component
+from ifckit.components import EvaluatedComponent, FillComponent
 from ifckit.geometry import Vec
 
 ALUMINUM_FRAME = {
@@ -36,15 +36,14 @@ OPENING_VOID = {
 }
 
 
-@component("curved_casement")
-class CurvedCasementComponent(WindowComponent):
+class CurvedCasementComponent(FillComponent):
     """Boogkozijn met IfcSectionedSpine.
 
     Dit is een proof-of-concept. Gebruikt een rechte lijn als spine.
     Kan worden uitgebreid met echte bogen via directrix_from_path().
     """
 
-    name = "curved_casement"
+    ifc_class = "IfcWindow"
 
     def build(self, ifc_file, plane, w, h, params):
         lt = params.get("lining_thickness", 55)
@@ -205,6 +204,3 @@ class CurvedCasementComponent(WindowComponent):
         )
 
         return spine
-
-
-CurvedCasementComponent.register()

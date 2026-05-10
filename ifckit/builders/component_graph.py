@@ -679,11 +679,37 @@ def evaluate_opening_nodes(
     params: Dict[str, float],
     plane=None,
 ) -> List[EvaluatedComponent]:
-    """Evaluate the opening_nodes section — Try Python first, then JSON."""
-    # Check Python registry first (will be loaded lazily)
+    """Evaluate opening geometry — JSON presets take precedence over Python."""
+    # Try JSON preset first
+    try:
+        preset = _load_preset(preset_name)
+    except FileNotFoundError:
+        pass
+    else:
+        opening_nodes = preset.get("opening_nodes")
+        if opening_nodes is None:
+            return []
+        resolved = _resolve_parameters(preset, params)
+        ref_w = float(preset["parameters"]["w"])
+        ref_h = float(preset["parameters"]["h"])
+        actual_w = float(params.get("w", ref_w))
+        actual_h = float(params.get("h", ref_h))
+        scale_x = actual_w / ref_w
+        scale_y = actual_h / ref_h
+        return _eval_node_list(
+            opening_nodes,
+            preset_name,
+            ifc_file,
+            context,
+            resolved,
+            scale_x,
+            scale_y,
+        )
+
+    # Fall back to Python component
     import ifckit.components
 
-    if not ifckit.components._pythonic_registered:
+    if not ifckit.components._discovered:
         ifckit.components._ensure_components_registered()
 
     if preset_name in ifckit.components.COMPONENT_REGISTRY and plane is not None:
@@ -692,45 +718,9 @@ def evaluate_opening_nodes(
         opening_comps = comp.build(
             ifc_file, plane, params.get("w", 1000), params.get("h", 1000), params
         )
+        return list(opening_comps)
 
-        result = []
-
-        # Python components return Opening, Lining, Glazing components directly
-        # No need to create extra void geometry here
-        for ec in opening_comps:
-            result.append(ec)
-        return result
-
-    # Fall back to JSON preset
-    try:
-        preset = _load_preset(preset_name)
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"Component graph preset not found: {preset_name!r}. "
-            f"Expected ifckit.components.json/{preset_name}.json"
-        )
-
-    opening_nodes = preset.get("opening_nodes")
-    if opening_nodes is None:
-        raise ValueError(
-            f"Preset {preset_name!r} has no 'opening_nodes' section. "
-            "Cannot evaluate opening geometry."
-        )
-
-    resolved = _resolve_parameters(preset, params)
-    ref_w = float(preset["parameters"]["w"])
-    ref_h = float(preset["parameters"]["h"])
-    actual_w = float(params.get("w", ref_w))
-    actual_h = float(params.get("h", ref_h))
-    scale_x = actual_w / ref_w
-    scale_y = actual_h / ref_h
-
-    return _eval_node_list(
-        opening_nodes,
-        preset_name,
-        ifc_file,
-        context,
-        resolved,
-        scale_x,
-        scale_y,
+    raise FileNotFoundError(
+        f"Component graph preset not found: {preset_name!r}. "
+        f"Expected ifckit.components.json/{preset_name}.json"
     )

@@ -1,5 +1,5 @@
 """
-Fixed Casement Component — Python Generative Window
+Rounded Casement Component — Python Generative Window
 
 Alternative to fixed_casement.json. Creates a simple
 window with sectioned-spine lining and glazing panel.
@@ -33,7 +33,7 @@ OPENING_VOID = {
 }
 
 
-class FixedCasementComponent(FillComponent):
+class RoundedCasementComponent(FillComponent):
     """Generative window: sectioned-spine frame with fixed glazing."""
 
     ifc_class = "IfcWindow"

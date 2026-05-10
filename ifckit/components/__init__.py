@@ -1,43 +1,22 @@
 """
 ifckit.components
-================
+=================
 
-Pythonic generative component system for windows and doors.
+Pythonic generative component system for fill products (windows, doors,
+shading devices, plates, etc.).
 
-Provides an alternative to JSON declarative presets. Components are Python
-classes that construct geometry programmatically using the reference plane
-as their coordinate system.
+Components are auto-discovered from ``ifckit/components/pythonic/`` — any
+file ending in ``_component.py`` is imported and its ``FillComponent``
+subclass is registered in ``COMPONENT_REGISTRY`` keyed by the file name
+minus the ``_component`` suffix.
 
-Usage:
-    from ifckit.components import WindowComponent, EvaluatedComponent
+Example component at ``pythonic/folding_door_component.py``::
 
-    class MyDoor(WindowComponent):
-        name = "my_door"
+    class FoldingDoor(FillComponent):
+        ifc_class = "IfcDoor"
 
         def build(self, ifc_file, plane, w, h, params) -> list[EvaluatedComponent]:
-            # Construct geometry
-            ...
-            return [EvaluatedComponent(solid=..., role="Lining", material=...)]
-
-    # Register
-    MyDoor.register()
-
-Integration:
-    The component evaluator checks the Python registry before
-    falling back to JSON presets. Same namespace, JSON wins
-    on name collision.
-
-Arbitrary extrusion direction:
-    Profiles are defined in the local XY plane of the reference Plane.
-    To extrude in a different direction, create a new Plane with the
-    desired orientation:
-
-    class SideWindow(WindowComponent):
-        def build(self, ifc_file, plane, w, h, params):
-            # Rotate plane 90° around Y for XZ profile plane
-            xz_plane = Plane(plane.origin, plane.z_axis, plane.y_axis, -plane.x_axis)
-            # Build profile in xz_plane, extrude in original Y
-            ...
+            return [...]
 """
 
 from __future__ import annotations
@@ -52,31 +31,30 @@ if TYPE_CHECKING:
 from ifckit.geometry import Plane
 
 # Global registry: name -> Component class
-COMPONENT_REGISTRY: dict[str, type[WindowComponent]] = {}
+COMPONENT_REGISTRY: dict[str, type["FillComponent"]] = {}
 
-_pythonic_registered = False
+_discovered = False
 
 
 def _ensure_components_registered():
-    """Auto-import Pythonic components to register them."""
-    global _pythonic_registered
-    if _pythonic_registered:
+    """Auto-discover Pythonic components and populate COMPONENT_REGISTRY."""
+    global _discovered
+    if _discovered:
         return
-    _pythonic_registered = True
-    # Trigger import of pythonic package which registers its components
+    _discovered = True
     import ifckit.components.pythonic  # noqa: F401
 
 
 @dataclass
 class EvaluatedComponent:
-    """Single output component produced by a WindowComponent.
+    """Single output component produced by a FillComponent.
 
     Attributes:
-        solid: The IFC representation item (IfcExtrudedAreaSolid, IfcBooleanResult, etc.)
-        role: Semantic role for material inheritance and identification.
-             Common values: "Lining", "Glazing", "Panel", "Opening"
-        material: Material definition dict, same structure as JSON.
-                 Keys: "color" (r/g/b 0-1), "transparency" (0-1), "name"
+        solid: The IFC representation item.
+        role: Semantic role: ``"Opening"``, ``"Lining"``, ``"Glazing"``,
+              ``"Panel"``, etc.  A component whose role is ``"Opening"``
+              triggers creation of an ``IfcOpeningElement``.
+        material: Material definition dict (color, transparency, name).
         node_id: Optional node identifier for tracking.
     """
 
@@ -86,37 +64,32 @@ class EvaluatedComponent:
     node_id: str | None = None
 
 
-class WindowComponent(ABC):
-    """Abstract base class for generative window/door components.
+class FillComponent(ABC):
+    """Abstract base class for generative fill components.
 
-    Components construct geometry programmatically using a reference Plane
-    as their local coordinate system. The plane defines:
-    - XY plane: where the 2D profile is drawn
-    - Z direction: default extrusion direction (into the wall)
+    A fill component produces geometry that lives inside an opening
+    (or is itself an opening).  It returns a list of
+    :class:`EvaluatedComponent` objects from :meth:`build`.
+
+    When one of those components has ``role="Opening"``, the pipeline
+    automatically creates an ``IfcOpeningElement`` + ``IfcRelVoidsElement``
+    in the host element.  All other roles become items in the fill product's
+    ``IfcShapeRepresentation``.
 
     Subclasses must:
-    1. Define class attribute `name` with the registered name
-    2. Implement `build()` to construct geometry
-    3. Call `register()` as a class decorator or explicitly
-
-    Example:
-        class DoorFlush(WindowComponent):
-            name = "door_flush"
-
-            def build(self, ifc_file, plane, w, h, params) -> list[EvaluatedComponent]:
-                # Build geometry
-                ...
-                return [EvaluatedComponent(solid=solid, role="Lining", material={...})]
-
-            DoorFlush.register()  # Or use @register decorator
+    * Set ``ifc_class`` (e.g. ``"IfcWindow"``, ``"IfcDoor"``,
+      ``"IfcPlate"``, ``"IfcShadingDevice"``).
+    * Implement :meth:`build`.
+    * Be placed in a ``_component.py`` file inside ``pythonic/`` — auto-
+      discovery handles the rest.  No decorator, no ``name``, no ``register``.
     """
 
-    name: str = ""
+    ifc_class: str = "IfcWindow"
 
     @abstractmethod
     def build(
         self,
-        ifc_file: ifcopenshell.file,
+        ifc_file: "ifcopenshell.file",
         plane: Plane,
         width: float,
         height: float,
@@ -125,74 +98,29 @@ class WindowComponent(ABC):
         """Build component geometry.
 
         Args:
-            ifc_file: Active IFC file for entity creation
-            plane: Reference plane - local XY is profile plane,
-                   local Z is default extrusion direction
-            width: Overall width in mm (from occurrence)
-            height: Overall height in mm (from occurrence)
-            params: Fully resolved parameters - type defaults merged with
-                   occurrence overrides. All numeric values in mm.
+            ifc_file: Active IFC file for entity creation.
+            plane: Reference plane — local XY is the profile plane,
+                   local Z is the default extrusion direction.
+            width: Overall width in mm.
+            height: Overall height in mm.
+            params: Fully resolved parameters (type defaults + occurrence
+                    overrides).  All values in mm.
 
         Returns:
-            List of EvaluatedComponent objects. Each becomes an item
-            in the IfcShapeRepresentation. The evaluator handles
-            placement, material styling, and representation type selection.
+            List of :class:`EvaluatedComponent` objects.  Each becomes an
+            item in the ``IfcShapeRepresentation``.  A component with
+            ``role="Opening"`` additionally creates an
+            ``IfcOpeningElement``.
         """
-        pass
-
-    @classmethod
-    def register(cls, name: str = None) -> type[WindowComponent]:
-        """Register this component to the global registry.
-
-        Args:
-            name: Optional override for class name attribute.
-                 Defaults to cls.name.
-
-        Returns:
-            The component class (for use as decorator).
-
-        Raises:
-            ValueError: If name is already registered.
-        """
-        registry_name = name or cls.name
-        if not registry_name:
-            raise ValueError(f"{cls.__name__} has no name attribute")
-        if registry_name in COMPONENT_REGISTRY:
-            existing = COMPONENT_REGISTRY[registry_name]
-            if existing is not cls:
-                raise ValueError(
-                    f"Component name {registry_name!r} already registered to {existing.__name__}"
-                )
-        COMPONENT_REGISTRY[registry_name] = cls
-        return cls
+        ...
 
 
-# Decorator form for convenience
-def component(name: str):
-    """Decorator to register a WindowComponent subclass.
-
-    Usage:
-        @component("my_door")
-        class MyDoor(WindowComponent):
-            name = "my_door"
-            ...
-    """
-
-    def decorator(cls: type[WindowComponent]) -> type[WindowComponent]:
-        cls.register(name)
-        return cls
-
-    return decorator
-
-
-def get_component(name: str) -> type[WindowComponent] | None:
+def get_component(name: str) -> type[FillComponent] | None:
     """Get a registered component class by name."""
     return COMPONENT_REGISTRY.get(name)
 
 
 def list_components() -> list[str]:
     """List all registered component names."""
-    # Ensure Pythonic components are registered
-    if not _pythonic_registered:
-        import ifckit.components.pythonic  # noqa: F401
+    _ensure_components_registered()
     return list(COMPONENT_REGISTRY.keys())

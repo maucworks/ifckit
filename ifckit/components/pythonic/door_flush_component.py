@@ -1,12 +1,9 @@
 """
 DoorFlush Component — Python Generative Door
-
-Alternative to door_flush.json. Creates a 3-sided frame
-with door panel and optional glazing.
 """
 
 from ifckit.builders._geom import extrude_profile, profile_from_points
-from ifckit.components import EvaluatedComponent, WindowComponent, component
+from ifckit.components import EvaluatedComponent, FillComponent
 
 ALUMINUM_FRAME = {
     "color": {"r": 0.8, "g": 0.8, "b": 0.8},
@@ -15,15 +12,13 @@ ALUMINUM_FRAME = {
 }
 
 DOOR_PANEL = {"color": {"r": 0.9, "g": 0.0, "b": 0.0}, "transparency": 0.0, "name": "Door panel"}
-
 CLEAR_GLASS = {"color": {"r": 0.9, "g": 0.95, "b": 1.0}, "transparency": 0.8, "name": "Clear glass"}
 
 
-@component("door_flush_component")
-class DoorFlushComponent(WindowComponent):
+class DoorFlushComponent(FillComponent):
     """Generative door: 3-sided frame with panel and glazing."""
 
-    name = "door_flush_component"
+    ifc_class = "IfcDoor"
 
     def build(self, ifc_file, plane, w, h, params):
         lt = params.get("lining_thickness", 50)
@@ -34,8 +29,6 @@ class DoorFlushComponent(WindowComponent):
         pd = params.get("panel_depth", 10)
 
         comps = []
-
-        # Dimensions in local coords
         wx = float(w)
         wy = float(h)
         ltx = float(lt)
@@ -113,6 +106,3 @@ class DoorFlushComponent(WindowComponent):
             comps.append(EvaluatedComponent(solid=side_solid, role="Glazing", material=CLEAR_GLASS))
 
         return comps
-
-
-DoorFlushComponent.register()
