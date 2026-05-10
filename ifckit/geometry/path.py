@@ -646,22 +646,20 @@ class Path:
 
         return _directrix(ifc_file, self)
 
-    def offset(self, dist: float, angle_step_deg: float = 5.0) -> "Path":
+    def offset(self, dist: float) -> "Path":
         """Return a new inward-offset Path at distance dist.
 
         Supports closed paths with both Line and Arc segments.
-        Arc segments are sampled to a polyline approximation before
-        offsetting so that the algorithm works on a uniform polyline.
+        Arc segments are internally sampled to a polyline at the arc's
+        segment resolution before the offset algorithm runs.
 
         Only correct for convex polygons in v1.
 
         Args:
             dist: Offset distance (positive = inward).
-            angle_step_deg: Arc sampling resolution in degrees
-                           (default 5°; smaller = finer, larger = faster).
 
         Returns:
-            New Path with offset geometry. self is not modified.
+            New Path with offset geometry.  *self* is not modified.
 
         Raises:
             ValueError: If path is not closed.
@@ -671,7 +669,7 @@ class Path:
             raise ValueError("offset() requires a closed path")
 
         # Sample all segments (Line and Arc) to a polyline
-        pts = self.sample(angle_step_deg).points
+        pts = self.sample().points
 
         if len(pts) < 3:
             raise ValueError("offset() requires at least 3 points after sampling")
