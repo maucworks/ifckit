@@ -120,7 +120,7 @@ class WallGraphBuilder(BaseBuilder):
         if ia > oa:
             outer, inner = inner, outer
 
-        outer.with_hole(inner)
+        outer = outer.with_hole(inner)
         profile = profile_from_points(ifc_file, outer)
         pos = axis2placement3d(ifc_file, Vec(0, 0, 0), pending.plane.z_axis, pending.plane.x_axis)
         solid = extrude_profile(ifc_file, profile, pending.height, position=pos)
