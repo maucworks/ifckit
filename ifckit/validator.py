@@ -39,6 +39,7 @@ from ifckit.elements.opening import PendingDoor, PendingOpening, PendingWindow
 from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+from ifckit.elements.wall_graph import PendingWallGraph
 from ifckit.geometry import Vec
 
 # ---------------------------------------------------------------------------
@@ -454,6 +455,21 @@ def _validate_window(w: PendingWindow) -> ValidationResult:
     if w.overall_height < 0.1:
         warnings.append(f"window height {w.overall_height:.3f} m is unusually short (< 0.1 m)")
 
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingWallGraph)
+def _validate_wall_graph(wg: PendingWallGraph) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+    if len(wg.vertices) < 2:
+        errors.append(f"wall_graph '{wg.name}': need at least 2 vertices, got {len(wg.vertices)}")
+    if not wg.edges:
+        errors.append(f"wall_graph '{wg.name}': no edges defined")
+    if wg.thickness <= 0:
+        errors.append(f"wall_graph '{wg.name}': thickness must be > 0, got {wg.thickness}")
+    if wg.height <= 0:
+        errors.append(f"wall_graph '{wg.name}': height must be > 0, got {wg.height}")
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 

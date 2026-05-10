@@ -15,12 +15,14 @@ from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.builders.slab import SlabBuilder
 from ifckit.builders.space import SpaceBuilder
 from ifckit.builders.wall import WallBuilder
+from ifckit.builders.wall_graph import WallGraphBuilder
 
 
 def default_registry() -> BuilderRegistry:
     """Return a BuilderRegistry pre-loaded with all built-in builders."""
     registry = BuilderRegistry()
     registry.register(WallBuilder())
+    registry.register(WallGraphBuilder())
     registry.register(SlabBuilder())
     registry.register(SpaceBuilder())
     registry.register(ExtrudedElementBuilder("basic_beam", "IfcBeam"))
@@ -34,6 +36,7 @@ __all__ = [
     "BuilderRegistry",
     "IIfcBuilder",
     "WallBuilder",
+    "WallGraphBuilder",
     "SlabBuilder",
     "SpaceBuilder",
     "ExtrudedElementBuilder",
