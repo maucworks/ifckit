@@ -127,6 +127,28 @@ def build_closed_rect_wall() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 6. Closed rectangle with fillet on all corners (path mode)
+# ---------------------------------------------------------------------------
+
+def build_fillet_rect_wall() -> None:
+    """Closed rectangular perimeter wall with rounded corners (R=800)."""
+    path = Path.from_pts(
+        [Vec(0, 0, 0), Vec(4000, 0, 0), Vec(4000, 3000, 0), Vec(0, 3000, 0)],
+        plane=XY,
+        closed=True,
+    )
+    path.fillet([0, 1, 2, 3], 800)
+
+    pending = PendingWallGraph(
+        path=path,
+        thickness=200,
+        height=3000,
+        name="Fillet_rect_wall",
+    )
+    _build_and_save(pending, "Fillet rect (Path + fillet)", "wall_graph_fillet_rect.ifc")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -145,4 +167,6 @@ if __name__ == "__main__":
     build_arc_wall()
     print("\n5. Closed rect wall (path mode):")
     build_closed_rect_wall()
+    print("\n6. Closed rect with fillet (path mode):")
+    build_fillet_rect_wall()
     print("\nDone.")
