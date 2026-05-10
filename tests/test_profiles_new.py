@@ -36,6 +36,7 @@ from ifckit.profiles.base import RegisterProfileType
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def ifc4_file():
     f = ifcopenshell.file(schema="IFC4")
@@ -46,8 +47,8 @@ def ifc4_file():
 # Profile ABC + registry
 # ---------------------------------------------------------------------------
 
-class TestProfileRegistry:
 
+class TestProfileRegistry:
     def test_polygon_registered(self):
         assert "polygon" in RegisterProfileType._registry
 
@@ -82,8 +83,8 @@ class TestProfileRegistry:
 # PolygonProfile
 # ---------------------------------------------------------------------------
 
-class TestPolygonProfile:
 
+class TestPolygonProfile:
     def test_construction(self):
         p = PolygonProfile([(0, 0), (1, 0), (1, 1), (0, 1)])
         assert len(p.points) == 4
@@ -115,26 +116,32 @@ class TestPolygonProfile:
         # CW winding → must be reversed to CCW
         p = PolygonProfile([(0, 0), (0, 1), (1, 1), (1, 0)])
         ent = p.to_ifc(ifc4_file)
-        coords = [(pt.Coordinates[0], pt.Coordinates[1])
-                  for pt in ent.OuterCurve.Points[:-1]]
+        coords = [(pt.Coordinates[0], pt.Coordinates[1]) for pt in ent.OuterCurve.Points[:-1]]
         # Signed area must be positive (CCW)
         n = len(coords)
-        area = sum(coords[i][0]*coords[(i+1)%n][1] - coords[(i+1)%n][0]*coords[i][1]
-                   for i in range(n)) / 2
+        area = (
+            sum(
+                coords[i][0] * coords[(i + 1) % n][1] - coords[(i + 1) % n][0] * coords[i][1]
+                for i in range(n)
+            )
+            / 2
+        )
         assert area > 0
 
     def test_get_profile_points(self):
         pts = [(0, 0), (2, 0), (2, 1), (0, 1)]
         p = PolygonProfile(pts)
-        assert p.get_profile_points() == pts
+        # Default anchor "c" shifts (0,0) → (-w/2, -h/2) = (-1, -0.5)
+        expected = [(-1.0, -0.5), (1.0, -0.5), (1.0, 0.5), (-1.0, 0.5)]
+        assert p.get_profile_points() == expected
 
 
 # ---------------------------------------------------------------------------
 # RoundedPolygonProfile
 # ---------------------------------------------------------------------------
 
-class TestRoundedPolygonProfile:
 
+class TestRoundedPolygonProfile:
     def test_construction(self):
         pts = [(0, 0), (4, 0), (4, 3), (0, 3)]
         p = RoundedPolygonProfile(pts, radius=0.1)
@@ -148,7 +155,7 @@ class TestRoundedPolygonProfile:
 
     def test_radius_list_wrong_length_raises(self):
         with pytest.raises(ValueError, match="radius list"):
-            RoundedPolygonProfile([(0,0),(1,0),(1,1)], radius=[0.1, 0.2])
+            RoundedPolygonProfile([(0, 0), (1, 0), (1, 1)], radius=[0.1, 0.2])
 
     def test_zero_radius_same_as_polygon(self):
         pts = [(0, 0), (4, 0), (4, 3), (0, 3)]
@@ -183,8 +190,8 @@ class TestRoundedPolygonProfile:
 # RectangleProfile
 # ---------------------------------------------------------------------------
 
-class TestRectangleProfile:
 
+class TestRectangleProfile:
     def test_construction(self):
         p = RectangleProfile(0.3, 0.5)
         assert p.x_dim == 0.3
@@ -232,8 +239,8 @@ class TestRectangleProfile:
 # CircleProfile
 # ---------------------------------------------------------------------------
 
-class TestCircleProfile:
 
+class TestCircleProfile:
     def test_construction(self):
         p = CircleProfile(0.15)
         assert p.radius == 0.15
@@ -269,8 +276,8 @@ class TestCircleProfile:
 # HollowCircleProfile
 # ---------------------------------------------------------------------------
 
-class TestHollowCircleProfile:
 
+class TestHollowCircleProfile:
     def test_construction(self):
         p = HollowCircleProfile(radius=0.1, wall_thickness=0.005)
         assert math.isclose(p.inner_radius, 0.095, rel_tol=1e-9)
@@ -306,11 +313,12 @@ class TestHollowCircleProfile:
 # IBeamProfile — extended tests (to_ifc, from_dict)
 # ---------------------------------------------------------------------------
 
-class TestIBeamProfileExtended:
 
+class TestIBeamProfileExtended:
     def test_to_ifc_is_i_shape_profile_def(self, ifc4_file):
-        p = IBeamProfile(height=0.3, width=0.15, web_thickness=0.007,
-                         flange_thickness=0.011, name="IPE300")
+        p = IBeamProfile(
+            height=0.3, width=0.15, web_thickness=0.007, flange_thickness=0.011, name="IPE300"
+        )
         ent = p.to_ifc(ifc4_file)
         assert ent.is_a("IfcIShapeProfileDef")
         assert ent.OverallDepth == pytest.approx(0.3)
@@ -320,8 +328,14 @@ class TestIBeamProfileExtended:
         assert ent.ProfileName == "IPE300"
 
     def test_from_dict_round_trip(self):
-        p = IBeamProfile(height=0.3, width=0.15, web_thickness=0.007,
-                         flange_thickness=0.011, anchor="c", name="IPE300")
+        p = IBeamProfile(
+            height=0.3,
+            width=0.15,
+            web_thickness=0.007,
+            flange_thickness=0.011,
+            anchor="c",
+            name="IPE300",
+        )
         d = p.to_dict()
         assert d["profile_type"] == "i_beam"
         p2 = Profile.dispatch_from_dict(d)
@@ -337,8 +351,8 @@ class TestIBeamProfileExtended:
 # LBeamProfile — extended tests (to_ifc, from_dict)
 # ---------------------------------------------------------------------------
 
-class TestLBeamProfileExtended:
 
+class TestLBeamProfileExtended:
     def test_to_ifc_is_l_shape_profile_def(self, ifc4_file):
         p = LBeamProfile(height=0.1, width=0.1, thickness=0.01, name="L100x100x10")
         ent = p.to_ifc(ifc4_file)
@@ -348,8 +362,7 @@ class TestLBeamProfileExtended:
         assert ent.Thickness == pytest.approx(0.01)
 
     def test_from_dict_round_trip(self):
-        p = LBeamProfile(height=0.1, width=0.1, thickness=0.01, anchor="sw",
-                         name="L100x100x10")
+        p = LBeamProfile(height=0.1, width=0.1, thickness=0.01, anchor="sw", name="L100x100x10")
         d = p.to_dict()
         assert d["profile_type"] == "l_beam"
         p2 = Profile.dispatch_from_dict(d)
@@ -364,14 +377,14 @@ class TestLBeamProfileExtended:
 # SteelProfile lookup
 # ---------------------------------------------------------------------------
 
-class TestSteelProfile:
 
+class TestSteelProfile:
     def test_hea200(self):
         p = SteelProfile.from_name("HEA200")
         assert isinstance(p, IBeamProfile)
         assert p.name == "HEA200"
         assert math.isclose(p.height, 0.190, rel_tol=1e-6)
-        assert math.isclose(p.width,  0.200, rel_tol=1e-6)
+        assert math.isclose(p.width, 0.200, rel_tol=1e-6)
 
     def test_ipe300(self):
         p = SteelProfile.from_name("IPE300")
@@ -431,13 +444,15 @@ class TestSteelProfile:
 
     def test_unit_millimetre_ibeam(self):
         from ifckit.schema import LengthUnit
+
         p = SteelProfile.from_name("HEA200", unit=LengthUnit.MILLIMETRE)
         assert isinstance(p, IBeamProfile)
         assert math.isclose(p.height, 190.0, rel_tol=1e-6)
-        assert math.isclose(p.width,  200.0, rel_tol=1e-6)
+        assert math.isclose(p.width, 200.0, rel_tol=1e-6)
 
     def test_unit_millimetre_chs(self):
         from ifckit.schema import LengthUnit
+
         p = SteelProfile.from_name("CHS168.3x10", unit=LengthUnit.MILLIMETRE)
         assert isinstance(p, HollowCircleProfile)
         assert math.isclose(p.radius, 168.3 / 2, rel_tol=1e-4)
@@ -445,6 +460,7 @@ class TestSteelProfile:
 
     def test_unit_metre_default_unchanged(self):
         from ifckit.schema import LengthUnit
+
         p_default = SteelProfile.from_name("IPE300")
         p_explicit = SteelProfile.from_name("IPE300", unit=LengthUnit.METRE)
         assert math.isclose(p_default.height, p_explicit.height, rel_tol=1e-9)
@@ -454,16 +470,18 @@ class TestSteelProfile:
 # profile_to_ifc() helper in _geom
 # ---------------------------------------------------------------------------
 
-class TestProfileToIfc:
 
+class TestProfileToIfc:
     def test_from_profile_object(self, ifc4_file):
         from ifckit.builders._geom import profile_to_ifc
+
         p = RectangleProfile(0.3, 0.5)
         ent = profile_to_ifc(ifc4_file, p)
         assert ent.is_a("IfcRectangleProfileDef")
 
     def test_from_point_list(self, ifc4_file):
         from ifckit.builders._geom import profile_to_ifc
+
         pts = [(0, 0), (1, 0), (1, 1), (0, 1)]
         ent = profile_to_ifc(ifc4_file, pts)
         assert ent.is_a("IfcArbitraryClosedProfileDef")
@@ -483,16 +501,17 @@ class TestProfileToIfc:
 # PendingBeam + Profile round-trip
 # ---------------------------------------------------------------------------
 
-class TestPendingBeamProfileRoundTrip:
 
+class TestPendingBeamProfileRoundTrip:
     def test_ibeam_preserved_in_to_dict(self):
         from ifckit.geometry import Vec, Line
         from ifckit.elements import PendingBeam
 
         beam = PendingBeam(
             axis=Line(Vec(0, 0, 0), Vec(5, 0, 0)),
-            profile=IBeamProfile(height=0.3, width=0.15, web_thickness=0.007,
-                                  flange_thickness=0.011, name="IPE300"),
+            profile=IBeamProfile(
+                height=0.3, width=0.15, web_thickness=0.007, flange_thickness=0.011, name="IPE300"
+            ),
         )
         d = beam.to_dict()
         assert isinstance(d["profile"], dict)
@@ -504,8 +523,9 @@ class TestPendingBeamProfileRoundTrip:
 
         beam = PendingBeam(
             axis=Line(Vec(0, 0, 0), Vec(5, 0, 0)),
-            profile=IBeamProfile(height=0.3, width=0.15, web_thickness=0.007,
-                                  flange_thickness=0.011, name="IPE300"),
+            profile=IBeamProfile(
+                height=0.3, width=0.15, web_thickness=0.007, flange_thickness=0.011, name="IPE300"
+            ),
         )
         d = beam.to_dict()
         beam2 = PendingBeam.from_dict(d)

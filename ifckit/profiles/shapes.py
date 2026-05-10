@@ -137,8 +137,20 @@ class PolygonProfile(Profile):
         super().__init__()
         self._init_transform(rotation, offset_x, offset_y)
 
+    def _bbox(self) -> Tuple[float, float]:
+        """Bounding box width × height of the raw polygon points."""
+        xs = [p[0] for p in self.points]
+        ys = [p[1] for p in self.points]
+        return (max(xs) - min(xs), max(ys) - min(ys))
+
+    def _bbox_sw(self) -> Tuple[float, float]:
+        """SW corner (min x, min y) of the raw polygon points."""
+        xs = [p[0] for p in self.points]
+        ys = [p[1] for p in self.points]
+        return (min(xs), min(ys))
+
     def get_profile_points(self) -> List[Tuple[float, float]]:
-        return self._apply_transform(list(self.points))
+        return self._apply_transform(list(self.points), bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         return _build_polyline_profile(ifc_file, self.get_profile_points(), self.name)

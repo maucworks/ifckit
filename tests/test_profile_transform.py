@@ -12,6 +12,7 @@ Covers:
   - LBeamProfile: same
   - SteelProfile.from_name() passes rotation/offset through
 """
+
 from __future__ import annotations
 
 import math
@@ -35,6 +36,7 @@ from ifckit.profiles.steel import SteelProfile
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ifc():
     return ifcopenshell.file(schema="IFC4")
 
@@ -56,6 +58,7 @@ def _placement_ref(ifc_file, entity):
 # ---------------------------------------------------------------------------
 # _apply_transform: unit tests on the base helper
 # ---------------------------------------------------------------------------
+
 
 class _ConcreteProfile(RectangleProfile):
     """Subclass to expose _apply_transform for testing."""
@@ -84,8 +87,7 @@ def test_apply_transform_offset():
 
 def test_apply_transform_combined():
     """Rotate 90° then translate by (1, 2)."""
-    p = _ConcreteProfile(x_dim=0.1, y_dim=0.2,
-                         rotation=math.pi / 2, offset_x=1.0, offset_y=2.0)
+    p = _ConcreteProfile(x_dim=0.1, y_dim=0.2, rotation=math.pi / 2, offset_x=1.0, offset_y=2.0)
     result = p._apply_transform([(1.0, 0.0)])
     x, y = result[0]
     # (1,0) rotated 90° → (0, 1); then + (1, 2) → (1, 3)
@@ -96,6 +98,7 @@ def test_apply_transform_combined():
 # ---------------------------------------------------------------------------
 # RectangleProfile
 # ---------------------------------------------------------------------------
+
 
 def test_rectangle_get_profile_points_offset():
     p = RectangleProfile(x_dim=0.2, y_dim=0.1, offset_x=1.0, offset_y=2.0)
@@ -143,6 +146,7 @@ def test_rectangle_roundtrip():
 # CircleProfile — offset only (rotation has no visible effect on circle)
 # ---------------------------------------------------------------------------
 
+
 def test_circle_to_ifc_offset():
     f = _ifc()
     p = CircleProfile(radius=0.05, offset_x=0.1, offset_y=0.2)
@@ -163,6 +167,7 @@ def test_circle_roundtrip():
 # ---------------------------------------------------------------------------
 # HollowCircleProfile
 # ---------------------------------------------------------------------------
+
 
 def test_hollow_circle_to_ifc_offset():
     f = _ifc()
@@ -185,19 +190,21 @@ def test_hollow_circle_roundtrip():
 # PolygonProfile
 # ---------------------------------------------------------------------------
 
+
 def test_polygon_get_profile_points_rotation():
     angle = math.pi / 2
     p = PolygonProfile(points=[(1, 0), (0, 1), (-1, 0)], rotation=angle)
     pts = p.get_profile_points()
-    # (1,0) rotated 90° → (0, 1)
+    # Default anchor "c" on bbox (w=2, h=1, sw=(-1,0)):
+    #   dx = -1-(-1)=0, dy = -0.5-0=-0.5
+    #   (1,0) → (1, -0.5) → rotated 90° → (0.5, 1)
     x, y = pts[0]
-    assert abs(x - 0.0) < 1e-9
+    assert abs(x - 0.5) < 1e-9
     assert abs(y - 1.0) < 1e-9
 
 
 def test_polygon_roundtrip():
-    p = PolygonProfile(points=[(1, 0), (0, 1), (-1, 0)],
-                       rotation=0.3, offset_x=1.0, offset_y=2.0)
+    p = PolygonProfile(points=[(1, 0), (0, 1), (-1, 0)], rotation=0.3, offset_x=1.0, offset_y=2.0)
     d = p.to_dict()
     p2 = Profile.dispatch_from_dict(d)
     assert abs(p2.rotation - 0.3) < 1e-12
@@ -208,12 +215,12 @@ def test_polygon_roundtrip():
 # IBeamProfile — anchor + rotation + offset
 # ---------------------------------------------------------------------------
 
+
 def test_ibeam_to_ifc_anchor_only():
     """anchor='s' (mid-bottom): centroid of IFC I-shape should be at (0, h/2)."""
     f = _ifc()
     h = 0.2
-    p = IBeamProfile(height=h, width=0.1, web_thickness=0.006, flange_thickness=0.01,
-                     anchor="s")
+    p = IBeamProfile(height=h, width=0.1, web_thickness=0.006, flange_thickness=0.01, anchor="s")
     ent = p.to_ifc(f)
     loc = _placement_coords(f, ent)
     assert abs(loc[0] - 0.0) < 1e-9
@@ -223,8 +230,15 @@ def test_ibeam_to_ifc_anchor_only():
 def test_ibeam_to_ifc_anchor_with_offset():
     f = _ifc()
     h = 0.2
-    p = IBeamProfile(height=h, width=0.1, web_thickness=0.006, flange_thickness=0.01,
-                     anchor="s", offset_x=0.05, offset_y=0.1)
+    p = IBeamProfile(
+        height=h,
+        width=0.1,
+        web_thickness=0.006,
+        flange_thickness=0.01,
+        anchor="s",
+        offset_x=0.05,
+        offset_y=0.1,
+    )
     ent = p.to_ifc(f)
     loc = _placement_coords(f, ent)
     assert abs(loc[0] - 0.05) < 1e-9
@@ -234,8 +248,9 @@ def test_ibeam_to_ifc_anchor_with_offset():
 def test_ibeam_to_ifc_rotation():
     f = _ifc()
     angle = math.pi / 6
-    p = IBeamProfile(height=0.2, width=0.1, web_thickness=0.006, flange_thickness=0.01,
-                     rotation=angle)
+    p = IBeamProfile(
+        height=0.2, width=0.1, web_thickness=0.006, flange_thickness=0.01, rotation=angle
+    )
     ent = p.to_ifc(f)
     ref = _placement_ref(f, ent)
     assert ref is not None
@@ -246,18 +261,26 @@ def test_ibeam_to_ifc_rotation():
 def test_ibeam_get_profile_points_rotation():
     """With 90° rotation the original X-extent becomes Y-extent."""
     p_base = IBeamProfile(height=0.2, width=0.1, web_thickness=0.006, flange_thickness=0.01)
-    p_rot  = IBeamProfile(height=0.2, width=0.1, web_thickness=0.006, flange_thickness=0.01,
-                          rotation=math.pi / 2)
+    p_rot = IBeamProfile(
+        height=0.2, width=0.1, web_thickness=0.006, flange_thickness=0.01, rotation=math.pi / 2
+    )
     base_pts = p_base.get_profile_points()
-    rot_pts  = p_rot.get_profile_points()
+    rot_pts = p_rot.get_profile_points()
     base_x_span = max(x for x, _ in base_pts) - min(x for x, _ in base_pts)
-    rot_y_span  = max(y for _, y in rot_pts)  - min(y for _, y in rot_pts)
+    rot_y_span = max(y for _, y in rot_pts) - min(y for _, y in rot_pts)
     assert abs(base_x_span - rot_y_span) < 1e-9
 
 
 def test_ibeam_roundtrip():
-    p = IBeamProfile(height=0.2, width=0.1, web_thickness=0.006, flange_thickness=0.01,
-                     rotation=0.4, offset_x=0.02, offset_y=-0.01)
+    p = IBeamProfile(
+        height=0.2,
+        width=0.1,
+        web_thickness=0.006,
+        flange_thickness=0.01,
+        rotation=0.4,
+        offset_x=0.02,
+        offset_y=-0.01,
+    )
     d = p.to_dict()
     p2 = IBeamProfile.from_dict(d)
     assert abs(p2.rotation - 0.4) < 1e-12
@@ -269,10 +292,12 @@ def test_ibeam_roundtrip():
 # LBeamProfile
 # ---------------------------------------------------------------------------
 
+
 def test_lbeam_to_ifc_offset():
     f = _ifc()
-    p = LBeamProfile(height=0.15, width=0.1, thickness=0.01,
-                     anchor="sw", offset_x=0.1, offset_y=0.2)
+    p = LBeamProfile(
+        height=0.15, width=0.1, thickness=0.01, anchor="sw", offset_x=0.1, offset_y=0.2
+    )
     ent = p.to_ifc(f)
     loc = _placement_coords(f, ent)
     # anchor='sw' → anchor offset (0,0); user offset adds (0.1, 0.2)
@@ -281,8 +306,9 @@ def test_lbeam_to_ifc_offset():
 
 
 def test_lbeam_roundtrip():
-    p = LBeamProfile(height=0.15, width=0.1, thickness=0.01,
-                     rotation=1.2, offset_x=0.1, offset_y=0.2)
+    p = LBeamProfile(
+        height=0.15, width=0.1, thickness=0.01, rotation=1.2, offset_x=0.1, offset_y=0.2
+    )
     d = p.to_dict()
     p2 = LBeamProfile.from_dict(d)
     assert abs(p2.rotation - 1.2) < 1e-12
@@ -292,6 +318,7 @@ def test_lbeam_roundtrip():
 # ---------------------------------------------------------------------------
 # SteelProfile.from_name passes through rotation / offset
 # ---------------------------------------------------------------------------
+
 
 def test_steel_from_name_rotation():
     p = SteelProfile.from_name("IPE200", rotation=math.pi / 2, offset_x=0.05)
