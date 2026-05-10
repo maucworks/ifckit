@@ -121,7 +121,7 @@ class Profile(Path, metaclass=RegisterProfileType):
     rotation: float = 0.0
     offset_x: float = 0.0
     offset_y: float = 0.0
-    anchor: str = "c"  # default; subclasses override via _init_transform()
+    anchor: "Optional[str]" = None  # None = raw coordinates, no transformation
 
     def __init__(self) -> None:
         # Initialise Path in the XY plane so is_planar is authoritatively True
@@ -187,7 +187,7 @@ class Profile(Path, metaclass=RegisterProfileType):
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
-        anchor: str = "c",
+        anchor: "Optional[str]" = None,
     ) -> None:
         """Store the transform parameters. Call from subclass __init__.
 
@@ -195,13 +195,13 @@ class Profile(Path, metaclass=RegisterProfileType):
             rotation: CCW rotation around the anchor point (radians).
             offset_x: Additional X translation applied after anchor + rotation.
             offset_y: Additional Y translation applied after anchor + rotation.
-            anchor:   One of the 9 compass keys (sw/s/se/w/c/e/nw/n/ne).
-                      Determines where (0, 0) sits relative to the bounding box.
-                      Subclasses should pass their natural default (e.g. 'c' for
-                      centred profiles, 's' for bottom-centre, 'sw' for L-shapes).
+            anchor:   One of the 9 compass keys (sw/s/se/w/c/e/nw/n/ne)
+                      or ``None`` for raw coordinates (no transformation).
         """
-        if anchor not in VALID_ANCHORS:
-            raise ValueError(f"anchor must be one of {sorted(VALID_ANCHORS)}, got {anchor!r}")
+        if anchor is not None and anchor not in VALID_ANCHORS:
+            raise ValueError(
+                f"anchor must be one of {sorted(VALID_ANCHORS)} or None, got {anchor!r}"
+            )
         self.rotation = float(rotation)
         self.offset_x = float(offset_x)
         self.offset_y = float(offset_y)
@@ -233,21 +233,11 @@ class Profile(Path, metaclass=RegisterProfileType):
                       TShapeProfile whose origin is at bottom-centre, so sw = ``(-w/2, 0)``).
         """
         dx, dy = 0.0, 0.0
-        if bbox is not None:
+        if self.anchor is not None and bbox is not None:
             w, h = bbox
             raw_dx, raw_dy = anchor_offset(self.anchor, w, h)
             if bbox_sw is not None:
-                # anchor_offset gives shift from sw corner; bbox_sw is where sw is
-                # in natural coords.  Total shift = raw shift - current natural position of sw.
                 sw_x, sw_y = bbox_sw
-                # We want origin at: sw + (fx*w, fy*h)
-                # raw_dx = -fx*w, raw_dy = -fy*h
-                # So desired origin shift = -(sw_x - raw_dx) = raw_dx - sw_x ... no.
-                # anchor_offset(anchor, w, h) returns (dx,dy) such that if you ADD (dx,dy)
-                # to points whose sw corner is at (0,0), the anchor lands at (0,0).
-                # But our sw corner is at bbox_sw, not (0,0).
-                # Correction: shift by raw_dx - sw_x, raw_dy - sw_y to account for the
-                # natural offset of sw from the natural origin.
                 dx = raw_dx - sw_x
                 dy = raw_dy - sw_y
             else:
@@ -293,7 +283,7 @@ class Profile(Path, metaclass=RegisterProfileType):
                       When omitted, ``(-w/2, -h/2)`` is assumed (centred origin).
         """
         ax, ay = anchor_x, anchor_y
-        if bbox is not None:
+        if self.anchor is not None and bbox is not None:
             w, h = bbox
             raw_dx, raw_dy = anchor_offset(self.anchor, w, h)
             if bbox_sw is not None:

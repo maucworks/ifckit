@@ -131,9 +131,8 @@ class TestPolygonProfile:
     def test_get_profile_points(self):
         pts = [(0, 0), (2, 0), (2, 1), (0, 1)]
         p = PolygonProfile(pts)
-        # Default anchor "c" shifts (0,0) → (-w/2, -h/2) = (-1, -0.5)
-        expected = [(-1.0, -0.5), (1.0, -0.5), (1.0, 0.5), (-1.0, 0.5)]
-        assert p.get_profile_points() == expected
+        # Default anchor=None — raw coordinates, no transformation
+        assert p.get_profile_points() == pts
 
 
 # ---------------------------------------------------------------------------

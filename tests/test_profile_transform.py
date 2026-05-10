@@ -195,11 +195,10 @@ def test_polygon_get_profile_points_rotation():
     angle = math.pi / 2
     p = PolygonProfile(points=[(1, 0), (0, 1), (-1, 0)], rotation=angle)
     pts = p.get_profile_points()
-    # Default anchor "c" on bbox (w=2, h=1, sw=(-1,0)):
-    #   dx = -1-(-1)=0, dy = -0.5-0=-0.5
-    #   (1,0) → (1, -0.5) → rotated 90° → (0.5, 1)
+    # Default anchor=None — raw coordinates, no shift, then rotate 90°
+    # (1,0) → (0, 1)
     x, y = pts[0]
-    assert abs(x - 0.5) < 1e-9
+    assert abs(x) < 1e-9
     assert abs(y - 1.0) < 1e-9
 
 
