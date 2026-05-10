@@ -215,7 +215,7 @@ class Path:
     def from_pts(
         cls,
         pts: List["Vec"],
-        plane: Optional["Plane"] = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane: Optional["Plane"] = None,
         closed: bool = False,
     ) -> "Path":
         """Build a Path from a list of Vec points as consecutive Line segments.
@@ -761,6 +761,35 @@ class Path:
             result.append((u, v))
 
         return result
+
+    def to_profile(
+        self,
+        plane: Optional["Plane"] = None,
+        name: Optional[str] = None,
+    ):
+        """Convert a closed planar Path to a :class:`PolygonProfile`.
+
+        Arc segments are sampled to a polyline approximation before
+        projection.  The returned profile supports ``.anchor``,
+        ``.rotation``, and ``.offset_x``/``.offset_y``.
+
+        Args:
+            plane: Reference plane for 2D projection.
+                   Falls back to *self._plane*.
+            name:  Optional profile name.
+
+        Returns:
+            :class:`ifckit.profiles.PolygonProfile` backed by this path's
+            sampled vertices.
+
+        Raises:
+            ValueError: If path is not closed.
+            ValueError: If no plane is available.
+        """
+        from ifckit.profiles.shapes import PolygonProfile
+
+        pts = self.to_profile_points(plane=plane)
+        return PolygonProfile(pts, name=name)
 
     def __repr__(self) -> str:
         return f"Path({len(self._segments)} segments, length={self.length:.3f})"
