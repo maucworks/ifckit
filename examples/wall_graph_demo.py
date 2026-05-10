@@ -88,13 +88,12 @@ def build_u_wall() -> None:
 # ---------------------------------------------------------------------------
 
 def build_arc_wall() -> None:
-    """Curved wall from a Path with Arc segments."""
+    """Curved wall from an open Path with Arc segments."""
     path = Path()
     path.add_line(Vec(0, 0, 0), Vec(2000, 0, 0))
     path.add_arc(Vec(2000, 2000, 0), Vec(0, 0, 1), Vec(2000, 0, 0), math.pi)
     path.add_line(Vec(0, 4000, 0), Vec(-2000, 4000, 0))
     path.add_line(Vec(-2000, 4000, 0), Vec(-2000, 0, 0))
-    path.add_line(Vec(-2000, 0, 0), Vec(0, 0, 0))
 
     pending = PendingWallGraph(
         path=path,
