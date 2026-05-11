@@ -5,6 +5,22 @@ Visual reference for each example.  Click the link to preview in the
 
 ---
 
+## `bonsai_add_wall.py`
+
+Paste into Blender's **Scripting** workspace while a Bonsai project is **already open**.
+Adds one `IfcWall` to the active storey (or the first storey it finds), creates a
+matching Blender mesh, and links everything so Bonsai is aware of it.
+
+No extra installs needed — uses only what Bonsai bundles (`ifcopenshell`, `bonsai.tool`).
+
+**Usage:**
+1. Open Blender → load or create an IFC project in Bonsai
+2. Set the active container (storey) in the Bonsai Project Overview panel
+3. Paste this script in the Scripting workspace, adjust the constants at the top, Run Script
+4. Save with **Ctrl+S** to persist changes to the `.ifc` file
+
+---
+
 ## `run_in_blender.py`
 
 Paste into Blender's **Scripting** workspace and press **Run Script**.

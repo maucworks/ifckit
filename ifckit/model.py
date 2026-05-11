@@ -56,6 +56,113 @@ class IfcModel:
         model.save("/tmp/output.ifc")
     """
 
+    @classmethod
+    def from_file(cls, ifc_file: "ifcopenshell.file") -> "IfcModel":
+        """
+        Wrap an existing ``ifcopenshell.file`` in an ``IfcModel`` without
+        creating a new project.  All builders and helper methods work as
+        normal; ``save()`` writes back to the same file object.
+
+        This is useful for adding ifckit-built elements (walls, windows, …)
+        to a project that was already opened externally — e.g. the active
+        Bonsai / BlenderBIM project.
+
+        The file must already contain exactly one ``IfcProject`` and a
+        ``Model/Body/MODEL_VIEW`` geometric representation sub-context.
+        If the body sub-context is missing it is created automatically.
+
+        Args:
+            ifc_file: An ``ifcopenshell.file`` instance, e.g. from
+                      ``ifcopenshell.open("project.ifc")`` or from
+                      Bonsai's ``tool.Ifc.get()``.
+
+        Returns:
+            ``IfcModel`` wrapping *ifc_file*.
+
+        Raises:
+            ValueError: If the file contains no ``IfcProject``.
+
+        Example (Bonsai Scripting editor)::
+
+            import bonsai.tool as tool
+            from ifckit.model import IfcModel
+            from ifckit.handles import StoreyHandle
+
+            model = IfcModel.from_file(tool.Ifc.get())
+            storey_entity = tool.Ifc.get().by_type("IfcBuildingStorey")[0]
+            storey = StoreyHandle(storey_entity, model)
+            storey.add(PendingWall(...))
+            # Changes are live in Bonsai; save with Ctrl+S.
+        """
+        import ifcopenshell.util.representation
+        import ifcopenshell.util.unit
+
+        projects = ifc_file.by_type("IfcProject")
+        if not projects:
+            raise ValueError("from_file(): the supplied file contains no IfcProject.")
+
+        obj = cls.__new__(cls)
+
+        # Core file reference
+        obj._file = ifc_file
+        obj._project = projects[0]
+
+        # Schema
+        schema_map = {
+            "IFC2X3": IfcSchema.IFC2X3,
+            "IFC4": IfcSchema.IFC4,
+            "IFC4X3_ADD2": IfcSchema.IFC4X3,
+            "IFC4X3": IfcSchema.IFC4X3,
+        }
+        obj.schema = schema_map.get(ifc_file.schema, IfcSchema.IFC4)
+
+        # Unit — derive from file's length unit scale
+        unit_scale = ifcopenshell.util.unit.calculate_unit_scale(ifc_file)
+        # 0.001 = millimetres, 1.0 = metres (anything else → metres)
+        obj.unit = LengthUnit.MILLIMETRE if abs(unit_scale - 0.001) < 1e-9 else LengthUnit.METRE
+
+        # Author — informational only, not writable back
+        obj.name = obj._project.Name or "Unnamed Project"
+        obj.author = ""
+
+        # Geometric representation contexts
+        body_ctx = ifcopenshell.util.representation.get_context(
+            ifc_file, "Model", "Body", "MODEL_VIEW"
+        )
+        if body_ctx is None:
+            # Find or create the parent Model context
+            model_ctx = next(
+                (
+                    c
+                    for c in ifc_file.by_type("IfcGeometricRepresentationContext")
+                    if not c.is_a("IfcGeometricRepresentationSubContext")
+                    and c.ContextType == "Model"
+                ),
+                None,
+            )
+            if model_ctx is None:
+                model_ctx = ifcopenshell.api.run(
+                    "context.add_context", ifc_file, context_type="Model"
+                )
+            body_ctx = ifc_file.create_entity(
+                "IfcGeometricRepresentationSubContext",
+                ContextIdentifier="Body",
+                ContextType="Model",
+                ParentContext=model_ctx,
+                TargetView="MODEL_VIEW",
+            )
+        obj._body_context = body_ctx
+        # _context = the parent Model context of the body sub-context
+        obj._context = body_ctx.ParentContext
+
+        # Builders registry + type cache
+        from ifckit.builders import default_registry
+
+        obj._registry = default_registry()
+        obj._type_cache = {}
+
+        return obj
+
     def __init__(
         self,
         name: str = "Unnamed Project",
