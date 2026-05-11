@@ -49,7 +49,7 @@ except ModuleNotFoundError:
 try:
     import importlib.metadata as _meta
     from packaging.version import Version as _V
-    _required = "0.2.0"
+    _required = "0.2.1"
     try:
         _installed = _meta.version("ifckit")
     except _meta.PackageNotFoundError:
@@ -61,7 +61,7 @@ except (ImportError, ModuleNotFoundError):
     print(f"ifckit >= 0.2.0 not found — installing now…")
     import subprocess
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "ifckit[ifc]>=0.2.0"],
+        [sys.executable, "-m", "pip", "install", "--upgrade", "ifckit[ifc]>=0.2.1"],
         check=True,
     )
     import ifckit  # noqa: F401
