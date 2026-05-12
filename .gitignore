@@ -52,6 +52,14 @@ tests/output/
 .ipynb_checkpoints/
 *.ipynb
 
+# Help markdown files (local only, not tracked)
+PLAN.md
+PLAN_M8_PATH.md
+PLAN_M9_WINDOW_JSON.md
+PYTHONIC_COMPONENTS_PLAN.md
+BUG_REPORT_BONSAI_TAB_CYCLE_HOLE.md
+IFC_SCHEMA_ANALYSIS.md
+
 # Temp
 tmp/
 tmp-*/
