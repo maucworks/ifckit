@@ -52,6 +52,9 @@ tests/output/
 .ipynb_checkpoints/
 *.ipynb
 
+# Neovim null-ls temp files
+.null-ls_*
+
 # Help markdown files (local only, not tracked)
 PLAN.md
 PLAN_M8_PATH.md
