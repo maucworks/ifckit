@@ -18,8 +18,8 @@ without depending on a specific CAD host application.
 
 All contributions must be compatible with the project's licensing:
 
-- **ifckit library**: **GPL-3.0-or-later**
-- See `COPYING` for the full license text.
+- **ifckit library**: **LGPL-3.0-or-later**
+- See `COPYING` (GPL-3.0) and `COPYING.LESSER` (LGPL-3.0) for the license texts.
 
 There is no Contributor License Agreement (CLA). By submitting a pull request,
 you agree that your contribution is licensed under the applicable license above.
