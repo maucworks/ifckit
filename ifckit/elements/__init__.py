@@ -30,9 +30,11 @@ from ifckit.elements.structural import (
     PendingColumn,
     PendingExtrudedElement,
     PendingRevolvedBeam,
+    PendingTaperedExtrusion,
 )
 from ifckit.elements.style import RenderStyle
 from ifckit.elements.types import PendingDoorType, PendingTypeObject, PendingWindowType
+from ifckit.elements.wall_graph import PendingWallGraph
 
 __all__ = [
     "PendingElement",
@@ -42,6 +44,7 @@ __all__ = [
     "PendingWall",
     "PendingSlab",
     "PendingSpace",
+    "PendingWallGraph",
     "PendingOpening",
     "PendingDoor",
     "PendingWindow",
@@ -55,6 +58,7 @@ __all__ = [
     "PendingColumn",
     "PendingExtrudedElement",
     "PendingRevolvedBeam",
+    "PendingTaperedExtrusion",
     "PendingSectionedSpine",  # NEW
     "AlignmentSegment",
     "BridgePartType",

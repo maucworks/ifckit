@@ -345,6 +345,10 @@ class Line:
         """For compatibility with Arc - returns the direction of the line."""
         return self.direction
 
+    def tangent_at(self, t: float) -> "Vec":
+        """Direction is constant along a line; t is ignored."""
+        return self.direction
+
     def reverse(self) -> "Line":
         return Line(self.end, self.start)
 
@@ -362,6 +366,13 @@ class Line:
 
     def to_polyline(self) -> "Polyline":
         return Polyline([self.start, self.end])
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"type": "line", "start": self.start.to_dict(), "end": self.end.to_dict()}
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Line":
+        return cls(Vec.from_dict(d["start"]), Vec.from_dict(d["end"]))
 
     def __repr__(self) -> str:
         return f"Line({self.start} → {self.end})"
@@ -444,6 +455,30 @@ class Arc:
         radial = (self.end - self.center).normalized()
         sign = 1.0 if self.angle >= 0 else -1.0
         return (self.normal**radial) * sign
+
+    def tangent_at(self, t: float) -> "Vec":
+        """t=0 -> start tangent, t=1 -> end tangent."""
+        radial = (self.point_at(t) - self.center).normalized()
+        sign = 1.0 if self.angle >= 0 else -1.0
+        return (self.normal**radial) * sign
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": "arc",
+            "center": self.center.to_dict(),
+            "normal": self.normal.to_dict(),
+            "start": self.start.to_dict(),
+            "angle": self.angle,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Arc":
+        return cls(
+            Vec.from_dict(d["center"]),
+            Vec.from_dict(d["normal"]),
+            Vec.from_dict(d["start"]),
+            d["angle"],
+        )
 
     def __repr__(self) -> str:
         return (

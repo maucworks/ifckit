@@ -9,7 +9,7 @@ support and path assembly helpers.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
     import ifcopenshell
@@ -97,6 +97,150 @@ class Path:
     @property
     def length(self) -> float:
         return sum(seg.length for seg in self._segments)
+
+    def _segment_and_local_t_at_length(self, d: float) -> "Tuple[int, float]":
+        """Map distance *d* along path to ``(segment_index, local_t)``.
+
+        Args:
+            d: Distance from path start in ``[0, length]``.
+
+        Returns:
+            ``(index, t)`` where *index* is the segment index and
+            *t* is the local parameter ``[0, 1]`` within that segment.
+        """
+        if not self._segments:
+            raise ValueError("Path has no segments")
+        total = self.length
+        if d <= 0.0:
+            return 0, 0.0
+        if d >= total:
+            return len(self._segments) - 1, 1.0
+        accumulated = 0.0
+        for i, seg in enumerate(self._segments):
+            seg_len = seg.length
+            if accumulated + seg_len >= d:
+                local_t = (d - accumulated) / seg_len
+                return i, local_t
+            accumulated += seg_len
+        return len(self._segments) - 1, 1.0
+
+    def point_at_length(self, d: float) -> "Vec":
+        """Point at distance *d* from the start of the path.
+
+        Args:
+            d: Distance from path start in ``[0, length]``.
+
+        Returns:
+            The point at that distance.
+        """
+        i, t = self._segment_and_local_t_at_length(d)
+        return self._segments[i].point_at(t)
+
+    def point_at(self, t: float) -> "Vec":
+        """Point at normalized parameter *t* along the total path length.
+
+        ``t=0`` → start point, ``t=1`` → end point.
+
+        Args:
+            t: Normalized parameter in ``[0, 1]``.
+
+        Returns:
+            The point at that parameter.
+        """
+        return self.point_at_length(t * self.length)
+
+    def tangent_at_length(self, d: float) -> "Vec":
+        """Tangent direction at distance *d* from the start of the path.
+
+        Args:
+            d: Distance from path start in ``[0, length]``.
+
+        Returns:
+            Normalized tangent direction at that distance.
+        """
+        i, t = self._segment_and_local_t_at_length(d)
+        return self._segments[i].tangent_at(t)
+
+    def tangent_at(self, t: float) -> "Vec":
+        """Tangent direction at normalized parameter *t*.
+
+        ``t=0`` → start tangent, ``t=1`` → end tangent.
+
+        Args:
+            t: Normalized parameter in ``[0, 1]``.
+
+        Returns:
+            Normalized tangent direction at that parameter.
+        """
+        return self.tangent_at_length(t * self.length)
+
+    def subpath(self, t_start: float, t_end: float) -> "Path":
+        """Return a new Path containing the portion from ``t_start`` to ``t_end``.
+
+        Both parameters are normalized ``[0, 1]`` along the total path length.
+        If *t_start* > *t_end* the two are swapped.  The result is a new Path
+        whose segments are trimmed copies of the original.
+
+        Args:
+            t_start: Start parameter in ``[0, 1]``.
+            t_end:   End parameter in ``[0, 1]``.
+
+        Returns:
+            A new Path spanning the requested portion.
+
+        Raises:
+            ValueError: If the path has no segments.
+        """
+        if not self._segments:
+            raise ValueError("Path has no segments")
+
+        t0 = max(0.0, min(1.0, t_start))
+        t1 = max(0.0, min(1.0, t_end))
+        if t0 > t1:
+            t0, t1 = t1, t0
+
+        total = self.length
+        d0 = t0 * total
+        d1 = t1 * total
+
+        i0, lt0 = self._segment_and_local_t_at_length(d0)
+        i1, lt1 = self._segment_and_local_t_at_length(d1)
+
+        import copy
+
+        new_path = Path(plane=self._plane)
+
+        if i0 == i1:
+            seg = self._segments[i0]
+            if isinstance(seg, Line):
+                new_path._segments.append(Line(seg.point_at(lt0), seg.point_at(lt1)))
+            else:
+                new_start = seg.point_at(lt0)
+                new_angle = seg.angle * (lt1 - lt0)
+                new_path._segments.append(Arc(seg.center, seg.normal, new_start, new_angle))
+            return new_path
+
+        # First segment trimmed from lt0 to end
+        seg0 = self._segments[i0]
+        if isinstance(seg0, Line):
+            new_path._segments.append(Line(seg0.point_at(lt0), seg0.end))
+        else:
+            new_path._segments.append(
+                Arc(seg0.center, seg0.normal, seg0.point_at(lt0), seg0.angle * (1.0 - lt0))
+            )
+
+        # Full middle segments
+        for i in range(i0 + 1, i1):
+            new_path._segments.append(copy.copy(self._segments[i]))
+
+        # Last segment trimmed from start to lt1
+        seg1 = self._segments[i1]
+        if isinstance(seg1, Line):
+            new_path._segments.append(Line(seg1.start, seg1.point_at(lt1)))
+        else:
+            new_path._segments.append(Arc(seg1.center, seg1.normal, seg1.start, seg1.angle * lt1))
+
+        return new_path
 
     def sample(self, angle_step_deg: float = 5.0) -> "Polyline":
         """
@@ -827,6 +971,37 @@ class Path:
 
         return result
 
+    def to_pts(self, plane: Optional["Plane"] = None) -> List["Vec"]:
+        """Return segment endpoint Vecs (3D world coords by default).
+
+        Args:
+            plane: If provided, points are projected to 2D local coords and
+                   returned as ``Vec(u, v, 0)``.
+
+        Returns:
+            List of Vec points (deduplicated at consecutive segment
+            boundaries, with trailing close-point stripped).
+        """
+        pts: List["Vec"] = []
+        for seg in self._segments:
+            if isinstance(seg, Arc):
+                seg_pts = seg.sample()
+            else:
+                seg_pts = [seg.start, seg.end]
+            if pts and pts[-1].equals(seg_pts[0], tol=1e-9):
+                seg_pts = seg_pts[1:]
+            pts.extend(seg_pts)
+
+        if len(pts) >= 2 and pts[0].equals(pts[-1], tol=1e-9):
+            pts = pts[:-1]
+
+        if plane is not None:
+            return [
+                Vec((p - plane.origin) @ plane.x_axis, (p - plane.origin) @ plane.y_axis, 0.0)
+                for p in pts
+            ]
+        return pts
+
     def to_profile(
         self,
         plane: Optional["Plane"] = None,
@@ -855,6 +1030,30 @@ class Path:
 
         pts = self.to_profile_points(plane=plane)
         return PolygonProfile(pts, name=name)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "plane": self._plane.to_dict() if self._plane else None,
+            "segments": [s.to_dict() for s in self._segments],
+            "holes": [h.to_dict() for h in self._holes],
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Path":
+        plane = Plane.from_dict(d["plane"]) if d.get("plane") else None
+        path = cls(plane=plane)
+
+        for sd in d.get("segments", []):
+            if sd["type"] == "line":
+                path._segments.append(Line.from_dict(sd))
+            elif sd["type"] == "arc":
+                path._segments.append(Arc.from_dict(sd))
+
+        for hd in d.get("holes", []):
+            hole = cls.from_dict(hd)
+            path._holes.append(hole)
+
+        return path
 
     def __repr__(self) -> str:
         return f"Path({len(self._segments)} segments, length={self.length:.3f})"

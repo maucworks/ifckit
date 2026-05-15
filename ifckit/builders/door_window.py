@@ -34,6 +34,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     shape_representation,
 )
+from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.profiles.anchor import anchor_offset
 
@@ -1056,3 +1057,84 @@ def build_door_model_b(
     )
     _set_door_operation(ifc_file, door, pending.operation_type)
     return door
+
+
+# ---------------------------------------------------------------------------
+# Builder classes for the default_registry
+# ---------------------------------------------------------------------------
+
+
+class WindowBuilder(BaseBuilder):
+    """Builder for PendingWindow elements."""
+
+    entity_type = "basic_window"
+
+    def _create_geometry(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending,  # PendingWindow
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        if getattr(pending, "component_graph", None):
+            from ifckit.builders._geom import get_body_context
+            from ifckit.builders.door_window import build_window_model_b
+
+            storey = container
+            body_ctx = get_body_context(ifc_file)
+            host_entity = _find_wall_in_storey(ifc_file, storey)
+            if host_entity is None:
+                raise LookupError(
+                    "WindowBuilder cannot find host wall in storey. "
+                    "Use wall_handle.add(window) to specify the host explicitly."
+                )
+            return build_window_model_b(ifc_file, pending, host_entity, storey, body_ctx)
+
+        raise LookupError(
+            "PendingWindow without component_graph requires an opening. "
+            "Use model.add_window(pending, opening=..., container=...) instead."
+        )
+
+
+class DoorBuilder(BaseBuilder):
+    """Builder for PendingDoor elements."""
+
+    entity_type = "basic_door"
+
+    def _create_geometry(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending,  # PendingDoor
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        if getattr(pending, "component_graph", None):
+            from ifckit.builders._geom import get_body_context
+            from ifckit.builders.door_window import build_door_model_b
+
+            storey = container
+            body_ctx = get_body_context(ifc_file)
+            host_entity = _find_wall_in_storey(ifc_file, storey)
+            if host_entity is None:
+                raise LookupError(
+                    "DoorBuilder cannot find host wall in storey. "
+                    "Use wall_handle.add(door) to specify the host explicitly."
+                )
+            return build_door_model_b(ifc_file, pending, host_entity, storey, body_ctx)
+
+        raise LookupError(
+            "PendingDoor without component_graph requires an opening. "
+            "Use model.add_door(pending, opening=..., container=...) instead."
+        )
+
+
+def _find_wall_in_storey(
+    ifc_file: ifcopenshell.file,
+    storey: ifcopenshell.entity_instance,
+) -> ifcopenshell.entity_instance | None:
+    """Find the first IfcWall or IfcWallStandardCase in *storey*."""
+    for rel in storey.ContainsElements or []:
+        for item in rel.RelatedElements or []:
+            if item.is_a("IfcWall") or item.is_a("IfcWallStandardCase"):
+                return item
+    return None

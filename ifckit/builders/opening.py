@@ -39,6 +39,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     shape_representation,
 )
+from ifckit.builders.base import BaseBuilder
 from ifckit.builders.psets import write_psets
 from ifckit.geometry import Plane, Vec
 from ifckit.profiles.anchor import anchor_offset
@@ -200,3 +201,24 @@ def build_opening_from_solids(
         RelatedOpeningElement=opening,
     )
     return opening
+
+
+class OpeningBuilder(BaseBuilder):
+    """Builder for PendingOpening elements.
+
+    Openings require a host wall — use ``model.add_opening(pending, host, container)``.
+    """
+
+    entity_type = "basic_opening"
+
+    def _create_geometry(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        raise LookupError(
+            "PendingOpening requires a host wall. "
+            "Use model.add_opening(pending, host=wall_handle, container=storey)."
+        )

@@ -200,4 +200,11 @@ class AlignmentHandle(Handle):
 class EntityHandle(Handle):
     """Generic wrapper around any ifcopenshell product entity."""
 
-    pass
+    def add(self, pending: "PendingElement") -> "EntityHandle":
+        """Build *pending* with this entity as host (Model B).
+
+        For windows/doors with a ``component_graph`` this creates the
+        opening + fill in one step.  For all other types the element
+        is placed relative to this entity.
+        """
+        return self._model_ref.add(pending, self)

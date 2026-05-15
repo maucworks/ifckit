@@ -89,23 +89,24 @@ class PendingWallGraph(PendingElement):
             self.plane = plane
             self.from_path = False
 
+    @property
+    def path(self) -> Path | None:
+        """The Path in path-mode, or None in edge-mode."""
+        return self._path if self.from_path else None
+
     def to_dict(self) -> dict:
         d = super().to_dict()  # includes "type", "name", style, hatch_pattern, properties
-        if self.from_path:
-            raise NotImplementedError(
-                "PendingWallGraph in path mode cannot be serialised to dict: "
-                "the original Path segments are not preserved. "
-                "Construct the element from a dict in edge mode, or implement "
-                "path serialisation before calling to_dict()."
-            )
+        if self.from_path and self._path is not None:
+            d["mode"] = "path"
+            d["path"] = self._path.to_dict()
+            d["angle_step_deg"] = self.angle_step_deg
+        else:
+            d["mode"] = "edge"
+            d["vertices"] = [(v.x, v.y, v.z) for v in self.vertices]
+            d["edges"] = self.edges
+            d["plane"] = self.plane.to_dict() if hasattr(self.plane, "to_dict") else {}
         d.update(
             {
-                "vertices": [
-                    (v.to_dict() if hasattr(v, "to_dict") else (v.x, v.y, v.z))
-                    for v in self.vertices
-                ],
-                "edges": self.edges,
-                "plane": self.plane.to_dict() if hasattr(self.plane, "to_dict") else {},
                 "thickness": self.thickness,
                 "height": self.height,
             }
@@ -114,6 +115,18 @@ class PendingWallGraph(PendingElement):
 
     @classmethod
     def from_dict(cls, d: dict) -> "PendingWallGraph":
+        if d.get("mode") == "path":
+            from ifckit.geometry.path import Path as _Path
+
+            return cls(
+                path=_Path.from_dict(d["path"]),
+                thickness=float(d.get("thickness", 200)),
+                height=float(d.get("height", 3000)),
+                name=d.get("name", ""),
+                angle_step_deg=float(d.get("angle_step_deg", 5.0)),
+            )
+
+        # Fallback: edge mode (backward compat)
         verts = [Vec(*p) for p in d.get("vertices", [])]
         edges = [(int(a), int(b)) for a, b in d.get("edges", [])]
         plane = Plane.from_dict(d.get("plane", {}))
