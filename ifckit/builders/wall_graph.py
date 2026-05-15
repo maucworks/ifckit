@@ -158,11 +158,11 @@ class WallGraphBuilder(BaseBuilder):
         pending: PendingElement,
     ) -> tuple[ifcopenshell.entity_instance, str]:
         """Offset centerline outward/inward → one ExtrudedAreaSolid with void."""
-        ht = pending.thickness / 2
+        off_left, off_right = pending.offset_pair
         path = pending._path
 
-        outer = path.offset(-ht)
-        inner = path.offset(+ht)
+        outer = path.offset(-off_left)
+        inner = path.offset(off_right)
 
         oa = abs(_signed_area_2d(outer.to_profile_points(plane=pending.plane)))
         ia = abs(_signed_area_2d(inner.to_profile_points(plane=pending.plane)))
@@ -188,7 +188,7 @@ class WallGraphBuilder(BaseBuilder):
         if n < 2:
             raise ValueError("open-path wall needs at least 2 points")
 
-        ht = pending.thickness / 2
+        off_left, off_right = pending.offset_pair
         normal = pending.plane.z_axis
 
         # Shifted segment anchors and directions (left side = +perp, right = -perp)
@@ -197,14 +197,14 @@ class WallGraphBuilder(BaseBuilder):
         for i in range(n - 1):
             d = (pts[i + 1] - pts[i]).normalized()
             perp = d**normal
-            left_segs.append((pts[i] + perp * ht, d))
-            right_segs.append((pts[i] - perp * ht, d))
+            left_segs.append((pts[i] + perp * off_left, d))
+            right_segs.append((pts[i] - perp * off_right, d))
 
         # Last segment's end anchor
         d_last = (pts[-1] - pts[-2]).normalized()
         perp_last = d_last**normal
-        left_end = pts[-1] + perp_last * ht
-        right_end = pts[-1] - perp_last * ht
+        left_end = pts[-1] + perp_last * off_left
+        right_end = pts[-1] - perp_last * off_right
 
         # Intersect consecutive offset segments for mitered corners
         left_pts = _miter_offset_segments(left_segs, left_end)
@@ -249,7 +249,15 @@ class WallGraphBuilder(BaseBuilder):
             )
 
         plane = pending.plane
-        ht = pending.thickness / 2
+        off_left, off_right = pending.offset_pair
+        ht = max(off_left, off_right)
+        if abs(off_left - off_right) > 0.01:
+            warnings.warn(
+                f"WallGraph: graph mode uses symmetric offset {ht:.1f} (max of "
+                f"offset_left={off_left:.1f}, offset_right={off_right:.1f}). "
+                "Use path mode for asymmetric walls.",
+                stacklevel=3,
+            )
 
         # Project all vertices to plane-local 2D coords once.
         local_pts: list[tuple[float, float]] = []

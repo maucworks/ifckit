@@ -855,33 +855,38 @@ class Path:
 
         return _directrix(ifc_file, self)
 
-    def offset(self, dist: float) -> "Path":
-        """Return a new inward-offset Path at distance dist.
+    def offset(self, dist: float, cap: bool = False) -> "Path":
+        """Return a new offset Path at distance dist.
 
-        Supports closed paths with both Line and Arc segments.
-        Arc segments are internally sampled to a polyline at the arc's
-        segment resolution before the offset algorithm runs.
+        Supports closed paths with both Line and Arc segments, and open
+        paths (with optional end caps).  Arc segments are internally
+        sampled to a polyline before the offset algorithm runs.
 
-        Only correct for convex polygons in v1.
+        For **closed** paths: positive *dist* offsets inward.
+        For **open** paths: positive *dist* offsets to the left of the
+        travel direction, negative to the right.  When *cap* is ``True``
+        the result is a closed path whose footprint is the offset curve
+        plus the original curve and perpendicular end caps — useful for
+        creating wall footprints from a centerline.
+
+        Only correct for convex polygons / gentle curvature.
 
         Args:
-            dist: Offset distance (positive = inward).
+            dist: Offset distance.
+            cap:  If ``True`` and the path is open, cap the ends to
+                  produce a closed path (ignored for closed paths).
 
         Returns:
             New Path with offset geometry.  *self* is not modified.
 
         Raises:
-            ValueError: If path is not closed.
-            ValueError: If offset causes degenerate geometry (non-convex).
+            ValueError: If path has too few points or offset is degenerate.
         """
-        if not self.is_closed:
-            raise ValueError("offset() requires a closed path")
-
         # Sample all segments (Line and Arc) to a polyline
         pts = self.sample().points
 
-        if len(pts) < 3:
-            raise ValueError("offset() requires at least 3 points after sampling")
+        if len(pts) < 2:
+            raise ValueError("offset() needs at least 2 points after sampling")
 
         # Compute plane normal
         n: "Vec | None" = None
@@ -892,35 +897,90 @@ class Path:
         if n is None:
             raise ValueError("Cannot determine plane normal for offset")
 
-        # Shift each edge perpendicular to its direction
-        shifted: "list[tuple[Vec, Vec]]" = []
-        for i in range(len(pts)):
-            p0 = pts[i]
-            p1 = pts[(i + 1) % len(pts)]
-            direction = (p1 - p0).normalized()
-            inward_n = (n**direction).normalized()
-            anchor = Vec(
-                p0.x + inward_n.x * dist,
-                p0.y + inward_n.y * dist,
-                p0.z + inward_n.z * dist,
-            )
-            shifted.append((anchor, direction))
+        # ── Closed path ──────────────────────────────────────────────
+        if self.is_closed:
+            if len(pts) < 3:
+                raise ValueError("offset() closed path needs at least 3 points after sampling")
 
-        # Intersect consecutive shifted edges to find new vertex positions
-        new_pts: "list[Vec]" = []
-        for i in range(len(shifted)):
-            prev_i = (i - 1) % len(shifted)
-            p1, d1 = shifted[prev_i]
-            p2, d2 = shifted[i]
-            pt = _line_line_intersect_2d(p1, d1, p2, d2)
-            if pt is None:
-                raise ValueError(
-                    f"offset(): parallel adjacent edges at corner {i} — "
-                    "path may be degenerate or dist too large"
+            shifted: "list[tuple[Vec, Vec]]" = []
+            for i in range(len(pts)):
+                p0 = pts[i]
+                p1 = pts[(i + 1) % len(pts)]
+                direction = (p1 - p0).normalized()
+                inward_n = (n**direction).normalized()
+                anchor = Vec(
+                    p0.x + inward_n.x * dist,
+                    p0.y + inward_n.y * dist,
+                    p0.z + inward_n.z * dist,
                 )
-            new_pts.append(pt)
+                shifted.append((anchor, direction))
 
-        return Path.from_pts(new_pts, plane=self._plane, closed=True)
+            new_pts: "list[Vec]" = []
+            for i in range(len(shifted)):
+                prev_i = (i - 1) % len(shifted)
+                p1, d1 = shifted[prev_i]
+                p2, d2 = shifted[i]
+                pt = _line_line_intersect_2d(p1, d1, p2, d2)
+                if pt is None:
+                    raise ValueError(
+                        f"offset(): parallel adjacent edges at corner {i} — "
+                        "path may be degenerate or dist too large"
+                    )
+                new_pts.append(pt)
+
+            return Path.from_pts(new_pts, plane=self._plane, closed=True)
+
+        # ── Open path ────────────────────────────────────────────────
+        n_pts = len(pts)
+
+        # Build offset segments: each edge shifted perpendicular by dist
+        # Convention: n × d = left side (matches closed-path inward convention)
+        segs: "list[tuple[Vec, Vec]]" = []
+        for i in range(n_pts - 1):
+            d = (pts[i + 1] - pts[i]).normalized()
+            perp = (n**d).normalized()
+            segs.append((pts[i] + perp * dist, d))
+
+        # End point of the last offset segment (anchor only)
+        d_last = (pts[-1] - pts[-2]).normalized() if n_pts >= 2 else Vec(0, 0, 0)
+        perp_last = (n**d_last).normalized()
+        end_pt = pts[-1] + perp_last * dist
+
+        # Miter intersections at corners
+        offset_pts: "list[Vec]" = [segs[0][0]]
+        for i in range(1, len(segs)):
+            p1, d1 = segs[i - 1]
+            p2, d2 = segs[i]
+            ip = _line_line_intersect_2d(p1, d1, p2, d2)
+            offset_pts.append(ip if ip is not None else p2)
+        offset_pts.append(end_pt)
+
+        if not cap:
+            # Return the offset curve as an open path
+            result = Path(plane=self._plane)
+            for i in range(len(offset_pts) - 1):
+                result.add_line(offset_pts[i], offset_pts[i + 1])
+            return result
+
+        # Cap: produce a closed footprint
+        #   offset curve → end cap → original pts reversed → start cap
+        d0 = (pts[1] - pts[0]).normalized()
+        perp0 = (n**d0).normalized()
+        start_pt = pts[0] + perp0 * dist  # same as offset_pts[0]
+
+        cap_start = pts[0]
+        cap_end = pts[-1]
+
+        # Build closed path: offset → end cap → original reverse → start cap
+        result = Path(plane=self._plane)
+        for i in range(len(offset_pts) - 1):
+            result.add_line(offset_pts[i], offset_pts[i + 1])
+        result.add_line(offset_pts[-1], cap_end)  # end cap
+        for i in range(n_pts - 1, 0, -1):
+            result.add_line(pts[i], pts[i - 1])
+        result.add_line(cap_start, start_pt)  # start cap
+        result._closed = True
+        return result
 
     def to_profile_points(
         self,

@@ -33,15 +33,17 @@ class PendingWallGraph(PendingElement):
         and X-junctions with correct shoulder fill at branching vertices.
 
     Args:
-        vertices:   3D positions (edge mode).
-        edges:      Edge index pairs (edge mode).
-        path:       Continuous centerline Path (path mode).
-        plane:      Placement plane (Z = up).  Defaults to path._plane.
-        thickness:  Wall thickness (mm).
-        height:     Wall height (mm).
-        name:       Element name.
-        style:      Optional RenderStyle.
-        properties: Optional UserProperties dict.
+        vertices:     3D positions (edge mode).
+        edges:        Edge index pairs (edge mode).
+        path:         Continuous centerline Path (path mode).
+        plane:        Placement plane (Z = up).  Defaults to path._plane.
+        thickness:    Wall thickness (mm).
+        height:       Wall height (mm).
+        offset_left:  Offset left of the path direction (mm).  ``None`` → ``thickness / 2``.
+        offset_right: Offset right of the path direction (mm).  ``None`` → ``thickness / 2``.
+        name:         Element name.
+        style:        Optional RenderStyle.
+        properties:   Optional UserProperties dict.
         angle_step_deg: Arc sampling resolution (default 5°).
     """
 
@@ -55,13 +57,26 @@ class PendingWallGraph(PendingElement):
         plane: Plane | None = None,
         thickness: float = 200,
         height: float = 3000,
+        offset_left: float | None = None,
+        offset_right: float | None = None,
         name: str = "",
         style: RenderStyle | None = None,
         properties: UserProperties | None = None,
         angle_step_deg: float = 5.0,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
-        self.thickness = float(thickness)
+        self.offset_left = float(offset_left) if offset_left is not None else None
+        self.offset_right = float(offset_right) if offset_right is not None else None
+        if offset_left is not None and offset_right is not None:
+            self.thickness = float(offset_left + offset_right)
+        elif offset_left is not None:
+            self.thickness = float(thickness)
+            self.offset_right = float(thickness - offset_left)
+        elif offset_right is not None:
+            self.thickness = float(thickness)
+            self.offset_left = float(thickness - offset_right)
+        else:
+            self.thickness = float(thickness)
         self.height = float(height)
         self.angle_step_deg = float(angle_step_deg)
 
@@ -94,8 +109,15 @@ class PendingWallGraph(PendingElement):
         """The Path in path-mode, or None in edge-mode."""
         return self._path if self.from_path else None
 
+    @property
+    def offset_pair(self) -> tuple[float, float]:
+        """Return ``(offset_left, offset_right)``, falling back to ``thickness / 2``."""
+        left = self.offset_left if self.offset_left is not None else self.thickness / 2
+        right = self.offset_right if self.offset_right is not None else self.thickness / 2
+        return left, right
+
     def to_dict(self) -> dict:
-        d = super().to_dict()  # includes "type", "name", style, hatch_pattern, properties
+        d = super().to_dict()
         if self.from_path and self._path is not None:
             d["mode"] = "path"
             d["path"] = self._path.to_dict()
@@ -111,30 +133,32 @@ class PendingWallGraph(PendingElement):
                 "height": self.height,
             }
         )
+        if self.offset_left is not None:
+            d["offset_left"] = self.offset_left
+        if self.offset_right is not None:
+            d["offset_right"] = self.offset_right
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "PendingWallGraph":
+        kwargs = dict(
+            thickness=float(d.get("thickness", 200)),
+            height=float(d.get("height", 3000)),
+            name=d.get("name", ""),
+            offset_left=float(d["offset_left"]) if "offset_left" in d else None,
+            offset_right=float(d["offset_right"]) if "offset_right" in d else None,
+        )
         if d.get("mode") == "path":
             from ifckit.geometry.path import Path as _Path
 
             return cls(
                 path=_Path.from_dict(d["path"]),
-                thickness=float(d.get("thickness", 200)),
-                height=float(d.get("height", 3000)),
-                name=d.get("name", ""),
                 angle_step_deg=float(d.get("angle_step_deg", 5.0)),
+                **kwargs,
             )
 
         # Fallback: edge mode (backward compat)
         verts = [Vec(*p) for p in d.get("vertices", [])]
         edges = [(int(a), int(b)) for a, b in d.get("edges", [])]
         plane = Plane.from_dict(d.get("plane", {}))
-        return cls(
-            vertices=verts,
-            edges=edges,
-            plane=plane,
-            thickness=float(d.get("thickness", 200)),
-            height=float(d.get("height", 3000)),
-            name=d.get("name", ""),
-        )
+        return cls(vertices=verts, edges=edges, plane=plane, **kwargs)

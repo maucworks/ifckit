@@ -1,7 +1,8 @@
 """Tests for extended Path functionality (M8)."""
 
 import pytest
-from ifckit.geometry import Vec, Plane, Path, Line, Arc
+
+from ifckit.geometry import Arc, Line, Path, Plane, Vec
 
 
 class TestIsClosed:
@@ -128,7 +129,7 @@ class TestMutators:
         p.reverse()
         p.assert_ccw()
         pts = [seg.start for seg in p.segments]
-        from ifckit.geometry import _signed_area, _polygon_normal
+        from ifckit.geometry import _polygon_normal, _signed_area
 
         n = _polygon_normal(pts)
         area = _signed_area(pts, n)
@@ -164,9 +165,15 @@ class TestOffset:
         assert abs(ys[1] - 945) < 1e-6
 
     def test_offset_raises_open(self):
-        p = Path.from_pts([Vec(0, 0, 0), Vec(1, 0, 0), Vec(2, 0, 0)])
-        with pytest.raises(ValueError, match="closed"):
-            p.offset(10)
+        p = Path.from_pts([Vec(0, 0, 0), Vec(1, 0, 0), Vec(2, 0, 0)], plane=Plane.world_xy())
+        # Open paths are now supported.  cap=False → parallel curve, cap=True → closed footprint.
+        o = p.offset(10)
+        assert not o.is_closed
+        assert o.start_point().equals(Vec(0, 10, 0))
+        assert o.end_point().equals(Vec(2, 10, 0))
+
+        o_cap = p.offset(10, cap=True)
+        assert o_cap.is_closed
 
     def test_offset_raises_arc(self):
         p = Path()
