@@ -1,0 +1,405 @@
+"""
+ifckit.geometry.curve
+=====================
+
+Curve — a NURBS/BSpline curve with evaluation (De Boor) and IFC serialisation.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
+
+from ifckit.geometry.primitives import Arc, Line, Vec
+
+if TYPE_CHECKING:
+    import ifcopenshell
+
+    from ifckit.geometry.path import Path
+
+
+# ---------------------------------------------------------------------------
+# 4D homogeneous helpers
+# ---------------------------------------------------------------------------
+
+_Homo4D = Tuple[float, float, float, float]  # (wx, wy, wz, w)
+
+
+def _build_full_knots(knots: Sequence[float], multiplicities: Sequence[int]) -> List[float]:
+    """Expand compact (knot, mult) pairs into the full knot vector."""
+    out: List[float] = []
+    for k, m in zip(knots, multiplicities):
+        out.extend([float(k)] * m)
+    return out
+
+
+def _cox_de_boor(span: int, p: int, u: float, uknots: List[float]) -> List[float]:
+    """Evaluate p+1 non‑zero B‑spline basis functions at *u* (Alg 2.2)."""
+    left: List[float] = [0.0] * (p + 1)
+    right: List[float] = [0.0] * (p + 1)
+    N: List[float] = [0.0] * (p + 1)
+    N[0] = 1.0
+    for j in range(1, p + 1):
+        left[j] = u - uknots[span + 1 - j]
+        right[j] = uknots[span + j] - u
+        saved = 0.0
+        for r in range(j):
+            denom = right[r + 1] + left[j - r]
+            if abs(denom) > 1e-12:
+                t = N[r] / denom
+                N[r] = saved + right[r + 1] * t
+                saved = left[j - r] * t
+            else:
+                saved = 0.0
+        N[j] = saved
+    return N
+
+
+def _cox_de_boor_deriv(span: int, p: int, u: float, uknots: List[float]) -> List[float]:
+    """First derivative of the p+1 non‑zero basis functions at *u*."""
+    Np = _cox_de_boor(span, p - 1, u, uknots)
+    dN: List[float] = [0.0] * (p + 1)
+    for i in range(p + 1):
+        j = span - p + i
+        a = uknots[j + p] - uknots[j]
+        b = uknots[j + p + 1] - uknots[j + 1]
+        if i < p:
+            dN[i] = (p / a) * Np[i] if abs(a) > 1e-12 else 0.0
+        if i > 0:
+            dN[i] -= (p / b) * Np[i - 1] if abs(b) > 1e-12 else 0.0
+    return dN
+
+
+def _find_knot_span(u: float, p: int, n: int, uknots: List[float]) -> int:
+    """Binary search for the knot span containing *u* (Alg 2.1)."""
+    if u >= uknots[n + 1]:
+        return n
+    if u <= uknots[p]:
+        return p
+    lo, hi = p, n + 1
+    mid = (lo + hi) // 2
+    while u < uknots[mid] or u >= uknots[mid + 1]:
+        if u < uknots[mid]:
+            hi = mid
+        else:
+            lo = mid
+        mid = (lo + hi) // 2
+    return mid
+
+
+# ---------------------------------------------------------------------------
+# Cox‑de Boor evaluation
+# ---------------------------------------------------------------------------
+
+
+def _eval_homo(p: int, uknots: List[float], pts: List[_Homo4D], u: float) -> _Homo4D:
+    """Evaluate a (homogeneous) BSpline at *u* via Cox‑de Boor basis functions."""
+    n = len(pts) - 1
+    span = _find_knot_span(u, p, n, uknots)
+    N = _cox_de_boor(span, p, u, uknots)
+    res = [0.0, 0.0, 0.0, 0.0]
+    for i in range(p + 1):
+        idx = span - p + i
+        w = pts[idx]
+        ni = N[i]
+        res[0] += w[0] * ni
+        res[1] += w[1] * ni
+        res[2] += w[2] * ni
+        res[3] += w[3] * ni
+    return tuple(res)  # type: ignore[return-value]
+
+
+# ---------------------------------------------------------------------------
+# Curve
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Curve
+# ---------------------------------------------------------------------------
+
+
+class Curve:
+    """A NURBS / BSpline curve evaluated via the De Boor algorithm.
+
+    IFC convention: the parameter lives in the knot domain
+    ``[knots[0], knots[-1]]``.  ``Curve.point_at(t)`` accepts a **normalised**
+    parameter ``t ∈ [0, 1]`` that is linearly mapped to the knot domain,
+    consistent with ``Path.point_at(t)``.
+
+    Args:
+        control_points:  Control polygon vertices.
+        knots:           Unique knot values (compact form).
+        multiplicities:  Multiplicity of each unique knot.
+        degree:          Curve degree.
+        weights:         Weights for rational NURBS (``None`` = non‑rational).
+        closed:          Whether the curve is closed in IFC sense.
+    """
+
+    def __init__(
+        self,
+        control_points: Sequence[Vec],
+        knots: Sequence[float],
+        multiplicities: Sequence[int],
+        degree: int,
+        weights: Optional[Sequence[float]] = None,
+        closed: bool = False,
+    ) -> None:
+        ncpts = len(control_points)
+        nknots = sum(multiplicities)
+        expected = ncpts + degree + 1
+        if nknots != expected:
+            raise ValueError(
+                f"Knot vector length ({nknots}) must equal control_points + degree + 1 ({expected})"
+            )
+        if degree < 1:
+            raise ValueError(f"Degree must be >= 1, got {degree}")
+
+        self.degree = degree
+        self.points = [Vec(*p) if not isinstance(p, Vec) else p for p in control_points]
+        self.knots = list(knots)
+        self.multiplicities = list(multiplicities)
+        self._weights = list(weights) if weights is not None else None
+        self.closed = closed
+
+        self._uknots = _build_full_knots(self.knots, self.multiplicities)
+
+    # ── properties ──────────────────────────────────────────────────
+
+    @property
+    def rational(self) -> bool:
+        return self._weights is not None
+
+    @property
+    def knot_domain(self) -> Tuple[float, float]:
+        return self._uknots[0], self._uknots[-1]
+
+    # ── parameter mapping ──────────────────────────────────────────
+
+    def _u_of_t(self, t: float) -> float:
+        u0, u1 = self.knot_domain
+        if u1 - u0 < 1e-12:
+            return u0
+        t = max(0.0, min(1.0, t))
+        return u0 + t * (u1 - u0)
+
+    # ── evaluation ──────────────────────────────────────────────────
+
+    def _homo_points(self) -> List[_Homo4D]:
+        n = len(self.points)
+        w = self._weights if self._weights is not None else [1.0] * n
+        return [
+            (self.points[i].x * w[i], self.points[i].y * w[i], self.points[i].z * w[i], w[i])
+            for i in range(n)
+        ]
+
+    def point_at(self, t: float) -> Vec:
+        """Evaluate point at normalised parameter ``t ∈ [0, 1]``."""
+        u = self._u_of_t(t)
+        h = _eval_homo(self.degree, self._uknots, self._homo_points(), u)
+        if abs(h[3]) > 1e-12:
+            return Vec(h[0] / h[3], h[1] / h[3], h[2] / h[3])
+        return Vec(h[0], h[1], h[2])
+
+    def tangent_at(self, t: float) -> Vec:
+        """Evaluate unit tangent at normalised parameter ``t ∈ [0, 1]``.
+
+        Uses central finite differences for robustness at clamped endpoints.
+        """
+        eps = 1e-6 * (self._uknots[-1] - self._uknots[0]) if len(self._uknots) > 1 else 1e-6
+        t0 = max(0.0, t - eps)
+        t1 = min(1.0, t + eps)
+        p0 = self.point_at(t0)
+        p1 = self.point_at(t1)
+        v = (p1 - p0) / (t1 - t0)
+        n = v.normalized()
+        return n if n is not None else Vec(0, 0, 0)
+
+    @property
+    def length(self) -> float:
+        """Numerical arc length via chord-length approximation."""
+        n = max(50, 4 * self.degree)
+        pts = self.sample(n)
+        return sum((pts[i + 1] - pts[i]).length() for i in range(len(pts) - 1))
+
+    def sample(self, n: int = 50) -> List[Vec]:
+        """Sample *n* evenly‑spaced points in parameter space ``[0, 1]``."""
+        return [self.point_at(i / max(n - 1, 1)) for i in range(n)]
+
+    @property
+    def start_point(self) -> Vec:
+        return self.point_at(0.0)
+
+    @property
+    def end_point(self) -> Vec:
+        return self.point_at(1.0)
+
+    # ── bi‑arc fitting ──────────────────────────────────────────────
+
+    def to_biarcs(self, tol: float = 0.01, max_iteration: int = 10) -> "Path":
+        """Approximate this NURBS curve as bi‑arcs → ``Path`` of ``Line`` + ``Arc``.
+
+        Uses recursive bi‑arc fitting (``ifckit.geometry.biarc.fit_biarcs``).
+
+        Args:
+            tol:           Maximum deviation from the original curve.
+            max_iteration: Maximum recursion depth (default 10).
+
+        Returns:
+            A ``Path`` containing only ``Line`` and ``Arc`` segments.
+        """
+        from ifckit.geometry.biarc import fit_biarcs
+        from ifckit.geometry.path import Path
+
+        segments = fit_biarcs(self.point_at, tolerance=tol, max_depth=max_iteration)
+        path = Path()
+        for seg in segments:
+            if isinstance(seg, Arc):
+                path._segments.append(seg)
+            elif isinstance(seg, Line):
+                path._segments.append(seg)
+        return path
+
+    def to_path(self, tolerance: float = 0.01, max_depth: int = 10) -> "Path":
+        """Alias for :meth:`to_biarcs`."""
+        return self.to_biarcs(tol=tolerance, max_iteration=max_depth)
+
+    # ── IFC serialisation ──────────────────────────────────────────
+
+    def _to_ifc_points(self, ifc_file: "ifcopenshell.file") -> list:
+        from ifckit.builders._geom import pt3
+
+        return [pt3(ifc_file, v.x, v.y, v.z) for v in self.points]
+
+    def to_ifc_bspline(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Create an ``IfcBSplineCurveWithKnots`` (non‑rational)."""
+        if self.rational:
+            raise ValueError("Use to_ifc_rational() for rational NURBS curves")
+        e = ifc_file.create_entity("IfcBSplineCurveWithKnots")
+        e.Degree = self.degree
+        e.ControlPointsList = self._to_ifc_points(ifc_file)
+        e.CurveForm = "UNSPECIFIED"
+        e.ClosedCurve = self.closed
+        e.SelfIntersect = False
+        e.Knots = self.knots
+        e.KnotMultiplicities = self.multiplicities
+        e.KnotSpec = "UNSPECIFIED"
+        return e
+
+    def to_ifc_rational(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Create an ``IfcRationalBSplineCurveWithKnots``."""
+        if not self.rational:
+            raise ValueError("Use to_ifc_bspline() for non‑rational curves")
+        e = ifc_file.create_entity("IfcRationalBSplineCurveWithKnots")
+        e.Degree = self.degree
+        e.ControlPointsList = self._to_ifc_points(ifc_file)
+        e.CurveForm = "UNSPECIFIED"
+        e.ClosedCurve = self.closed
+        e.SelfIntersect = False
+        e.Knots = self.knots
+        e.KnotMultiplicities = self.multiplicities
+        e.KnotSpec = "UNSPECIFIED"
+        e.WeightsData = self._weights
+        return e
+
+    # ── serialisation ──────────────────────────────────────────────
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "degree": self.degree,
+            "control_points": [v.to_dict() for v in self.points],
+            "knots": self.knots,
+            "multiplicities": self.multiplicities,
+            "closed": self.closed,
+        }
+        if self._weights is not None:
+            d["weights"] = self._weights
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Curve":
+        return cls(
+            control_points=[Vec.from_dict(v) for v in d["control_points"]],
+            knots=d["knots"],
+            multiplicities=d["multiplicities"],
+            degree=d["degree"],
+            weights=d.get("weights"),
+            closed=d.get("closed", False),
+        )
+
+    def __repr__(self) -> str:
+        w_str = ", rational" if self.rational else ""
+        return (
+            f"Curve(degree={self.degree}, "
+            f"{len(self.points)} points, "
+            f"knots={self.knots[:3]}...{self.knots[-3:]}{w_str})"
+        )
+
+    # ── OCC bridge ──────────────────────────────────────────────────
+
+    @classmethod
+    def from_occ_edge(cls, edge) -> "Curve":
+        """Create a Curve from an OCC ``TopoDS_Edge``.
+
+        Supports both FreeCAD ``Part.Edge`` and raw ``pythonocc-core``
+        ``TopoDS_Edge``.  The edge must contain a ``Geom_BSplineCurve``
+        — lines and circles are not supported (use ``Path`` for those).
+        """
+        # Try FreeCAD API (edge.Curve.getPoles)
+        curve_attr = getattr(edge, "Curve", None)
+        if curve_attr is not None and hasattr(curve_attr, "getPoles"):
+            curve = curve_attr
+            poles = [Vec(p.x, p.y, p.z) for p in curve.getPoles()]
+            knots = list(curve.getKnots())
+            mults = list(curve.getMultiplicities())
+            degree = curve.Degree
+            weights = list(curve.getWeights()) if curve.isRational() else None
+            closed = curve.isPeriodic()
+            return cls(
+                control_points=poles,
+                knots=knots,
+                multiplicities=mults,
+                degree=degree,
+                weights=weights,
+                closed=closed,
+            )
+
+        # Fall back to pythonocc-core API
+        try:
+            from OCC.Core.BRep import BRep_Tool
+            from OCC.Core.Geom import Geom_BSplineCurve
+        except ImportError:
+            raise ImportError("Curve.from_occ_edge() requires either FreeCAD or pythonocc-core")
+
+        result = BRep_Tool.Curve(edge)
+        if result is None:
+            raise TypeError("Edge has no curve")
+        curve_handle = result[0]  # first element of the (handle, first, last) tuple
+
+        # Downcast to BSpline
+        bspline = Geom_BSplineCurve.DownCast(curve_handle)
+        if bspline is None:
+            raise TypeError("Edge contains a non-BSpline curve. Use Path for line/circle segments.")
+
+        poles = []
+        for i in range(bspline.NbPoles()):
+            p = bspline.Pole(i + 1)
+            poles.append(Vec(p.X(), p.Y(), p.Z()))
+
+        knots = [bspline.Knot(i + 1) for i in range(bspline.NbKnots())]
+        mults = [bspline.Multiplicity(i + 1) for i in range(bspline.NbKnots())]
+        degree = bspline.Degree()
+        weights = (
+            [bspline.Weight(i + 1) for i in range(bspline.NbPoles())]
+            if bspline.IsRational()
+            else None
+        )
+        closed = bspline.IsPeriodic()
+
+        return cls(
+            control_points=poles,
+            knots=knots,
+            multiplicities=mults,
+            degree=degree,
+            weights=weights,
+            closed=closed,
+        )

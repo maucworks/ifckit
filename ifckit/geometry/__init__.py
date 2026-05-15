@@ -9,9 +9,14 @@ Modules
 -------
 primitives  — Vec, Plane, Line, Arc, Polyline
 path        — Path, assemble_path
+biarc       — solve_biarc, fit_biarcs
+curve       — Curve
+surface     — Surface (also: occ_eval_point, occ_intersect_plane)
 frames      — FrameField, transport_frames, fixed_ref_frames, upvector_frames
 """
 
+from ifckit.geometry.biarc import fit_biarcs, solve_biarc
+from ifckit.geometry.curve import Curve
 from ifckit.geometry.frames import (
     FrameField,
     fixed_ref_frames,
@@ -28,6 +33,7 @@ from ifckit.geometry.primitives import (
     _polygon_normal,
     _signed_area,
 )
+from ifckit.geometry.surface import Surface
 
 __all__ = [
     # primitives
@@ -41,6 +47,12 @@ __all__ = [
     # path
     "Path",
     "assemble_path",
+    # curve
+    "Curve",
+    "solve_biarc",
+    "fit_biarcs",
+    # surface
+    "Surface",
     # frames
     "FrameField",
     "transport_frames",
