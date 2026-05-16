@@ -318,36 +318,30 @@ class Surface:
         return cls.from_occ_surface(bspline)
 
     @classmethod
-    def fill(cls, curves, degree=3, n_samples=10, constraints=None, supports=None):
-        """Create a surface bounded by 3‑4 curves (Coons‑like fill).
+    def fill(cls, curves, degree=3, n_samples=10):
+        """Create a surface bounded by 3‑4 curves via Coons blending.
 
-        By default the interior is estimated via bilinear Coons blending
-        from the boundary curves, then a BSpline surface is fit through
-        the resulting point grid.  When *constraints* are specified the
-        OCC ``BRepOffsetAPI_MakeFilling`` algorithm is used instead,
-        which supports per‑edge **G1** (tangent) continuity against
-        optional support surfaces.
+        The interior is estimated via bilinear Coons blending from the
+        boundary curves, then a BSpline surface is fit through the
+        resulting point grid.  Edges are auto‑aligned to the Coons
+        convention (u‑edges left→right, v‑edges bottom→top).
+
+        For per‑edge G1 constraints and support surfaces use
+        :meth:`patch`.
 
         Args:
-            curves:      Boundary curves (3 or 4).
-            degree:      Target degree.
-            n_samples:   Number of subdivisions (Coons fallback only).
-            constraints: Per‑edge continuity ``["C0", "G1", …]``.
-                         ``None`` → Coons blending (no tangents).
-            supports:    Per‑edge support ``Surface`` for G1 edges
-                         (``None`` = no support). Ignored for C0 edges.
+            curves:    Boundary curves (3 or 4).
+            degree:    Target degree.
+            n_samples: Number of subdivisions in U and V.
 
         Returns:
             A new Surface.
         """
         n = len(curves)
         if n not in (3, 4):
-            raise ValueError("fill() requires 3 or 4 boundary curves")
+            raise ValueError("fill() requires 3 or 4 boundary curves. For other sizes use patch().")
 
-        # Auto‑align: reverse any edge whose param direction goes against
-        # the Coons convention.  For a rectangle-like patch:
-        #   u‑edges (c0, c2): start at lower X → end at higher X
-        #   v‑edges (c1, c3): start at lower Y → end at higher Y
+        # Auto‑align to Coons convention
         curves = list(curves)
         eps = 1e-4
         for i in range(n):
@@ -360,62 +354,93 @@ class Surface:
                 if s.y > e.y + eps:
                     curves[i] = curves[i].reverse()
 
-        # ── Backward‑compatible Coons path ──────────────────────────
-        if constraints is None or all(c.upper() == "C0" for c in (constraints or ["C0"] * n)):
-            require_occ()
-            from OCC.Core.GeomAbs import GeomAbs_C2
-            from OCC.Core.GeomAPI import GeomAPI_PointsToBSplineSurface
-            from OCC.Core.gp import gp_Pnt
-            from OCC.Core.TColgp import TColgp_Array2OfPnt
-
-            ns = n_samples
-            c0, c1, c2 = curves[0], curves[1], curves[2]
-            c3 = curves[3] if n == 4 else None
-
-            grid = TColgp_Array2OfPnt(1, ns + 1, 1, ns + 1)
-            for i in range(ns + 1):
-                u = i / ns
-                for j in range(ns + 1):
-                    v = j / ns
-                    # Coons blending:
-                    #   c0 = bottom (param u, left→right)
-                    #   c1 = right  (param v, bottom→top)
-                    #   c2 = top    (param u, left→right)
-                    #   c3 = left   (param v, bottom→top)
-                    pu = c0.point_at(u) * (1.0 - v) + c2.point_at(u) * v
-                    pv = (c3 or c1).point_at(v) * (1.0 - u) + c1.point_at(v) * u
-                    corners = (
-                        c0.point_at(0) * (1.0 - u) * (1.0 - v)  # BL
-                        + c0.point_at(1) * u * (1.0 - v)  # BR
-                        + (c2.point_at(1) if n == 4 else c0.point_at(1)) * u * v  # TR
-                        + (c2.point_at(0) if n == 4 else c0.point_at(0)) * (1.0 - u) * v  # TL
-                    )
-                    p = pu + pv - corners
-                    grid.SetValue(i + 1, j + 1, gp_Pnt(p.x, p.y, p.z))
-
-            dg = degree
-            if dg > ns:
-                dg = ns
-            occ_surf = GeomAPI_PointsToBSplineSurface(
-                grid,
-                3,
-                max(3, dg + 2),
-                GeomAbs_C2,
-                1e-3,
-            )
-            return cls.from_occ_surface(occ_surf.Surface())
-
-        # ── BRepOffsetAPI_MakeFilling path (supports G1 — has support faces) ──
         require_occ()
-        import warnings as _w
+        from OCC.Core.GeomAbs import GeomAbs_C2
+        from OCC.Core.GeomAPI import GeomAPI_PointsToBSplineSurface
+        from OCC.Core.gp import gp_Pnt
+        from OCC.Core.TColgp import TColgp_Array2OfPnt
+
+        ns = n_samples
+        c0, c1, c2 = curves[0], curves[1], curves[2]
+        c3 = curves[3] if n == 4 else None
+
+        grid = TColgp_Array2OfPnt(1, ns + 1, 1, ns + 1)
+        for i in range(ns + 1):
+            u = i / ns
+            for j in range(ns + 1):
+                v = j / ns
+                pu = c0.point_at(u) * (1.0 - v) + c2.point_at(u) * v
+                pv = (c3 or c1).point_at(v) * (1.0 - u) + c1.point_at(v) * u
+                corners = (
+                    c0.point_at(0) * (1.0 - u) * (1.0 - v)
+                    + c0.point_at(1) * u * (1.0 - v)
+                    + (c2.point_at(1) if n == 4 else c0.point_at(1)) * u * v
+                    + (c2.point_at(0) if n == 4 else c0.point_at(0)) * (1.0 - u) * v
+                )
+                p = pu + pv - corners
+                grid.SetValue(i + 1, j + 1, gp_Pnt(p.x, p.y, p.z))
+
+        dg = degree
+        if dg > ns:
+            dg = ns
+        occ_surf = GeomAPI_PointsToBSplineSurface(
+            grid,
+            3,
+            max(3, dg + 2),
+            GeomAbs_C2,
+            1e-3,
+        )
+        return cls.from_occ_surface(occ_surf.Surface())
+
+    @classmethod
+    def patch(
+        cls,
+        curves,
+        constraints=None,
+        supports=None,
+    ) -> "Surface":
+        """Create a surface bounded by ≥2 curves via OCC MakeFilling.
+
+        Supports per‑edge **G1** (tangent) continuity against optional
+        support surfaces.  Edges are auto‑aligned to form a closed loop.
+
+        Args:
+            curves:      Boundary curves (≥2).
+            constraints: Per‑edge continuity ``["C0", "G1", …]``.
+                        ``None`` or ``"C0"`` → position only.
+            supports:    Per‑edge support ``Surface`` for G1 edges
+                        (``None`` = no support). G1 edges require a
+                        support.
+
+        Returns:
+            A new Surface.
+
+        Raises:
+            ValueError: If G1 is specified without a support surface.
+        """
+        n = len(curves)
+        if n < 2:
+            raise ValueError("patch() requires at least 2 curves")
+
+        # Auto‑align to a closed loop: curve[i].end ≈ curve[i+1].start
+        curves = list(curves)
+        eps = 1e-4
+        for i in range(n):
+            j = (i + 1) % n
+            d_end_start = (curves[i].point_at(1) - curves[j].point_at(0)).length()
+            d_start_start = (curves[i].point_at(0) - curves[j].point_at(0)).length()
+            if d_end_start > eps and d_start_start < eps:
+                curves[i] = curves[i].reverse()
+
+        require_occ()
 
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
         from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeFilling
+        from OCC.Core.Geom import Geom_BSplineSurface
         from OCC.Core.GeomAbs import GeomAbs_C0, GeomAbs_G1
         from OCC.Core.TopAbs import TopAbs_FACE
         from OCC.Core.TopExp import TopExp_Explorer
 
-        # Map constraint strings → OCC constants
         _CONST_MAP = {"C0": GeomAbs_C0, "G1": GeomAbs_G1}
         full_constraints = [
             _CONST_MAP.get(c.upper(), GeomAbs_C0) if c else GeomAbs_C0
@@ -424,7 +449,6 @@ class Surface:
         while len(full_constraints) < n:
             full_constraints.append(GeomAbs_C0)
 
-        # Validate: G1 edges need a support face
         if supports is None:
             supports = [None] * n
         for i, (c, s) in enumerate(zip(full_constraints, supports)):
@@ -442,41 +466,44 @@ class Surface:
             gc = full_constraints[i]
             supp = supports[i] if supports and i < len(supports) else None
             if supp is not None:
-                occ_face = _build_occ_face(supp)
-                filler.Add(edge, occ_face, gc)
+                filler.Add(edge, _build_occ_face(supp), gc)
             else:
                 filler.Add(edge, gc)
 
-        try:
-            filler.Build()
-        except RuntimeError:
-            _w.warn(
-                "Surface.fill() with constraints failed — falling back to C0 Coons blending.",
-                stacklevel=3,
-            )
-            return cls.fill(curves, degree=degree, n_samples=n_samples)
-
+        filler.Build()
         if not filler.IsDone():
-            _w.warn(
-                "Surface.fill() MakeFilling returned IsDone=False — "
-                "falling back to C0 Coons blending.",
-                stacklevel=3,
-            )
-            return cls.fill(curves, degree=degree, n_samples=n_samples)
+            raise RuntimeError("Patch MakeFilling returned IsDone=False")
 
         exp = TopExp_Explorer(filler.Shape(), TopAbs_FACE)
         if not exp.More():
-            raise RuntimeError("MakeFilling produced no face")
-        face = exp.Current()
-        adaptor = BRepAdaptor_Surface(face)
+            raise RuntimeError("Patch produced no face")
+        adaptor = BRepAdaptor_Surface(exp.Current())
         geom = adaptor.Surface().Surface()
-        from OCC.Core.Geom import Geom_BSplineSurface
-
         bspline = Geom_BSplineSurface.DownCast(geom)
         if bspline is None:
-            raise RuntimeError("MakeFilling result is not a BSpline surface")
+            raise RuntimeError("Patch result is not a BSpline surface")
 
         return cls.from_occ_surface(bspline)
+
+    @classmethod
+    def sweep(
+        cls,
+        rails: "Sequence[Curve]",
+        profiles: "Sequence[Curve]",
+    ) -> "Surface":
+        """Create a swept surface (1‑2 rails × 1+ profiles).
+
+        Uses OCC ``BRepOffsetAPI_MakePipeShell``.  Not yet implemented
+        — skeleton only.
+
+        Args:
+            rails:    Guide curves (1 or 2).
+            profiles: Cross‑section curves (1 or more).
+
+        Raises:
+            NotImplementedError: Always (skeleton).
+        """
+        raise NotImplementedError("Surface.sweep() is not yet implemented")
 
 
 def _build_occ_edge(curve: "Curve") -> object:
