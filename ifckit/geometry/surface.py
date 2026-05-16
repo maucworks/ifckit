@@ -544,30 +544,38 @@ class Surface:
     def ribbon(
         cls,
         curve: "Curve",
-        angle: float = 0.0,
+        angles: "Sequence[float] | None" = None,
         width: float = 100.0,
-        angle_end: "float | None" = None,
-        angle_deg: "float | None" = None,
-        angle_end_deg: "float | None" = None,
+        angle: float | None = None,
+        angle_end: float | None = None,
+        angle_deg: float | None = None,
+        angle_end_deg: float | None = None,
         n_pts: int = 20,
     ) -> "Surface":
         """Create a ribbon (ruled support surface) along a curve.
 
         The ribbon shares one exact edge with *curve* and extends outward
-        by *width* at the given *angle*.  The result can be used as a G1
+        by *width* at the given *angles*.  The result can be used as a G1
         support surface in :meth:`patch`.
 
-        When *angle_end* differs from *angle* the ribbon twists linearly
-        from start to end.
+        ``angles`` is a list of rotation angles (radians) around the curve
+        tangent (0 = horizontal perpendicular).  With one angle there is
+        no twist; with two the ribbon twists linearly from start to end;
+        with more the angles are distributed at equal chord‑length
+        intervals.
+
+        For backward compatibility *angle* / *angle_end* (or their
+        ``_deg`` variants) may be used instead of a 2‑element list.
 
         Internally builds a ruled surface between the original curve and
         an offset curve via OCC ``BRepFill_Generator``.
 
         Args:
             curve:         Spine curve — the ribbon's shared edge.
-            angle:         Start rotation around tangent (rad, 0=horizontal).
+            angles:        Rotation angles around tangent (rad).
             width:         Ribbon width / offset distance.
-            angle_end:     End rotation (rad).  ``None`` = same as *angle*.
+            angle:         Start angle (rad).  Overridden by *angles*.
+            angle_end:     End angle (rad).  Overridden by *angles*.
             angle_deg:     Shorthand — *angle* in degrees.
             angle_end_deg: Shorthand — *angle_end* in degrees.
             n_pts:         Number of samples for the offset curve.
@@ -575,12 +583,20 @@ class Surface:
         Returns:
             A new Surface suitable as G1 support for :meth:`patch`.
         """
-        if angle_deg is not None:
-            angle = math.radians(angle_deg)
-        if angle_end_deg is not None:
-            angle_end = math.radians(angle_end_deg)
-        if angle_end is None:
-            angle_end = angle
+        # Resolve angles list from the various input styles
+        if angles is not None:
+            ang_list = list(angles)
+        elif angle_deg is not None or angle_end_deg is not None:
+            a0 = math.radians(angle_deg) if angle_deg is not None else 0.0
+            a1 = math.radians(angle_end_deg) if angle_end_deg is not None else a0
+            ang_list = [a0, a1]
+        elif angle is not None or angle_end is not None:
+            a0 = angle if angle is not None else 0.0
+            a1 = angle_end if angle_end is not None else a0
+            ang_list = [a0, a1]
+        else:
+            ang_list = [0.0]
+
         require_occ()
 
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
@@ -592,14 +608,24 @@ class Surface:
         up = Vec(0, 0, 1)
 
         # ── Sample curve and compute offset points ─────────────────
+        def _interp_angle(t):
+            n = len(ang_list)
+            if n == 1:
+                return ang_list[0]
+            pos = t * (n - 1)
+            i = int(pos)
+            if i >= n - 1:
+                return ang_list[-1]
+            frac = pos - i
+            return ang_list[i] + frac * (ang_list[i + 1] - ang_list[i])
+
         off_pts: "list[Vec]" = []
         for i in range(n_pts):
             t = i / (n_pts - 1)
             p = curve.point_at(t)
             tan = curve.tangent_at(t)
-            # Perpendicular = tangent × world‑up, then rotate around tangent
             perp = (tan**up).normalized()
-            a = angle + (angle_end - angle) * t
+            a = _interp_angle(t)
             if abs(a) > 1e-12:
                 c, s = math.cos(a), math.sin(a)
                 perp = perp * c + up * s
