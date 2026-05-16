@@ -602,6 +602,9 @@ class Surface:
         # ── Pipe shell sweep ──────────────────────────────────────
         pipe = BRepOffsetAPI_MakePipeShell(spine_wire)
         pipe.SetTransitionMode(BRepBuilderAPI_RightCorner)
+        pipe.SetForceApproxC1(True)
+        pipe.SetMaxDegree(8)
+        pipe.SetMaxSegments(20)
         pipe.Add(w0, v0)
         pipe.Add(w1, v1)
         pipe.Build()
@@ -618,9 +621,57 @@ class Surface:
             raise RuntimeError("Ribbon produced no face")
         adaptor = BRepAdaptor_Surface(exp.Current())
         geom = adaptor.Surface().Surface()
-        bspline = Geom_BSplineSurface.DownCast(geom)
+
+        def _downcast(surf):
+            try:
+                return Geom_BSplineSurface.DownCast(surf)
+            except BaseException:
+                return None
+
+        bspline = _downcast(geom)
         if bspline is None:
-            raise RuntimeError("Ribbon result is not a BSpline surface")
+            # Fallback: build BSpline from curve + manually computed offset.
+            # (Pipe shell returns a plane for very straight curves.)
+            from OCC.Core.GeomAbs import GeomAbs_C1
+            from OCC.Core.GeomAPI import GeomAPI_PointsToBSplineSurface
+            from OCC.Core.gp import gp_Pnt
+            from OCC.Core.TColgp import TColgp_Array2OfPnt
+
+            n = 16
+            pts = TColgp_Array2OfPnt(1, n, 1, 2)
+            for i in range(n):
+                t = i / (n - 1)
+                p = curve.point_at(t)
+                pts.SetValue(i + 1, 1, gp_Pnt(p.x, p.y, p.z))
+                # Compute offset at this t with interpolated angle
+                a = angle + (angle_end - angle) * t
+                tan = curve.tangent_at(t)
+                tv = gp_Vec(tan.x, tan.y, tan.z)
+                perp = up.Crossed(tv)
+                perp.Normalize()
+                if abs(a) > 1e-12:
+                    c, s = math.cos(a), math.sin(a)
+                    perp = gp_Vec(
+                        perp.X() * c + up.X() * s,
+                        perp.Y() * c + up.Y() * s,
+                        perp.Z() * c + up.Z() * s,
+                    )
+                off = gp_Pnt(
+                    p.x + perp.X() * width,
+                    p.y + perp.Y() * width,
+                    p.z + perp.Z() * width,
+                )
+                pts.SetValue(i + 1, 2, off)
+            occ_surf = GeomAPI_PointsToBSplineSurface(
+                pts,
+                1,
+                3,
+                GeomAbs_C1,
+                1e-2,
+            )
+            bspline = _downcast(occ_surf.Surface())
+            if bspline is None:
+                raise RuntimeError("Ribbon approx result is not a BSpline surface")
         return cls.from_occ_surface(bspline)
 
 
