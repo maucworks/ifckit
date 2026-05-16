@@ -380,7 +380,90 @@ class Curve:
             degree=3,
         )
 
-    # ── OCC bridge ──────────────────────────────────────────────────
+    # ── Interpolation through points ────────────────────────────────
+
+    @classmethod
+    def from_points(
+        cls,
+        points: "Sequence[Vec]",
+        degree: int = 3,
+        tan_start: "Vec | None" = None,
+        tan_end: "Vec | None" = None,
+        knots: "Sequence[float] | None" = None,
+    ) -> "Curve":
+        """Interpolate a BSpline curve through a set of points.
+
+        Uses OCC ``GeomAPI_Interpolate`` (requires ``pythonocc-core``).
+
+        Args:
+            points:    Points the curve must pass through (minimum 2).
+            degree:    Target degree (default 3).  Minimum is clamped to
+                      ``min(len(points) - 1, 3)``.
+            tan_start: Optional start tangent for G1 end condition.
+            tan_end:   Optional end tangent for G1 end condition.
+            knots:     Optional explicit knot parameters ``∈ [0, 1]``.
+                      Length must equal ``len(points)``.  When ``None``
+                      chord‑length parameterisation is used.
+
+        Returns:
+            A new ``Curve`` through all *points*.
+        """
+        try:
+            from OCC.Core.Geom import Geom_BSplineCurve
+            from OCC.Core.GeomAPI import GeomAPI_Interpolate
+            from OCC.Core.gp import gp_Pnt, gp_Vec
+            from OCC.Core.TColgp import TColgp_HArray1OfPnt
+            from OCC.Core.TColStd import TColStd_HArray1OfReal
+        except ImportError:
+            raise ImportError("Curve.from_points() requires pythonocc-core")
+
+        n = len(points)
+        if n < 2:
+            raise ValueError("Need at least 2 points")
+
+        pts_arr = TColgp_HArray1OfPnt(1, n)
+        for i, p in enumerate(points):
+            pts_arr.SetValue(i + 1, gp_Pnt(p.x, p.y, p.z))
+
+        if knots is not None:
+            if len(knots) != n:
+                raise ValueError(f"knots length ({len(knots)}) must match points ({n})")
+            par_arr = TColStd_HArray1OfReal(1, n)
+            for i, k in enumerate(knots):
+                par_arr.SetValue(i + 1, float(k))
+            interp = GeomAPI_Interpolate(pts_arr, par_arr, False, 1e-6)
+        else:
+            interp = GeomAPI_Interpolate(pts_arr, False, 1e-6)
+
+        if tan_start is not None or tan_end is not None:
+            if tan_start is not None and tan_end is not None:
+                interp.Load(
+                    gp_Vec(tan_start.x, tan_start.y, tan_start.z),
+                    gp_Vec(tan_end.x, tan_end.y, tan_end.z),
+                )
+            elif tan_start is not None:
+                interp.Load(gp_Vec(tan_start.x, tan_start.y, tan_start.z))
+            else:
+                interp.Load(gp_Vec(tan_end.x, tan_end.y, tan_end.z))
+
+        interp.Perform()
+
+        curve = interp.Curve()
+        bspline = Geom_BSplineCurve.DownCast(curve)
+        if bspline is None:
+            raise RuntimeError("GeomAPI_Interpolate did not produce a BSpline")
+
+        poles = [
+            Vec(bspline.Pole(i + 1).X(), bspline.Pole(i + 1).Y(), bspline.Pole(i + 1).Z())
+            for i in range(bspline.NbPoles())
+        ]
+
+        return cls(
+            control_points=poles,
+            knots=[bspline.Knot(i + 1) for i in range(bspline.NbKnots())],
+            multiplicities=[bspline.Multiplicity(i + 1) for i in range(bspline.NbKnots())],
+            degree=bspline.Degree(),
+        )
 
     @classmethod
     def from_occ_edge(cls, edge) -> "Curve":
