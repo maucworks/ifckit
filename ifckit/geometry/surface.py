@@ -113,38 +113,33 @@ class Surface:
         nv: int = 20,
         label: str = "",
         material: "dict | None" = None,
+        deflection: "float | object" = 0.01,
     ) -> dict:
-        """Triangulate the surface into a dict for 3D viewer consumption.
+        """Triangulate the surface via OCC and return a dict for 3D viewer.
+
+        Uses OCC ``BRepMesh_IncrementalMesh`` (requires ``pythonocc-core``).
 
         Args:
-            nu:         Number of U‑samples.
-            nv:         Number of V‑samples.
+            nu:         Ignored (OCC adaptive mesh).
+            nv:         Ignored (OCC adaptive mesh).
             label:      Display name.
             material:   Visual properties (color, opacity, …).
+            deflection: Mesh deflection / ``TessellationDetail``.
 
         Returns:
             A dict with ``primitive="triangles"``, ``positions``,
             ``indices``, and optional ``label``, ``material``.
         """
-        vertices: "list[Vec]" = []
-        for iu in range(nu):
-            for iv in range(nv):
-                u = iu / (nu - 1)
-                v = iv / (nv - 1)
-                vertices.append(self.point_at(u, v))
+        from ifckit.geometry.surface import occ_tessellate, require_occ
 
-        indices: "list[int]" = []
-        for iu in range(nu - 1):
-            for iv in range(nv - 1):
-                i0 = iu * nv + iv
-                i1 = iu * nv + iv + 1
-                i2 = (iu + 1) * nv + iv
-                i3 = (iu + 1) * nv + iv + 1
-                indices.extend([i0, i1, i2, i1, i3, i2])
+        require_occ()
+        verts, tris = occ_tessellate(self, deflection)
+        positions = [c for v in verts for c in v]
+        indices = [i - 1 for tri in tris for i in tri]
 
         d: dict = {
             "primitive": "triangles",
-            "positions": [c for v in vertices for c in (v.x, v.y, v.z)],
+            "positions": positions,
             "indices": indices,
             "label": label or "Surface",
         }
