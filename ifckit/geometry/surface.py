@@ -512,51 +512,116 @@ class Surface:
         curve: "Curve",
         angle: float = 0.0,
         width: float = 100.0,
-        n_pts: int = 50,
+        angle_end: "float | None" = None,
         angle_deg: "float | None" = None,
+        angle_end_deg: "float | None" = None,
     ) -> "Surface":
-        """Create a ribbon (ruled support surface) along a curve.
+        """Create a ribbon (swept support surface) along a curve.
 
-        The ribbon shares one exact edge with *curve* and extends outward
-        by *width* at the given *angle* relative to the horizontal
-        perpendicular direction ``tangent × world_Z``.  The result can be
-        used as a G1 support surface in :meth:`patch`.
+        Sweeps a line segment from the start of *curve* to the end,
+        morphing the profile angle via OCC ``BRepOffsetAPI_MakePipeShell``.
+        The ribbon shares one exact edge with *curve*.
 
         Args:
-            curve:     Spine curve — the ribbon's shared edge.
-            angle:     Rotation around the curve tangent (radians).
-                       0 = horizontal perpendicular (default).
-            width:     Ribbon width / offset distance.
-            n_pts:     Sampling density for the offset curve.
-            angle_deg: Shorthand — sets *angle* from degrees.
+            curve:         Spine / rail curve.
+            angle:         Start rotation around tangent (rad, 0=horizontal).
+            width:         Ribbon width / offset distance.
+            angle_end:     End rotation (rad).  ``None`` = same as *angle*.
+            angle_deg:     Shorthand — *angle* in degrees.
+            angle_end_deg: Shorthand — *angle_end* in degrees.
 
         Returns:
-            A new Surface.
+            A new Surface suitable as G1 support for :meth:`patch`.
         """
         if angle_deg is not None:
             angle = math.radians(angle_deg)
+        if angle_end_deg is not None:
+            angle_end = math.radians(angle_end_deg)
+        if angle_end is None:
+            angle_end = angle
         require_occ()
 
-        # Sample offset points
-        up = Vec(0, 0, 1)
-        off = []
-        for i in range(n_pts):
-            t = i / (n_pts - 1)
-            p = curve.point_at(t)
-            tan = curve.tangent_at(t)
-            x_dir = (tan**up).normalized()
-            if abs(angle) > 1e-12:
-                c, s = math.cos(angle), math.sin(angle)
-                y_dir = up
-                x_rot = x_dir * c + y_dir * s
-            else:
-                x_rot = x_dir
-            off.append(p + x_rot * width)
+        from OCC.Core.BRepBuilderAPI import (
+            BRepBuilderAPI_MakeEdge,
+            BRepBuilderAPI_MakeWire,
+            BRepBuilderAPI_RightCorner,
+        )
+        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakePipeShell
+        from OCC.Core.gp import gp_Vec
 
-        from ifckit.geometry.curve import Curve as _Curve
+        up = gp_Vec(0, 0, 1)
 
-        offset = _Curve.from_points(off)
-        return cls.loft([curve, offset])
+        # ── Start line segment ────────────────────────────────────
+        # ── Spine wire ────────────────────────────────────────────
+        spine_edge = _build_occ_edge(curve)
+        spine_wire = BRepBuilderAPI_MakeWire(spine_edge).Wire()
+
+        # Extract exact spine vertices for profile attachment
+        from OCC.Core.BRep import BRep_Tool
+        from OCC.Core.TopExp import topexp
+
+        v0 = topexp.FirstVertex(spine_edge)
+        v1 = topexp.LastVertex(spine_edge) if not curve.closed else v0
+        pt0_occ = BRep_Tool.Pnt(v0)
+        pt1_occ = BRep_Tool.Pnt(v1)
+
+        # ── Start line segment ────────────────────────────────────
+        t0 = curve.tangent_at(0)
+        tv0 = gp_Vec(t0.x, t0.y, t0.z)
+        perp0 = up.Crossed(tv0)
+        perp0.Normalize()
+        if abs(angle) > 1e-12:
+            c, s = math.cos(angle), math.sin(angle)
+            perp0 = gp_Vec(
+                perp0.X() * c + up.X() * s,
+                perp0.Y() * c + up.Y() * s,
+                perp0.Z() * c + up.Z() * s,
+            )
+        pt0_end = pt0_occ.Translated(perp0.Scaled(width))
+        e0 = BRepBuilderAPI_MakeEdge(pt0_occ, pt0_end).Edge()
+        w0 = BRepBuilderAPI_MakeWire(e0).Wire()
+
+        # ── End line segment ──────────────────────────────────────
+        t1 = curve.tangent_at(1)
+        tv1 = gp_Vec(t1.x, t1.y, t1.z)
+        perp1 = up.Crossed(tv1)
+        perp1.Normalize()
+        if abs(angle_end) > 1e-12:
+            c, s = math.cos(angle_end), math.sin(angle_end)
+            perp1 = gp_Vec(
+                perp1.X() * c + up.X() * s,
+                perp1.Y() * c + up.Y() * s,
+                perp1.Z() * c + up.Z() * s,
+            )
+        pt1_end = pt1_occ.Translated(perp1.Scaled(width))
+        e1 = BRepBuilderAPI_MakeEdge(pt1_occ, pt1_end).Edge()
+        w1 = BRepBuilderAPI_MakeWire(e1).Wire()
+
+        # ── Pipe shell sweep ──────────────────────────────────────
+
+        # ── Pipe shell sweep ──────────────────────────────────────
+        pipe = BRepOffsetAPI_MakePipeShell(spine_wire)
+        pipe.SetTransitionMode(BRepBuilderAPI_RightCorner)
+        pipe.Add(w0, v0)
+        pipe.Add(w1, v1)
+        pipe.Build()
+        if not pipe.IsDone():
+            raise RuntimeError(f"Ribbon pipe shell failed (error {pipe.GetStatus()})")
+
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+        from OCC.Core.Geom import Geom_BSplineSurface
+        from OCC.Core.TopAbs import TopAbs_FACE
+        from OCC.Core.TopExp import TopExp_Explorer
+
+        exp = TopExp_Explorer(pipe.Shape(), TopAbs_FACE)
+        if not exp.More():
+            raise RuntimeError("Ribbon produced no face")
+        adaptor = BRepAdaptor_Surface(exp.Current())
+        geom = adaptor.Surface().Surface()
+        bspline = Geom_BSplineSurface.DownCast(geom)
+        if bspline is None:
+            raise RuntimeError("Ribbon result is not a BSpline surface")
+        return cls.from_occ_surface(bspline)
 
 
 def _build_occ_edge(curve: "Curve") -> object:
@@ -587,7 +652,7 @@ def _build_occ_edge(curve: "Curve") -> object:
     else:
         geom = Geom_BSplineCurve(poles, ukn, mul, curve.degree, curve.closed)
 
-    return BRepBuilderAPI_MakeEdge(geom, 0.0, 1.0).Edge()
+    return BRepBuilderAPI_MakeEdge(geom, curve.knots[0], curve.knots[-1]).Edge()
 
 
 # ---------------------------------------------------------------------------
