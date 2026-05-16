@@ -8,6 +8,7 @@ OCC (``pythonocc-core``) evaluation.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
 from ifckit.geometry.primitives import Vec
@@ -504,6 +505,54 @@ class Surface:
             NotImplementedError: Always (skeleton).
         """
         raise NotImplementedError("Surface.sweep() is not yet implemented")
+
+    @classmethod
+    def ribbon(
+        cls,
+        curve: "Curve",
+        angle: float = 0.0,
+        width: float = 100.0,
+        n_pts: int = 50,
+    ) -> "Surface":
+        """Create a ribbon (ruled support surface) along a curve.
+
+        The ribbon shares one exact edge with *curve* and extends outward
+        by *width* at the given *angle* relative to the horizontal
+        perpendicular direction ``tangent × world_Z``.  The result can be
+        used as a G1 support surface in :meth:`patch`.
+
+        Args:
+            curve:  Spine curve — the ribbon's shared edge.
+            angle:  Rotation around the curve tangent (radians).
+                    0 = horizontal perpendicular (default).
+            width:  Ribbon width / offset distance.
+            n_pts:  Sampling density for the offset curve.
+
+        Returns:
+            A new Surface.
+        """
+        require_occ()
+
+        # Sample offset points
+        up = Vec(0, 0, 1)
+        off = []
+        for i in range(n_pts):
+            t = i / (n_pts - 1)
+            p = curve.point_at(t)
+            tan = curve.tangent_at(t)
+            x_dir = (tan**up).normalized()
+            if abs(angle) > 1e-12:
+                c, s = math.cos(angle), math.sin(angle)
+                y_dir = up
+                x_rot = x_dir * c + y_dir * s
+            else:
+                x_rot = x_dir
+            off.append(p + x_rot * width)
+
+        from ifckit.geometry.curve import Curve as _Curve
+
+        offset = _Curve.from_points(off)
+        return cls.loft([curve, offset])
 
 
 def _build_occ_edge(curve: "Curve") -> object:
