@@ -334,6 +334,52 @@ class Curve:
             f"knots={self.knots[:3]}...{self.knots[-3:]}{w_str})"
         )
 
+    # ── Hermite-style construction ──────────────────────────────────
+
+    @classmethod
+    def from_tangents(
+        cls,
+        start: Vec,
+        tan_start: Vec,
+        end: Vec,
+        tan_end: Vec,
+        scale: float | None = None,
+    ) -> "Curve":
+        """Create a cubic Bezier curve from two points and their tangents.
+
+        The curve passes through *start* and *end* with the given
+        tangent directions at each endpoint.  The interior shape is
+        determined by the tangent magnitude(s).
+
+        Args:
+            start:      Start point.
+            tan_start:  Start tangent (direction + magnitude).
+            end:        End point.
+            tan_end:    End tangent (direction + magnitude).
+            scale:      Optional uniform multiplier for both tangents.
+                       When ``None`` (default) a chord‑length heuristic
+                       is used: ``|end - start| / 3``.
+
+        Returns:
+            A new degree‑3 BSpline (cubic Bezier) Curve.
+        """
+        chord = end - start
+        if scale is None:
+            scale = chord.length() / 3.0
+
+        ts = tan_start.normalized() * scale if tan_start.length() > 1e-12 else Vec(0, 0, 0)
+        te = tan_end.normalized() * scale if tan_end.length() > 1e-12 else Vec(0, 0, 0)
+
+        control_points = [start, start + ts, end - te, end]
+        knots = [0.0, 1.0]
+        mults = [4, 4]
+        return cls(
+            control_points=control_points,
+            knots=knots,
+            multiplicities=mults,
+            degree=3,
+        )
+
     # ── OCC bridge ──────────────────────────────────────────────────
 
     @classmethod
