@@ -509,13 +509,16 @@ class Surface:
         exp = TopExp_Explorer(filler.Shape(), TopAbs_FACE)
         if not exp.More():
             raise RuntimeError("Patch produced no face")
-        adaptor = BRepAdaptor_Surface(exp.Current())
+        result_face = exp.Current()
+        adaptor = BRepAdaptor_Surface(result_face)
         geom = adaptor.Surface().Surface()
         bspline = Geom_BSplineSurface.DownCast(geom)
         if bspline is None:
             raise RuntimeError("Patch result is not a BSpline surface")
 
-        return cls.from_occ_surface(bspline)
+        result = cls.from_occ_surface(bspline)
+        result._occ_face = result_face
+        return result
 
     @classmethod
     def sweep(
@@ -894,7 +897,9 @@ def occ_tessellate(
 
     deflection = float(deflection)
 
-    face = _build_occ_face(surf)
+    face = getattr(surf, "_occ_face", None)
+    if face is None:
+        face = _build_occ_face(surf)
     mesh = BRepMesh_IncrementalMesh(face, deflection)
     mesh.Perform()
 
