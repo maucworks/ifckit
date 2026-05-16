@@ -513,6 +513,7 @@ class Surface:
         angle: float = 0.0,
         width: float = 100.0,
         n_pts: int = 50,
+        angle_deg: "float | None" = None,
     ) -> "Surface":
         """Create a ribbon (ruled support surface) along a curve.
 
@@ -522,15 +523,18 @@ class Surface:
         used as a G1 support surface in :meth:`patch`.
 
         Args:
-            curve:  Spine curve — the ribbon's shared edge.
-            angle:  Rotation around the curve tangent (radians).
-                    0 = horizontal perpendicular (default).
-            width:  Ribbon width / offset distance.
-            n_pts:  Sampling density for the offset curve.
+            curve:     Spine curve — the ribbon's shared edge.
+            angle:     Rotation around the curve tangent (radians).
+                       0 = horizontal perpendicular (default).
+            width:     Ribbon width / offset distance.
+            n_pts:     Sampling density for the offset curve.
+            angle_deg: Shorthand — sets *angle* from degrees.
 
         Returns:
             A new Surface.
         """
+        if angle_deg is not None:
+            angle = math.radians(angle_deg)
         require_occ()
 
         # Sample offset points
