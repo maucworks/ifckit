@@ -225,6 +225,30 @@ class Curve:
         """Sample *n* evenly‑spaced points in parameter space ``[0, 1]``."""
         return [self.point_at(i / max(n - 1, 1)) for i in range(n)]
 
+    def reverse(self) -> "Curve":
+        """Return a new curve with reversed direction.
+
+        The new curve traverses the same geometry from end to start.
+        Both control points and knot vector are reflected.
+        """
+        new_points = list(reversed(self.points))
+        new_weights = list(reversed(self._weights)) if self._weights else None
+
+        # Reflect interior knots:  k → k_first + k_last − k
+        # then sort ascending to maintain valid knot vector
+        k0, k1 = self.knots[0], self.knots[-1]
+        interior = sorted(k0 + k1 - k for k in self.knots[1:-1])
+        new_knots = [k0] + interior + [k1]
+
+        return Curve(
+            control_points=new_points,
+            knots=new_knots,
+            multiplicities=self.multiplicities,
+            degree=self.degree,
+            weights=new_weights,
+            closed=self.closed,
+        )
+
     def to_mesh_dict(
         self,
         n_points: int = 50,
@@ -251,6 +275,22 @@ class Curve:
         if material is not None:
             d["material"] = material
         return d
+
+    def preview(
+        self,
+        label: str = "",
+        material: "dict | None" = None,
+        n_points: int = 50,
+    ) -> dict:
+        """Return a ``__type__: "mesh"`` dict ready for the viewer pipeline."""
+        return {
+            "__type__": "mesh",
+            **self.to_mesh_dict(
+                label=label,
+                material=material,
+                n_points=n_points,
+            ),
+        }
 
     @property
     def start_point(self) -> Vec:

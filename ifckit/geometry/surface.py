@@ -147,6 +147,22 @@ class Surface:
             d["material"] = material
         return d
 
+    def preview(
+        self,
+        label: str = "",
+        material: "dict | None" = None,
+        deflection: "float | object" = 0.01,
+    ) -> dict:
+        """Return a ``__type__: "mesh"`` dict ready for the viewer pipeline."""
+        return {
+            "__type__": "mesh",
+            **self.to_mesh_dict(
+                label=label,
+                material=material,
+                deflection=deflection,
+            ),
+        }
+
     # ── IFC serialisation ──────────────────────────────────────────
 
     def _to_ifc_pt(self, ifc_file, v: Vec):
@@ -328,8 +344,24 @@ class Surface:
         if n not in (3, 4):
             raise ValueError("fill() requires 3 or 4 boundary curves")
 
+        # Auto‑align: reverse any edge whose param direction goes against
+        # the Coons convention.  For a rectangle-like patch:
+        #   u‑edges (c0, c2): start at lower X → end at higher X
+        #   v‑edges (c1, c3): start at lower Y → end at higher Y
+        curves = list(curves)
+        eps = 1e-4
+        for i in range(n):
+            s = curves[i].point_at(0)
+            e = curves[i].point_at(1)
+            if i in (0, 2):  # u‑direction edge (bottom / top)
+                if s.x > e.x + eps:
+                    curves[i] = curves[i].reverse()
+            elif i in (1, 3):  # v‑direction edge (right / left)
+                if s.y > e.y + eps:
+                    curves[i] = curves[i].reverse()
+
         # ── Backward‑compatible Coons path ──────────────────────────
-        if constraints is None:
+        if constraints is None or all(c.upper() == "C0" for c in (constraints or ["C0"] * n)):
             require_occ()
             from OCC.Core.GeomAbs import GeomAbs_C2
             from OCC.Core.GeomAPI import GeomAPI_PointsToBSplineSurface
@@ -345,13 +377,18 @@ class Surface:
                 u = i / ns
                 for j in range(ns + 1):
                     v = j / ns
-                    pu = c0.point_at(v) * (1.0 - u) + c2.point_at(v) * u
-                    pv = c1.point_at(u) * (1.0 - v) + (c3 or c1).point_at(u) * v
+                    # Coons blending:
+                    #   c0 = bottom (param u, left→right)
+                    #   c1 = right  (param v, bottom→top)
+                    #   c2 = top    (param u, left→right)
+                    #   c3 = left   (param v, bottom→top)
+                    pu = c0.point_at(u) * (1.0 - v) + c2.point_at(u) * v
+                    pv = (c3 or c1).point_at(v) * (1.0 - u) + c1.point_at(v) * u
                     corners = (
-                        c0.point_at(0) * (1.0 - u) * (1.0 - v)
-                        + c0.point_at(1) * (1.0 - u) * v
-                        + c2.point_at(0) * u * (1.0 - v)
-                        + c2.point_at(1) * u * v
+                        c0.point_at(0) * (1.0 - u) * (1.0 - v)  # BL
+                        + c0.point_at(1) * u * (1.0 - v)  # BR
+                        + (c2.point_at(1) if n == 4 else c0.point_at(1)) * u * v  # TR
+                        + (c2.point_at(0) if n == 4 else c0.point_at(0)) * (1.0 - u) * v  # TL
                     )
                     p = pu + pv - corners
                     grid.SetValue(i + 1, j + 1, gp_Pnt(p.x, p.y, p.z))
@@ -368,7 +405,7 @@ class Surface:
             )
             return cls.from_occ_surface(occ_surf.Surface())
 
-        # ── BRepOffsetAPI_MakeFilling path (supports G1) ───────────
+        # ── BRepOffsetAPI_MakeFilling path (supports G1 — has support faces) ──
         require_occ()
         import warnings as _w
 
@@ -378,15 +415,24 @@ class Surface:
         from OCC.Core.TopAbs import TopAbs_FACE
         from OCC.Core.TopExp import TopExp_Explorer
 
-        # Default constraint = C0
+        # Map constraint strings → OCC constants
         _CONST_MAP = {"C0": GeomAbs_C0, "G1": GeomAbs_G1}
         full_constraints = [
             _CONST_MAP.get(c.upper(), GeomAbs_C0) if c else GeomAbs_C0
             for c in (constraints or ["C0"] * n)
         ]
-        # Pad if shorter than curves
         while len(full_constraints) < n:
             full_constraints.append(GeomAbs_C0)
+
+        # Validate: G1 edges need a support face
+        if supports is None:
+            supports = [None] * n
+        for i, (c, s) in enumerate(zip(full_constraints, supports)):
+            if c == GeomAbs_G1 and s is None:
+                raise ValueError(
+                    f"G1 constraint on curve[{i}] requires a support Surface "
+                    "(the adjacent face that defines the tangent direction)."
+                )
 
         filler = BRepOffsetAPI_MakeFilling()
         filler.SetConstrParam(1e-3, 1e-3, 0.1, 0.1)
@@ -480,12 +526,31 @@ def _build_occ_surface(surf: Surface):
             p = surf.control_points[i][j]
             poles.SetValue(i + 1, j + 1, gp_Pnt(p.x, p.y, p.z))
 
+    def _uniq_knots(knots: list[float]) -> list[float]:
+        """Extract unique knots from a full knot vector (with multiplicities)."""
+        uniq: list[float] = []
+        for k in knots:
+            if not uniq or abs(k - uniq[-1]) > 1e-10:
+                uniq.append(k)
+        return uniq
+
     ukn = TColStd_Array1OfReal(1, len(surf.uknots))
     for i, k in enumerate(surf.uknots):
         ukn.SetValue(i + 1, k)
     vkn = TColStd_Array1OfReal(1, len(surf.vknots))
     for i, k in enumerate(surf.vknots):
         vkn.SetValue(i + 1, k)
+
+    # OCC Geom_BSplineSurface expects unique knots + multiplicities separately.
+    # ifckit stores the full knot vector; convert here.
+    ukn_uniq = _uniq_knots(surf.uknots)
+    vkn_uniq = _uniq_knots(surf.vknots)
+    ukn_arr = TColStd_Array1OfReal(1, len(ukn_uniq))
+    for i, k in enumerate(ukn_uniq):
+        ukn_arr.SetValue(i + 1, k)
+    vkn_arr = TColStd_Array1OfReal(1, len(vkn_uniq))
+    for i, k in enumerate(vkn_uniq):
+        vkn_arr.SetValue(i + 1, k)
 
     um = TColStd_Array1OfInteger(1, len(surf.umults))
     for i, m in enumerate(surf.umults):
@@ -502,8 +567,8 @@ def _build_occ_surface(surf: Surface):
         args = (
             poles,
             wgt,
-            ukn,
-            vkn,
+            ukn_arr,
+            vkn_arr,
             um,
             vm,
             surf.udegree,
@@ -513,7 +578,7 @@ def _build_occ_surface(surf: Surface):
         )
         return Geom_BSplineSurface(*args)
 
-    args = (poles, ukn, vkn, um, vm, surf.udegree, surf.vdegree, surf.uclosed, surf.vclosed)
+    args = (poles, ukn_arr, vkn_arr, um, vm, surf.udegree, surf.vdegree, surf.uclosed, surf.vclosed)
     return Geom_BSplineSurface(*args)
 
 
