@@ -115,6 +115,7 @@ class Surface:
         label: str = "",
         material: "dict | None" = None,
         deflection: "float | object" = 0.01,
+        y_up: bool = True,
     ) -> dict:
         """Triangulate the surface via OCC and return a dict for 3D viewer.
 
@@ -126,6 +127,8 @@ class Surface:
             label:      Display name.
             material:   Visual properties (color, opacity, …).
             deflection: Mesh deflection / ``TessellationDetail``.
+            y_up:       If True (default), convert coordinates to
+                        Three.js/glTF Y-up: ``(x, z, -y)``.
 
         Returns:
             A dict with ``primitive="triangles"``, ``positions``,
@@ -135,7 +138,10 @@ class Surface:
 
         require_occ()
         verts, tris = occ_tessellate(self, deflection)
-        positions = [c for v in verts for c in v]
+        if y_up:
+            positions = [c for v in verts for c in (v[0], v[2], -v[1])]
+        else:
+            positions = [c for v in verts for c in v]
         indices = [i - 1 for tri in tris for i in tri]
 
         d: dict = {
@@ -153,15 +159,26 @@ class Surface:
         label: str = "",
         material: "dict | None" = None,
         deflection: "float | object" = 0.01,
+        y_up: bool = True,
     ) -> dict:
-        """Return a ``__type__: "mesh"`` dict ready for the viewer pipeline."""
+        """Return a ``__type__: "mesh"`` dict ready for the viewer pipeline.
+
+        Uses OCC adaptive triangulation. See ``Path.preview()`` for
+        the full material documentation.
+
+        Args:
+            label:      Display name.
+            material:   Visual properties dict.
+            deflection: Mesh deflection / ``TessellationDetail`` (see ifckit).
+            y_up:       If True (default), convert coordinates to
+                        Three.js/glTF Y-up: ``(x, z, -y)``.
+
+        Returns:
+            ``{"__type__": "mesh", "primitive": "triangles", …}``
+        """
         return {
             "__type__": "mesh",
-            **self.to_mesh_dict(
-                label=label,
-                material=material,
-                deflection=deflection,
-            ),
+            **self.to_mesh_dict(label=label, material=material, deflection=deflection, y_up=y_up),
         }
 
     # ── IFC serialisation ──────────────────────────────────────────
@@ -399,6 +416,7 @@ class Surface:
         curves,
         constraints=None,
         supports=None,
+        tolerance: float = 1e-3,
     ) -> "Surface":
         """Create a surface bounded by ≥2 curves via OCC MakeFilling.
 
@@ -412,6 +430,8 @@ class Surface:
             supports:    Per‑edge support ``Surface`` for G1 edges
                         (``None`` = no support). G1 edges require a
                         support.
+            tolerance:   3D tolerance for MakeFilling.  Higher values
+                        (e.g. ``1e-2``) are faster but coarser.
 
         Returns:
             A new Surface.
@@ -460,7 +480,7 @@ class Surface:
                 )
 
         filler = BRepOffsetAPI_MakeFilling()
-        filler.SetConstrParam(1e-3, 1e-3, 0.1, 0.1)
+        filler.SetConstrParam(tolerance, tolerance, 2 * tolerance, 2 * tolerance)
 
         for i, curve in enumerate(curves):
             edge = _build_occ_edge(curve)
@@ -515,6 +535,7 @@ class Surface:
         angle_end: "float | None" = None,
         angle_deg: "float | None" = None,
         angle_end_deg: "float | None" = None,
+        tolerance: float = 1e-3,
     ) -> "Surface":
         """Create a ribbon (swept support surface) along a curve.
 
@@ -529,6 +550,7 @@ class Surface:
             angle_end:     End rotation (rad).  ``None`` = same as *angle*.
             angle_deg:     Shorthand — *angle* in degrees.
             angle_end_deg: Shorthand — *angle_end* in degrees.
+            tolerance:     Pipe shell tolerance.  Higher = faster but coarser.
 
         Returns:
             A new Surface suitable as G1 support for :meth:`patch`.
@@ -605,6 +627,7 @@ class Surface:
         pipe.SetForceApproxC1(True)
         pipe.SetMaxDegree(8)
         pipe.SetMaxSegments(20)
+        pipe.SetTolerance(tolerance)
         pipe.Add(w0, v0)
         pipe.Add(w1, v1)
         pipe.Build()
