@@ -262,6 +262,35 @@ class Path:
             pts = pts[:-1]
         return Polyline(pts)
 
+    def to_mesh_dict(
+        self,
+        angle_step_deg: float = 5.0,
+        label: str = "",
+        material: "dict | None" = None,
+    ) -> dict:
+        """Serialize the path as a polyline for 3D viewer consumption.
+
+        Args:
+            angle_step_deg: Arc sampling resolution (degrees).
+            label:          Display name.
+            material:       Visual properties (color, opacity, …).
+
+        Returns:
+            A dict with ``primitive``, ``positions``, and optional
+            ``closed``, ``label``, ``material`` keys.
+        """
+        poly = self.sample(angle_step_deg)
+        pts = poly.points if hasattr(poly, "points") else list(poly)
+        d: dict = {
+            "primitive": "line-loop" if self.is_closed else "line-strip",
+            "positions": [c for v in pts for c in (v.x, v.y, v.z)],
+            "closed": self.is_closed,
+            "label": label or "Path",
+        }
+        if material is not None:
+            d["material"] = material
+        return d
+
     def start_point(self) -> Optional["Vec"]:
         if not self._segments:
             return None

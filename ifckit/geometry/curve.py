@@ -225,6 +225,33 @@ class Curve:
         """Sample *n* evenly‑spaced points in parameter space ``[0, 1]``."""
         return [self.point_at(i / max(n - 1, 1)) for i in range(n)]
 
+    def to_mesh_dict(
+        self,
+        n_points: int = 50,
+        label: str = "",
+        material: "dict | None" = None,
+    ) -> dict:
+        """Serialize the curve as a polyline for 3D viewer consumption.
+
+        Args:
+            n_points:   Number of sample points.
+            label:      Display name.
+            material:   Visual properties (color, opacity, …).
+
+        Returns:
+            A dict with ``primitive``, ``positions``, and optional
+            ``label``, ``material`` keys.
+        """
+        pts = self.sample(n_points)
+        d: dict = {
+            "primitive": "line-strip",
+            "positions": [c for v in pts for c in (v.x, v.y, v.z)],
+            "label": label or "Curve",
+        }
+        if material is not None:
+            d["material"] = material
+        return d
+
     @property
     def start_point(self) -> Vec:
         return self.point_at(0.0)
