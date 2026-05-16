@@ -267,6 +267,7 @@ class Path:
         angle_step_deg: float = 5.0,
         label: str = "",
         material: "dict | None" = None,
+        y_up: bool = True,
     ) -> dict:
         """Serialize the path as a polyline for 3D viewer consumption.
 
@@ -274,6 +275,9 @@ class Path:
             angle_step_deg: Arc sampling resolution (degrees).
             label:          Display name.
             material:       Visual properties (color, opacity, …).
+            y_up:           If True (default), convert coordinates from
+                            ifckit Z-up to Three.js/glTF Y-up convention:
+                            ``(x, z, -y)``.
 
         Returns:
             A dict with ``primitive``, ``positions``, and optional
@@ -281,15 +285,52 @@ class Path:
         """
         poly = self.sample(angle_step_deg)
         pts = poly.points if hasattr(poly, "points") else list(poly)
+        if y_up:
+            flat = [c for v in pts for c in (v.x, v.z, -v.y)]
+        else:
+            flat = [c for v in pts for c in (v.x, v.y, v.z)]
         d: dict = {
             "primitive": "line-loop" if self.is_closed else "line-strip",
-            "positions": [c for v in pts for c in (v.x, v.y, v.z)],
+            "positions": flat,
             "closed": self.is_closed,
             "label": label or "Path",
         }
         if material is not None:
             d["material"] = material
         return d
+
+    def preview(
+        self,
+        label: str = "",
+        material: "dict | None" = None,
+        angle_step_deg: float = 5.0,
+        y_up: bool = True,
+    ) -> dict:
+        """Return a ``__type__: "mesh"`` dict ready for the viewer pipeline.
+
+        Equivalent to wrapping ``to_mesh_dict()`` in ``{"__type__": "mesh", …}``.
+
+        Args:
+            label:          Display name in the viewer.
+            material:       Optional visual properties dict. Supported keys:
+
+                - ``color`` (str, hex)        — ``"#FF6600"``
+                - ``opacity`` (float 0‑1)
+                - ``line_type`` (str)          — ``"solid"`` | ``"dashed"`` | ``"dotted"``
+                - ``line_width`` (int)         — point size for ``"dotted"``
+                - ``dash_size``, ``gap_size`` (float)  — for dashed lines
+
+            angle_step_deg: Arc sampling resolution (degrees).
+
+        Returns:
+            ``{"__type__": "mesh", "primitive": …, "positions": […], …}``
+        """
+        return {
+            "__type__": "mesh",
+            **self.to_mesh_dict(
+                label=label, material=material, angle_step_deg=angle_step_deg, y_up=y_up
+            ),
+        }
 
     def start_point(self) -> Optional["Vec"]:
         if not self._segments:

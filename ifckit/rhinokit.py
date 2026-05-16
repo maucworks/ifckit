@@ -410,78 +410,12 @@ def draw_paper_rectangle(
 
 
 # ---------------------------------------------------------------------------
-# Dev reload helper
+# Dev reload helper — re-exported from ifckit.reload for backward compat
 # ---------------------------------------------------------------------------
 
+from ifckit.reload import reload_all as _reload_all  # noqa: E402
 
-def reload_all(project_root: str | None = None) -> None:
-    """
-    Ensure *project_root* is on ``sys.path`` and reload all ifckit submodules
-    in dependency order (leaves first, root last).
-
-    Call this at the top of every Grasshopper Script node to pick up
-    live code changes without restarting Rhino::
-
-        import ifckit.rhinokit as rk
-        rk.reload_all()          # or rk.reload_all(r'/path/to/ifckit')
-
-    Parameters
-    ----------
-    project_root : str, optional
-        Absolute path to the project root (the directory that contains the
-        ``ifckit`` package).  Reads the ``IFCKIT_PATH`` environment variable
-        first; falls back to ``/Users/Mauc/L140-py-ifckit`` if neither is set.
-    """
-    import importlib
-    import os
-    import sys
-
-    _default = None
-    root = project_root or os.environ.get("IFCKIT_PATH", _default)
-    if root and root not in sys.path:
-        sys.path.insert(0, root)
-
-    _RELOAD_ORDER = [
-        "ifckit.schema",
-        "ifckit.geometry",
-        "ifckit.elements",
-        "ifckit.elements.opening",
-        "ifckit.profiles.base",
-        "ifckit.profiles.shapes",
-        "ifckit.profiles.i_beam",
-        "ifckit.profiles.l_beam",
-        "ifckit.profiles.steel",
-        "ifckit.profiles",
-        "ifckit.builders._geom",
-        "ifckit.builders.base",
-        "ifckit.builders.extruded",
-        "ifckit.builders.opening",
-        "ifckit.builders.wall",
-        "ifckit.builders.slab",
-        "ifckit.builders.space",
-        "ifckit.builders.beam_factory",
-        "ifckit.builders.revolved_beam",
-        "ifckit.builders.door_window",
-        "ifckit.builders.bridge",
-        "ifckit.builders",
-        "ifckit.rhinokit",
-        "ifckit.preview",
-        "ifckit.rhino_import",
-        "ifckit.model",
-        "ifckit.validator",
-        "ifckit.json_build",
-        "ifckit",
-    ]
-
-    for mod_name in _RELOAD_ORDER:
-        mod = sys.modules.get(mod_name)
-        if mod is not None:
-            importlib.reload(mod)
-        else:
-            try:
-                importlib.import_module(mod_name)
-            except ImportError:
-                pass  # optional submodule not installed
+reload_all = _reload_all
 
 
 # ---------------------------------------------------------------------------

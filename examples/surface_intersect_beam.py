@@ -25,13 +25,53 @@ def make_wavy_surface() -> Surface:
     """4×4 rational B‑spline surface (degree 3)."""
     pts = [
         [Vec(0, 0, 0), Vec(1000, 0, 500), Vec(2000, 0, 0), Vec(3000, 0, 0)],
-        [Vec(0, 1000, 200), Vec(1000, 1000, 1000), Vec(2000, 1000, 800), Vec(3000, 1000, 300)],
-        [Vec(0, 2000, 0), Vec(1000, 2000, 700), Vec(2000, 2000, 1200), Vec(3000, 2000, 400)],
-        [Vec(0, 3000, 0), Vec(1000, 3000, 300), Vec(2000, 3000, 500), Vec(3000, 3000, 0)],
+        [
+            Vec(0, 1000, 200),
+            Vec(1000, 1000, 1000),
+            Vec(2000, 1000, 800),
+            Vec(3000, 1000, 300),
+        ],
+        [
+            Vec(0, 2000, 0),
+            Vec(1000, 2000, 700),
+            Vec(2000, 2000, 1200),
+            Vec(3000, 2000, 400),
+        ],
+        [
+            Vec(0, 3000, 0),
+            Vec(1000, 3000, 300),
+            Vec(2000, 3000, 500),
+            Vec(3000, 3000, 0),
+        ],
     ]
-    w = [[1.0, 1.0, 1.0, 1.0], [1.0, 0.9, 0.9, 1.0],
-         [1.0, 0.9, 0.9, 1.0], [1.0, 1.0, 1.0, 1.0]]
+    w = [
+        [1.0, 1.0, 1.0, 1.0],
+        [1.0, 0.9, 0.9, 1.0],
+        [1.0, 0.9, 0.9, 1.0],
+        [1.0, 1.0, 1.0, 1.0],
+    ]
     return Surface(pts, [0, 1], [0, 1], [4, 4], [4, 4], 3, 3, weights=w)
+
+
+def _get_intersection(surf: Surface, x):
+
+    # ── 2. Intersect with YZ plane at x = 1500 ────────────────────
+    yz_plane = Plane.from_origin_and_normal(Vec(x, 0, 0), Vec(1, 0, 0))
+    curves = occ_intersect_plane(surf, yz_plane)
+    print(f"Intersection curves: {len(curves)}")
+    if not curves:
+        return
+
+    # ── 3. Intersection curve → biarcs ─────────────────────────────
+    curve = curves[0]
+    path = curve.to_biarcs(tol=50, max_iteration=3)
+    arcs = [s for s in path.segments if isinstance(s, Arc)]
+    print(f"Biarcs: {len(arcs)} arcs")
+    if not arcs:
+        print("✗ No arcs found")
+        return
+
+    return arcs
 
 
 def main():
@@ -43,26 +83,14 @@ def main():
     surf = make_wavy_surface()
     print(f"Surface: {surf}")
 
-    # ── 2. Intersect with YZ plane at x = 1500 ────────────────────
-    yz_plane = Plane.from_origin_and_normal(Vec(1500, 0, 0), Vec(1, 0, 0))
-    curves = occ_intersect_plane(surf, yz_plane)
-    print(f"Intersection curves: {len(curves)}")
-    if not curves:
-        return
-
-    # ── 3. Intersection curve → biarcs ─────────────────────────────
-    curve = curves[0]
-    path = curve.to_biarcs(tol=500, max_iteration=3)
-    arcs = [s for s in path.segments if isinstance(s, Arc)]
-    print(f"Biarcs: {len(arcs)} arcs")
-
-    if not arcs:
-        print("✗ No arcs found")
-        return
+    arcs = []
+    for i in range(0, 3000, 500):
+        a = _get_intersection(surf, i)
+        arcs.extend(a)
 
     # ── 4. I-beam profile points ──────────────────────────────────
-    ibeam = IBeamProfile(height=200, width=120,
-                         web_thickness=8, flange_thickness=12)
+    ibeam = IBeamProfile(height=100, width=50, web_thickness=2, flange_thickness=2)
+    ibeam = ibeam.rotate(90)
     profile = [s.start for s in ibeam.segments]
 
     # ── 5. IFC model ──────────────────────────────────────────────
@@ -77,14 +105,20 @@ def main():
     z = f.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
     x = f.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
     plc = f.create_entity("IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x)
-    place = f.create_entity("IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=plc)
+    place = f.create_entity(
+        "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=plc
+    )
     storey = f.create_entity(
-        "IfcBuildingStorey", GlobalId=guid(), Name="Storey",
+        "IfcBuildingStorey",
+        GlobalId=guid(),
+        Name="Storey",
         ObjectPlacement=place,
     )
     f.create_entity(
-        "IfcRelAggregates", GlobalId=guid(),
-        RelatingObject=proj, RelatedObjects=[storey],
+        "IfcRelAggregates",
+        GlobalId=guid(),
+        RelatingObject=proj,
+        RelatedObjects=[storey],
     )
 
     context = get_body_context(f)

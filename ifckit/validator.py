@@ -38,7 +38,12 @@ from ifckit.elements.building import PendingSlab, PendingWall
 from ifckit.elements.opening import PendingDoor, PendingOpening, PendingWindow
 from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.space import PendingSpace
-from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+from ifckit.elements.structural import (
+    PendingBeam,
+    PendingColumn,
+    PendingRevolvedBeam,
+    PendingTaperedExtrusion,
+)
 from ifckit.elements.wall_graph import PendingWallGraph
 from ifckit.geometry import Vec
 
@@ -470,6 +475,37 @@ def _validate_wall_graph(wg: PendingWallGraph) -> ValidationResult:
         errors.append(f"wall_graph '{wg.name}': thickness must be > 0, got {wg.thickness}")
     if wg.height <= 0:
         errors.append(f"wall_graph '{wg.name}': height must be > 0, got {wg.height}")
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingTaperedExtrusion)
+def _validate_tapered(t: PendingTaperedExtrusion) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if len(t.start_profile) < 3:
+        errors.append(
+            f"PendingTaperedExtrusion '{t.name}': start_profile must have at least 3 points, "
+            f"got {len(t.start_profile)}"
+        )
+
+    if len(t.start_profile) != len(t.end_profile):
+        errors.append(
+            f"PendingTaperedExtrusion '{t.name}': start_profile ({len(t.start_profile)} pts) "
+            f"and end_profile ({len(t.end_profile)} pts) must have equal point count"
+        )
+
+    area = abs(_profile_area_2d(t.start_profile))
+    if area < _MIN_LENGTH**2:
+        errors.append(f"PendingTaperedExtrusion '{t.name}': start profile area is effectively zero")
+
+    if t.height <= 0.0:
+        errors.append(f"PendingTaperedExtrusion '{t.name}': height must be > 0, got {t.height}")
+    elif t.height < _WARN_SHORT:
+        warnings.append(
+            f"PendingTaperedExtrusion '{t.name}': height is very small ({t.height:.4f} m)"
+        )
+
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 
 

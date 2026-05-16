@@ -18,21 +18,8 @@ import traceback
 # Reload (development only — harmless in production)
 # ---------------------------------------------------------------------------
 try:
-    from ifckit.rhinokit import reload_all
+    from ifckit.reload import reload_all
     reload_all()
-except Exception:
-    pass
-
-# ---------------------------------------------------------------------------
-# Reload (picks up live code changes without restarting Rhino)
-# ---------------------------------------------------------------------------
-try:
-    import os, sys, importlib
-    _root = os.environ.get("IFCKIT_PATH", r"/Users/Mauc/L140-py-ifckit")
-    if _root not in sys.path:
-        sys.path.insert(0, _root)
-    import ifckit.rhinokit as _rk
-    _rk.reload_all(_root)
 except Exception:
     pass
 

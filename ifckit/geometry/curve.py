@@ -254,6 +254,7 @@ class Curve:
         n_points: int = 50,
         label: str = "",
         material: "dict | None" = None,
+        y_up: bool = True,
     ) -> dict:
         """Serialize the curve as a polyline for 3D viewer consumption.
 
@@ -261,15 +262,21 @@ class Curve:
             n_points:   Number of sample points.
             label:      Display name.
             material:   Visual properties (color, opacity, …).
+            y_up:       If True (default), convert coordinates to
+                        Three.js/glTF Y-up: ``(x, z, -y)``.
 
         Returns:
             A dict with ``primitive``, ``positions``, and optional
             ``label``, ``material`` keys.
         """
         pts = self.sample(n_points)
+        if y_up:
+            flat = [c for v in pts for c in (v.x, v.z, -v.y)]
+        else:
+            flat = [c for v in pts for c in (v.x, v.y, v.z)]
         d: dict = {
             "primitive": "line-strip",
-            "positions": [c for v in pts for c in (v.x, v.y, v.z)],
+            "positions": flat,
             "label": label or "Curve",
         }
         if material is not None:
@@ -281,15 +288,12 @@ class Curve:
         label: str = "",
         material: "dict | None" = None,
         n_points: int = 50,
+        y_up: bool = True,
     ) -> dict:
         """Return a ``__type__: "mesh"`` dict ready for the viewer pipeline."""
         return {
             "__type__": "mesh",
-            **self.to_mesh_dict(
-                label=label,
-                material=material,
-                n_points=n_points,
-            ),
+            **self.to_mesh_dict(label=label, material=material, n_points=n_points, y_up=y_up),
         }
 
     @property

@@ -30,6 +30,18 @@ class RoundedCasementComponent(FillComponent):
         wy = float(h)
 
         comps = []
+        dist = min([wx / 2.01, wy / 2.01])
+        spine_opening = Path.from_pts(
+            [
+                Vec(0, 0, 0),
+                Vec(wx, 0, 0),
+                Vec(wx, wy, 0),
+                Vec(0, wy, 0),
+            ],
+            Plane(Vec(0, 0, wt), Vec(1, 0, 0), Vec(0, 1, 0)),
+            closed=True,
+        )
+        spine_opening.fillet([0, 1, 2, 3], dist)
         spine = Path.from_pts(
             [
                 Vec(0, 0, 0),
@@ -40,11 +52,10 @@ class RoundedCasementComponent(FillComponent):
             Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
             closed=True,
         )
-        dist = min([wx / 2.01, wy / 2.01])
         spine.fillet([0, 1, 2, 3], dist)
 
         # ── Opening void ──────────────────────────────────────────────
-        opening_profile = profile_from_points(ifc_file, spine)
+        opening_profile = profile_from_points(ifc_file, spine_opening)
 
         opening_solid = extrude_profile(
             ifc_file,

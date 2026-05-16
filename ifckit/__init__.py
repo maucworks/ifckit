@@ -34,6 +34,7 @@ from ifckit.elements import (
     PendingOpening,
     PendingRevolvedBeam,
     PendingSlab,
+    PendingTaperedExtrusion,
     PendingTypeObject,
     PendingWall,
     PendingWindow,
@@ -61,6 +62,10 @@ def __getattr__(name):
         import ifckit.rhinokit as rk
 
         return rk
+    if name == "bk":
+        import ifckit.bonsaikit as bk
+
+        return bk
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -119,6 +124,7 @@ __all__ = [
     "DOOR_OPERATION_TYPES",
     "WINDOW_TYPES",
     "OPENING_HOST_IFC_CLASSES",
+    "PendingTaperedExtrusion",
     "PendingTypeObject",
     "PendingDoorType",
     "PendingWindowType",

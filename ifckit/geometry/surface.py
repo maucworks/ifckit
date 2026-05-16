@@ -550,6 +550,7 @@ class Surface:
         angle_end: float | None = None,
         angle_deg: float | None = None,
         angle_end_deg: float | None = None,
+        angles_deg: "Sequence[float] | None" = None,
         n_pts: int = 20,
     ) -> "Surface":
         """Create a ribbon (ruled support surface) along a curve.
@@ -558,33 +559,33 @@ class Surface:
         by *width* at the given *angles*.  The result can be used as a G1
         support surface in :meth:`patch`.
 
-        ``angles`` is a list of rotation angles (radians) around the curve
-        tangent (0 = horizontal perpendicular).  With one angle there is
-        no twist; with two the ribbon twists linearly from start to end;
-        with more the angles are distributed at equal chord‑length
+        ``angles`` is a list of rotation angles (**radians**) around the
+        curve tangent (0 = horizontal perpendicular).  With one angle
+        there is no twist; with two the ribbon twists linearly from start
+        to end; with more the angles are distributed at equal chord‑length
         intervals.
 
-        For backward compatibility *angle* / *angle_end* (or their
-        ``_deg`` variants) may be used instead of a 2‑element list.
-
-        Internally builds a ruled surface between the original curve and
-        an offset curve via OCC ``BRepFill_Generator``.
+        For convenience use ``angle_deg`` / ``angle_end_deg`` for degrees,
+        or ``angles_deg`` for a list of degrees.
 
         Args:
             curve:         Spine curve — the ribbon's shared edge.
-            angles:        Rotation angles around tangent (rad).
+            angles:        Rotation angles around tangent (**radians**).
             width:         Ribbon width / offset distance.
             angle:         Start angle (rad).  Overridden by *angles*.
             angle_end:     End angle (rad).  Overridden by *angles*.
-            angle_deg:     Shorthand — *angle* in degrees.
-            angle_end_deg: Shorthand — *angle_end* in degrees.
+            angle_deg:     Start angle (degrees).
+            angle_end_deg: End angle (degrees).
+            angles_deg:    Angles list in degrees (overrides *angles*).
             n_pts:         Number of samples for the offset curve.
 
         Returns:
             A new Surface suitable as G1 support for :meth:`patch`.
         """
         # Resolve angles list from the various input styles
-        if angles is not None:
+        if angles_deg is not None:
+            ang_list = [math.radians(a) for a in angles_deg]
+        elif angles is not None:
             ang_list = list(angles)
         elif angle_deg is not None or angle_end_deg is not None:
             a0 = math.radians(angle_deg) if angle_deg is not None else 0.0

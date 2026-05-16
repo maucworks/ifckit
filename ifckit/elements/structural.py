@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ifckit.elements.base import PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
-from ifckit.geometry import Arc, Line, Plane, Vec
+from ifckit.geometry import Arc, Line, Path, Plane, Vec
 
 # A profile point can be a Vec or a plain (x, y) or (x, y, z) tuple.
 # A profile source can also be any object with get_profile_points(), or a Profile.
@@ -291,6 +291,134 @@ class PendingColumn(PendingExtrudedElement):
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingColumn":
         return cls._from_dict_fields(d)  # type: ignore[return-value]
+
+
+class PendingTaperedExtrusion(PendingElement):
+    """
+    A tapered extrusion defined by a plane, start profile, end profile, and height.
+
+    Produces ``IfcExtrudedAreaSolidTapered`` in IFC, where the cross-section
+    linearly transitions from *start_profile* to *end_profile* along the
+    extrusion axis.
+
+    Both profiles must have the same number of points.
+
+    Args:
+        plane:          Placement plane (defines position and orientation).
+        start_profile:  Start profile — a ``Path`` or ``List[Vec]``.
+        end_profile:    End profile — a ``Path`` or ``List[Vec]``
+                        (same type + same point count as start).
+        height:         Extrusion distance along ``plane.z_axis`` (metres).
+        name:           Element name.
+    """
+
+    element_type = "tapered_extrusion"
+
+    def __init__(
+        self,
+        plane: Plane,
+        start_profile: Union[Path, List[Vec]],
+        end_profile: Union[Path, List[Vec]],
+        height: float,
+        name: str = "",
+        style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
+    ) -> None:
+        super().__init__(name=name, style=style, properties=properties)
+        self.plane = plane
+        self._start_src = start_profile
+        self._end_src = end_profile
+
+        self._start_len = self._profile_point_count(start_profile, plane)
+        self._end_len = self._profile_point_count(end_profile, plane)
+
+        if self._start_len < 3:
+            raise ValueError("start_profile must have at least 3 points")
+        if self._start_len != self._end_len:
+            raise ValueError(
+                f"start_profile ({self._start_len} pts) and "
+                f"end_profile ({self._end_len} pts) must have equal point count"
+            )
+
+        self.height = float(height)
+
+    @staticmethod
+    def _profile_point_count(profile: Union[Path, List[Vec]], plane: Plane) -> int:
+        if isinstance(profile, Path):
+            pts = profile.to_profile_points(plane)
+            return len(pts)
+        return len(profile)
+
+    def _resolve_pts(self, profile: Union[Path, List[Vec]], plane: Plane) -> List[tuple]:
+        """Resolve profile to a list of 2D (u, v) points in *plane* local coords."""
+        if isinstance(profile, Path):
+            return profile.to_profile_points(plane)
+        from ifckit.builders._geom import project_profile_to_plane as _proj
+
+        return _proj(profile, plane)
+
+    @property
+    def start_profile(self) -> List[Vec]:
+        """Start profile as resolved list of Vec (projected to plane XY)."""
+        if isinstance(self._start_src, Path):
+            pts = self._start_src.to_profile_points(self.plane)
+            return [Vec(u, v, 0) for u, v in pts]
+        return list(self._start_src)
+
+    @property
+    def end_profile(self) -> List[Vec]:
+        """End profile as resolved list of Vec (projected to plane XY)."""
+        if isinstance(self._end_src, Path):
+            pts = self._end_src.to_profile_points(self.plane)
+            return [Vec(u, v, 0) for u, v in pts]
+        return list(self._end_src)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["plane"] = self.plane.to_dict()
+        d["height"] = self.height
+        _start = self._start_src
+        _end = self._end_src
+        if isinstance(_start, Path):
+            pts = _start.to_profile_points(self.plane)
+            d["start_profile"] = {
+                "type": "path",
+                "pts": [[u, v] for u, v in pts],
+            }
+        else:
+            d["start_profile"] = [p.to_tuple() for p in _start]
+        if isinstance(_end, Path):
+            pts = _end.to_profile_points(self.plane)
+            d["end_profile"] = {
+                "type": "path",
+                "pts": [[u, v] for u, v in pts],
+            }
+        else:
+            d["end_profile"] = [p.to_tuple() for p in _end]
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "PendingTaperedExtrusion":
+        plane = Plane.from_dict(cls._require(d, "plane"))
+        height = cls._require(d, "height")
+        raw_start = cls._require(d, "start_profile")
+        raw_end = cls._require(d, "end_profile")
+
+        def _resolve(raw):
+            if isinstance(raw, dict) and raw.get("type") == "path":
+                pts = [plane.origin + plane.x_axis * u + plane.y_axis * v for u, v in raw["pts"]]
+                return Path.from_pts(pts, closed=True)
+            return [Vec(*pt) for pt in raw]
+
+        return cls(
+            plane=plane,
+            start_profile=_resolve(raw_start),
+            end_profile=_resolve(raw_end),
+            height=height,
+            name=d.get("name", ""),
+            style=cls._style_from_dict(d),
+            properties=d.get("properties") or {},
+        )
 
 
 class PendingRevolvedBeam(PendingElement):
