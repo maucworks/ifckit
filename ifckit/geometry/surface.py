@@ -421,6 +421,7 @@ class Surface:
         constraints=None,
         supports=None,
         tol: float = 1e-3,
+        tolerance: "float | None" = None,
     ) -> "Surface":
         """Create a surface bounded by ≥2 curves via OCC MakeFilling.
 
@@ -436,6 +437,7 @@ class Surface:
                         support.
             tol:         3D tolerance for MakeFilling.  Higher values
                         (e.g. ``1e-2``) are faster but coarser.
+            tolerance:   Deprecated alias for *tol*.
 
         Returns:
             A new Surface.
@@ -443,6 +445,8 @@ class Surface:
         Raises:
             ValueError: If G1 is specified without a support surface.
         """
+        if tolerance is not None:
+            tol = tolerance
         n = len(curves)
         if n < 2:
             raise ValueError("patch() requires at least 2 curves")
