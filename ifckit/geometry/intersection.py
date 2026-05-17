@@ -173,22 +173,37 @@ class Intersection:
         from ifckit.geometry.surface import Surface as _Surf
         from ifckit.geometry.surface import _build_occ_surface
 
-        occ_surf = _build_occ_surface(surf)
-        face = BRepBuilderAPI_MakeFace(occ_surf, 1e-6).Face()
+        # Use cached trimmed face (from patch) to avoid intersecting
+        # outside the patch boundary.
+        occ_face = getattr(surf, "_occ_face", None)
+        if occ_face is None:
+            occ_surf = _build_occ_surface(surf)
+            occ_face = BRepBuilderAPI_MakeFace(occ_surf, 1e-6).Face()
 
         if isinstance(other, Plane):
             pl = other
-            occ_other = gp_Pln(
-                gp_Pnt(pl.origin.x, pl.origin.y, pl.origin.z),
-                gp_Dir(pl.z_axis.x, pl.z_axis.y, pl.z_axis.z),
-            )
+            # Create a bounded plane face that covers the surface's
+            # approximate extent — an infinite gp_Pln makes the
+            # section algorithm slow and unbounded.
+            bbox = _surface_bbox(occ_face)
+            margin = max(bbox[2] - bbox[0], bbox[3] - bbox[1]) * 0.5 + 100
+            occ_other = BRepBuilderAPI_MakeFace(
+                gp_Pln(
+                    gp_Pnt(pl.origin.x, pl.origin.y, pl.origin.z),
+                    gp_Dir(pl.z_axis.x, pl.z_axis.y, pl.z_axis.z),
+                ),
+                bbox[0] - margin,
+                bbox[2] + margin,
+                bbox[1] - margin,
+                bbox[3] + margin,
+            ).Face()
         elif isinstance(other, _Surf):
             occ_s2 = _build_occ_surface(other)
             occ_other = BRepBuilderAPI_MakeFace(occ_s2, 1e-6).Face()
         else:
             raise TypeError(f"Unsupported section type: {type(other).__name__}")
 
-        section = BRepAlgoAPI_Section(face, occ_other)
+        section = BRepAlgoAPI_Section(occ_face, occ_other)
         section.Build()
 
         curves: list = []
@@ -203,3 +218,24 @@ class Intersection:
             exp.Next()
 
         return cls(curves=curves)
+
+
+def _surface_bbox(face: object, n: int = 10) -> tuple[float, float, float, float]:
+    """Compute 2D bounding box ``(umin, vmin, umax, vmax)`` of a face's surface."""
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+
+    adaptor = BRepAdaptor_Surface(face)
+    s = adaptor.Surface().Surface()
+    umin = adaptor.FirstUParameter()
+    umax = adaptor.LastUParameter()
+    vmin = adaptor.FirstVParameter()
+    vmax = adaptor.LastVParameter()
+    xs, ys = [], []
+    for i in range(n):
+        for j in range(n):
+            u = umin + (umax - umin) * i / (n - 1)
+            v = vmin + (vmax - vmin) * j / (n - 1)
+            p = s.Value(u, v)
+            xs.append(p.X())
+            ys.append(p.Y())
+    return min(xs), min(ys), max(xs), max(ys)
