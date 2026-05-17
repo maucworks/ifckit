@@ -68,7 +68,7 @@ class RevolvedBeamBuilder(BaseBuilder):
         if needs_flip:
             pts_2d = [(p.x, p.y) for p in pending.profile]
         else:
-            pts_2d = [(-p.x, -p.y) for p in pending.profile]
+            pts_2d = [(p.x, -p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
 
         # rev_pos frame at arc start — local X=radial, Z=-tangent, Y=arc.normal
