@@ -74,17 +74,66 @@ def main():
     write_obj(str(obj_path), sub_verts, sub_faces)
     print(f"✓ OBJ saved to {obj_path}")
 
-    # ── 3. Extract IFC patches ────────────────────────────────────
+    # ── 3. Export IFC ──────────────────────────────────────────────
     patches = extract_patches(sub_verts, sub_faces)
     import ifcopenshell
 
     f = ifcopenshell.file(schema="IFC4")
-    for i, s in enumerate(patches[:4]):  # first 4 patches
-        e = s.to_ifc_bspline(f)
-        print(f"  patch {i}: {e.is_a()}, Udeg={e.UDegree} Vdeg={e.VDegree}")
+    g = ifcopenshell.guid.new
+
+    # Spatial structure
+    si_unit = f.create_entity("IfcSIUnit", UnitType="LENGTHUNIT", Prefix="MILLI", Name="METRE")
+    unit_assign = f.create_entity("IfcUnitAssignment", Units=[si_unit])
+
+    owner = f.create_entity(
+        "IfcPersonAndOrganization",
+        f.create_entity("IfcPerson", GivenName="User"),
+        f.create_entity("IfcOrganization", Name="ifckit"),
+    )
+    owner_hist = f.create_entity(
+        "IfcOwnerHistory", OwningUser=owner, OwningApplication=owner,
+        State="READWRITE", ChangeAction="ADDED",
+    )
+    proj = f.create_entity("IfcProject", g(), owner_hist, "SubdivCage",
+                           UnitsInContext=unit_assign)
+
+    ctx = f.create_entity(
+        "IfcGeometricRepresentationContext",
+        ContextIdentifier="Model", ContextType="Model",
+        CoordinateSpaceDimension=3,
+    )
+
+    site = f.create_entity("IfcSite", g(), owner_hist, "Site")
+    bldg = f.create_entity("IfcBuilding", g(), owner_hist, "Building")
+    storey = f.create_entity("IfcBuildingStorey", g(), owner_hist, "Storey")
+    f.create_entity("IfcRelAggregates", g(), owner_hist, RelatingObject=proj, RelatedObjects=[site])
+    f.create_entity("IfcRelAggregates", g(), owner_hist, RelatingObject=site, RelatedObjects=[bldg])
+    f.create_entity(
+        "IfcRelAggregates", g(), owner_hist,
+        RelatingObject=bldg, RelatedObjects=[storey],
+    )
+
+    # Patches as proxies
+    for i, s in enumerate(patches):
+        ifc_surf = s.to_ifc_bspline(f)
+        rep = f.create_entity(
+            "IfcShapeRepresentation", ContextOfItems=ctx,
+            RepresentationIdentifier="Surface", RepresentationType="Surface3D",
+            Items=[ifc_surf],
+        )
+        proxy = f.create_entity(
+            "IfcBuildingElementProxy", g(), owner_hist, f"Patch-{i}",
+            Representation=f.create_entity(
+                "IfcProductDefinitionShape", Representations=[rep],
+            ),
+        )
+        f.create_entity("IfcRelContainedInSpatialStructure",
+                         g(), owner_hist,
+                         RelatingStructure=storey, RelatedElements=[proxy])
+
     ifc_path = output_dir / "subdiv_cage.ifc"
     f.write(str(ifc_path))
-    print(f"✓ IFC saved to {ifc_path}")
+    print(f"✓ IFC saved to {ifc_path}  ({len(patches)} patches)")
 
     # ── 4. Cube ──────────────────────────────────────────────────
     cv, cf = make_cube()
