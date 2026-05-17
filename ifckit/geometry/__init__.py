@@ -13,6 +13,7 @@ biarc       — solve_biarc, fit_biarcs
 curve       — Curve
 surface     — Surface (also: occ_eval_point, occ_intersect_plane)
 intersection — Intersection
+subdivision — catmull_clark, extract_patches, write_obj
 frames      — FrameField, transport_frames, fixed_ref_frames, upvector_frames
 """
 
@@ -35,6 +36,7 @@ from ifckit.geometry.primitives import (
     _polygon_normal,
     _signed_area,
 )
+from ifckit.geometry.subdivision import catmull_clark, extract_patches, write_obj
 from ifckit.geometry.surface import Surface
 
 __all__ = [
@@ -56,6 +58,10 @@ __all__ = [
     # surface
     "Surface",
     "Intersection",
+    # subdivision
+    "catmull_clark",
+    "extract_patches",
+    "write_obj",
     # frames
     "FrameField",
     "transport_frames",
