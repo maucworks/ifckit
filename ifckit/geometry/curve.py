@@ -586,8 +586,21 @@ class Curve:
         for i in range(1, len(occ_curves)):
             prev_end = _curve_end(occ_curves[i - 1])
             curr_start = _curve_start(occ_curves[i])
-            gap = prev_end.Distance(curr_start)
-            if gap > tol:
+            curr_end = _curve_end(occ_curves[i])
+            gap_fwd = prev_end.Distance(curr_start)
+            gap_rev = prev_end.Distance(curr_end)
+
+            if gap_fwd <= tol:
+                # Forward connection — add as‑is
+                joiner.Add(occ_curves[i], tol)
+
+            elif gap_rev <= tol:
+                # Reversed connection — flip the ifckit Curve and retry
+                curves[i] = curves[i].reverse()
+                occ_curves[i] = _build_occ_curve(curves[i])
+                joiner.Add(occ_curves[i], tol)
+
+            else:
                 # Not G0‑connected → finalise current group
                 groups.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
                 joiner = GeomConvert_CompCurveToBSplineCurve()
