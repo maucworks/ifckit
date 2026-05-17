@@ -907,6 +907,61 @@ class Path:
 
         return new_path
 
+    def continued(self, tol: float = 1e-9) -> "Path":
+        """Return a new Path with all segments chained end‑to‑start.
+
+        Segments whose end matches the next segment's **end** (reversed)
+        are flipped so the chain is continuous.  This is the same logic
+        used by :func:`assemble_path` but applied to a single already‑
+        ordered path.
+
+        Args:
+            tol: Endpoint comparison tolerance.
+
+        Returns:
+            A new ``Path`` with consistent segment direction.
+        """
+        result = Path(plane=self._plane)
+        if not self._segments:
+            return result
+        result._segments = [self._segments[0]]
+        for seg in self._segments[1:]:
+            _, rev = _segments_fit(result._segments[-1], seg, tol)
+            result._segments.append(seg.reverse() if rev else seg)
+        return result
+
+    def normalize(self, tol: float = 1e-9) -> "Path":
+        """Return a new Path with consistent arc normal direction.
+
+        All ``Arc`` segments are flipped so their normals point in the
+        same direction as the first arc in the path.  ``Line`` segments
+        are left untouched.
+
+        Args:
+            tol: Dot‑product tolerance for opposite detection.
+
+        Returns:
+            A new ``Path`` with uniform arc normals.
+        """
+        result = Path(plane=self._plane)
+        if not self._segments:
+            return result
+
+        # Find the canonical normal from the first Arc
+        canonical = None
+        for seg in self._segments:
+            if isinstance(seg, Arc):
+                canonical = seg.normal.normalized()
+                break
+
+        for seg in self._segments:
+            if isinstance(seg, Arc) and canonical is not None:
+                if (seg.normal.normalized() @ canonical) < 0:
+                    result._segments.append(seg.reverse())
+                    continue
+            result._segments.append(seg)
+        return result
+
     def directrix(self, ifc_file) -> "ifcopenshell.entity_instance":
         """Create an IfcCompositeCurve for use in IfcSectionedSpine.
 
