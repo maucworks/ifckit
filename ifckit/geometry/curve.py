@@ -573,12 +573,30 @@ class Curve:
         result = BRep_Tool.Curve(edge)
         if result is None:
             raise TypeError("Edge has no curve")
-        curve_handle = result[0]  # first element of the (handle, first, last) tuple
+        curve_handle, first_param, last_param = result
 
         # Downcast to BSpline
         bspline = Geom_BSplineCurve.DownCast(curve_handle)
         if bspline is None:
             raise TypeError("Edge contains a non-BSpline curve. Use Path for line/circle segments.")
+
+        # If the edge is trimmed (parameter range ≠ full curve domain),
+        # sample the edge within its actual bounds — the raw BSpline
+        # extends beyond the edge's trim limits.
+        k0 = bspline.Knot(1)
+        k1 = bspline.Knot(bspline.NbKnots())
+        eps = 1e-4 * max(1.0, abs(k1 - k0))
+        if abs(first_param - k0) > eps or abs(last_param - k1) > eps:
+            from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+
+            adaptor = BRepAdaptor_Curve(edge)
+            n = max(20, bspline.Degree() * 4)
+            pts = []
+            for i in range(n):
+                u = first_param + (last_param - first_param) * i / (n - 1)
+                p = adaptor.Value(u)
+                pts.append(Vec(p.X(), p.Y(), p.Z()))
+            return cls.from_points(pts, degree=min(3, len(pts) - 1))
 
         poles = []
         for i in range(bspline.NbPoles()):
