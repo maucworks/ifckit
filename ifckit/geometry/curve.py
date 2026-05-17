@@ -564,6 +564,8 @@ class Curve:
         from ifckit.geometry.surface import _build_occ_curve, _curve_from_occ_bspline
 
         occ_curves = [_build_occ_curve(c) for c in curves]
+        if not occ_curves:
+            return []
 
         from OCC.Core.gp import gp_Pnt
 
