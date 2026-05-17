@@ -50,31 +50,26 @@ class RevolvedBeamBuilder(BaseBuilder):
 
         # Canonical plane normal for profile continuity
         cp_normal = pending.cp_normal  # may be None
+        plane = getattr(pending, "plane", None)
+        arc_n = arc.normal.normalized()
+        arc_tan = arc.tangent_at_start().normalized()
         if cp_normal is None:
-            plane = getattr(pending, "plane", None)
             if plane is not None:
                 cp_normal = plane.z_axis.normalized()
 
-        if cp_normal is None:
-            needs_flip = False
-        else:
-            # Normalize both for robust comparison
-            arc_n = arc.normal.normalized()
-            cp_n = cp_normal.normalized()
-            # Flip profile if arc normal opposes cp_normal
-            needs_flip = arc_n.dot(cp_n) < 0
+        mult_x = -1
+        mult_y = -1
+        needs_flip = False
+        if plane is not None:
+            mult_x = -1 if arc_tan.dot(plane.x_axis) < 0 else 1
 
-        # Calculate radial direction and radius for CP
-        radius = arc.radius
+        if cp_normal is not None:
+            needs_flip = arc_n.dot(cp_normal.normalized()) < 0
 
-        # Profile points - offset by radius in local X to position at arc start in CP
-        # If needs_flip, negate both X and Y to maintain continuity
-        axis_dist = -radius
         if needs_flip:
-            pts_2d = [((p.x), p.y) for p in pending.profile]
-            # axis_dist *= -1
-        else:
-            pts_2d = [(-p.x, -p.y) for p in pending.profile]
+            mult_x *= -1
+            mult_y *= -1
+        pts_2d = [(mult_x * p.x, mult_y * p.y) for p in pending.profile]
         profile = profile_from_points(ifc_file, pts_2d)
 
         # Position = CP at arc center
@@ -84,10 +79,8 @@ class RevolvedBeamBuilder(BaseBuilder):
         # Position's local XY = radial-normal plane = CP
 
         cpo = arc.start
-        # cps = arc.start
         cpx = (arc.start - arc.center).normalized()
         cpn = -arc.tangent_at_start().normalized()
-        # cpy = arc.normal.normalized()
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
             Location=pt3(ifc_file, *cpo.to_tuple()),
@@ -100,7 +93,7 @@ class RevolvedBeamBuilder(BaseBuilder):
         # So (0,1,0) in that local frame correctly resolves to arc.normal in world space.
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
-            Location=pt3(ifc_file, axis_dist, 0, 0),
+            Location=pt3(ifc_file, -arc.radius, 0, 0),
             Axis=dir3(ifc_file, 0.0, 1.0, 0.0),
         )
 
