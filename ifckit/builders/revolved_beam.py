@@ -51,6 +51,11 @@ class RevolvedBeamBuilder(BaseBuilder):
         # Canonical plane normal for profile continuity
         cp_normal = pending.cp_normal  # may be None
         if cp_normal is None:
+            plane = getattr(pending, "plane", None)
+            if plane is not None:
+                cp_normal = plane.z_axis.normalized()
+
+        if cp_normal is None:
             needs_flip = False
         else:
             # Normalize both for robust comparison
