@@ -113,18 +113,46 @@ def main():
         RelatingObject=bldg, RelatedObjects=[storey],
     )
 
-    # Patches as proxies
+    # Patches as proxies (NURBS + tessellation for viewer compatibility)
     for i, s in enumerate(patches):
         ifc_surf = s.to_ifc_bspline(f)
-        rep = f.create_entity(
+
+        # Tessellated representation (Bonsai/Blender can't render NURBS)
+        pts = [
+            s.control_points[0][0],
+            s.control_points[0][1],
+            s.control_points[1][1],
+            s.control_points[1][0],
+        ]
+        coord_list = f.create_entity(
+            "IfcCartesianPointList3D",
+            CoordList=[(p.x, p.y, p.z) for p in pts],
+        )
+        tfs = f.create_entity(
+            "IfcTriangulatedFaceSet",
+            Coordinates=coord_list,
+            CoordIndex=[
+                (1, 2, 3),
+                (1, 3, 4),
+            ],
+        )
+
+        nurb_rep = f.create_entity(
             "IfcShapeRepresentation", ContextOfItems=ctx,
             RepresentationIdentifier="Surface", RepresentationType="Surface3D",
             Items=[ifc_surf],
         )
+        tess_rep = f.create_entity(
+            "IfcShapeRepresentation", ContextOfItems=ctx,
+            RepresentationIdentifier="Tessellation",
+            RepresentationType="Tessellation",
+            Items=[tfs],
+        )
         proxy = f.create_entity(
             "IfcBuildingElementProxy", g(), owner_hist, f"Patch-{i}",
             Representation=f.create_entity(
-                "IfcProductDefinitionShape", Representations=[rep],
+                "IfcProductDefinitionShape",
+                Representations=[nurb_rep, tess_rep],
             ),
         )
         f.create_entity("IfcRelContainedInSpatialStructure",
