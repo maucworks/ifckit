@@ -432,6 +432,10 @@ class PendingRevolvedBeam(PendingElement):
         ref_line:   Optional reference line for orientation.
         cp_normal:  Canonical plane normal — if arc.normal opposes this,
                    the profile is flipped 180° to maintain continuity.
+        plane:      Explicit profile orientation plane.  When set the
+                   profile XY aligns with *plane* (X = width, Y = up)
+                   and the revolution axis is ``plane.z_axis``.  All
+                   arcs share the same orientation — no flip detection.
         clip_data:  Optional clip plane data.
     """
 
@@ -444,6 +448,7 @@ class PendingRevolvedBeam(PendingElement):
         name: str = "",
         ref_line: Optional[Line] = None,
         cp_normal: Optional[Vec] = None,
+        plane: Optional["Plane"] = None,
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
     ) -> None:
@@ -453,6 +458,7 @@ class PendingRevolvedBeam(PendingElement):
         self.profile = _coerce_profile(profile)
         self.ref_line = ref_line
         self.cp_normal = cp_normal
+        self.plane = plane
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -465,6 +471,12 @@ class PendingRevolvedBeam(PendingElement):
         d["profile"] = [p.to_tuple() for p in self.profile]
         if self.cp_normal is not None:
             d["cp_normal"] = self.cp_normal.to_tuple()
+        if self.plane is not None:
+            d["plane"] = {
+                "origin": self.plane.origin.to_tuple(),
+                "x_axis": self.plane.x_axis.to_tuple(),
+                "y_axis": self.plane.y_axis.to_tuple(),
+            }
         return d
 
     @classmethod
@@ -478,11 +490,21 @@ class PendingRevolvedBeam(PendingElement):
         )
         profile = [Vec(*pt) for pt in cls._require(d, "profile")]
         cp_normal = Vec(*d["cp_normal"]) if "cp_normal" in d else None
+        plane_d = d.get("plane")
+        if plane_d:
+            plane = Plane(
+                Vec(*plane_d["origin"]),
+                Vec(*plane_d["x_axis"]),
+                Vec(*plane_d["y_axis"]),
+            )
+        else:
+            plane = None
         return cls(
             arc=arc,
             profile=profile,
             name=d.get("name", ""),
             cp_normal=cp_normal,
+            plane=plane,
             style=cls._style_from_dict(d),
             properties=d.get("properties") or {},
         )

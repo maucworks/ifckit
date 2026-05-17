@@ -48,41 +48,49 @@ class RevolvedBeamBuilder(BaseBuilder):
         arc = pending.arc
         elev = storey_elevation(container)  # noqa: F841
 
-        # Canonical plane normal for profile continuity
-        cp_normal = pending.cp_normal  # may be None
-        if cp_normal is None:
-            needs_flip = False
-        else:
-            # Normalize both for robust comparison
-            arc_n = arc.normal.normalized()
-            cp_n = cp_normal.normalized()
-            # Flip profile if arc normal opposes cp_normal
-            needs_flip = arc_n.dot(cp_n) < 0
+        has_plane = getattr(pending, "plane", None) is not None
 
-        # Calculate radial direction and radius for CP
+        # Calculate radial direction and radius
         radius = arc.radius
-
-        # Profile points - offset by radius in local X to position at arc start in CP
-        # If needs_flip, negate both X and Y to maintain continuity
         axis_dist = -radius
-        if needs_flip:
-            pts_2d = [((p.x), p.y) for p in pending.profile]
-            # axis_dist *= -1
+
+        if has_plane:
+            # Explicit plane — profile as‑is (no flip), always same orientation
+            pts_2d = [(p.x, p.y) for p in pending.profile]
         else:
-            pts_2d = [(-p.x, -p.y) for p in pending.profile]
+            # Canonical plane normal (backward compat)
+            cp_normal = pending.cp_normal
+            if cp_normal is None:
+                needs_flip = False
+            else:
+                arc_n = arc.normal.normalized()
+                cp_n = cp_normal.normalized()
+                needs_flip = arc_n.dot(cp_n) < 0
+            if needs_flip:
+                pts_2d = [(p.x, p.y) for p in pending.profile]
+            else:
+                pts_2d = [(-p.x, -p.y) for p in pending.profile]
+
         profile = profile_from_points(ifc_file, pts_2d)
 
-        # Position = CP at arc center
-        # CP origin = arc center
-        # CP local X = radial direction (from center toward start)
-        # CP local Y = arc normal (perpendicular to arc plane)
-        # Position's local XY = radial-normal plane = CP
-
+        # rev_pos frame at arc start
         cpo = arc.start
-        # cps = arc.start
-        cpx = (arc.start - arc.center).normalized()
-        cpn = -arc.tangent_at_start().normalized()
-        # cpy = arc.normal.normalized()
+        cpx = (arc.start - arc.center).normalized()  # local X = radial
+        cpn = -arc.tangent_at_start().normalized()  # local Z = -tangent
+        local_y = (cpn**cpx).normalized()  # local Y = arc.normal
+
+        if has_plane:
+            # Revolution axis = plane.z_axis, expressed in rev_pos local frame
+            pz = pending.plane.z_axis
+            axis_dir = dir3(
+                ifc_file,
+                pz @ cpx,
+                pz @ local_y,
+                pz @ cpn,
+            )
+        else:
+            axis_dir = dir3(ifc_file, 0.0, 1.0, 0.0)  # local Y = arc.normal
+
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
             Location=pt3(ifc_file, *cpo.to_tuple()),
@@ -90,13 +98,10 @@ class RevolvedBeamBuilder(BaseBuilder):
             RefDirection=dir3(ifc_file, *cpx.to_tuple()),
         )
 
-        # Axis of revolution - at arc center, direction = arc normal
-        # IfcAxis1Placement is in the local frame of rev_pos, where local Y = arc normal (cpy).
-        # So (0,1,0) in that local frame correctly resolves to arc.normal in world space.
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
             Location=pt3(ifc_file, axis_dist, 0, 0),
-            Axis=dir3(ifc_file, 0.0, 1.0, 0.0),
+            Axis=axis_dir,
         )
 
         # Create revolved solid - negative angle for CW sweep
