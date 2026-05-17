@@ -546,7 +546,6 @@ class Surface:
         curve: "Curve",
         angles: "Sequence[float] | None" = None,
         width: float = 100.0,
-        symmetric: bool = False,
         angle: float | None = None,
         angle_end: float | None = None,
         angle_deg: float | None = None,
@@ -557,12 +556,8 @@ class Surface:
         """Create a ribbon (ruled support surface) along a curve.
 
         The ribbon shares one exact edge with *curve* and extends outward
-        by *width* at the given *angles* (asymmetric).  With
-        ``symmetric=True`` the ribbon extends *width*/2 on each side of
-        the curve (visual preview, not suitable as G1 support).
-
-        The result can be used as a G1 support surface in :meth:`patch`
-        (asymmetric mode only).
+        by *width* at the given *angles*.  The result is used as a G1
+        support surface in :meth:`patch`.
 
         ``angles`` is a list of rotation angles (**radians**) around the
         curve tangent (0 = horizontal perpendicular).  With one angle
@@ -577,8 +572,6 @@ class Surface:
             curve:         Spine curve.
             angles:        Rotation angles around tangent (**radians**).
             width:         Ribbon width / offset distance.
-            symmetric:     If ``True``, centre the ribbon on the curve
-                          (visual only — no G1 support).
             angle:         Start angle (rad).  Overridden by *angles*.
             angle_end:     End angle (rad).  Overridden by *angles*.
             angle_deg:     Start angle (degrees).
@@ -587,7 +580,7 @@ class Surface:
             n_pts:         Number of samples for the offset curve.
 
         Returns:
-            A new Surface.
+            A new Surface suitable as G1 support for :meth:`patch`.
         """
         # Resolve angles list from the various input styles
         if angles_deg is not None:
@@ -615,8 +608,6 @@ class Surface:
         from OCC.Core.TopExp import TopExp_Explorer, topexp
 
         up = Vec(0, 0, 1)
-        curve_edge: object | None = None
-        ribbon_face: object | None = None
 
         # ── Sample curve and compute offset points ─────────────────
         def _interp_angle(t):
@@ -631,8 +622,6 @@ class Surface:
             return ang_list[i] + frac * (ang_list[i + 1] - ang_list[i])
 
         off_pts: "list[Vec]" = []
-        off_pos: "list[Vec]" = []
-        off_neg: "list[Vec]" = []
         for i in range(n_pts):
             t = i / (n_pts - 1)
             p = curve.point_at(t)
@@ -642,41 +631,23 @@ class Surface:
             if abs(a) > 1e-12:
                 c, s = math.cos(a), math.sin(a)
                 perp = perp * c + up * s
-            if symmetric:
-                off_pos.append(p + perp * width * 0.5)
-                off_neg.append(p - perp * width * 0.5)
-            else:
-                off_pts.append(p + perp * width)
+            off_pts.append(p + perp * width)
 
-        # ── Ruled surface ─────────────────────────────────────────
+        # ── Ruled surface between curve and offset curve ──────────
         from OCC.Core.BRepFill import BRepFill_Generator
 
         from ifckit.geometry.curve import Curve as _Curve
 
-        if symmetric:
-            offset_pos = _Curve.from_points(off_pos)
-            offset_neg = _Curve.from_points(off_neg)
-            e1 = _build_occ_edge(offset_neg)
-            e2 = _build_occ_edge(offset_pos)
-            w1 = BRepBuilderAPI_MakeWire(e1).Wire()
-            w2 = BRepBuilderAPI_MakeWire(e2).Wire()
-            gen = BRepFill_Generator()
-            gen.AddWire(w1)
-            gen.AddWire(w2)
-            gen.Perform()
-            # Symmetric ribbon: curve is in the middle, no edge cache
-            curve_edge = None
-            ribbon_face = None
-        else:
-            offset = _Curve.from_points(off_pts)
-            e1 = _build_occ_edge(curve)
-            e2 = _build_occ_edge(offset)
-            w1 = BRepBuilderAPI_MakeWire(e1).Wire()
-            w2 = BRepBuilderAPI_MakeWire(e2).Wire()
-            gen = BRepFill_Generator()
-            gen.AddWire(w1)
-            gen.AddWire(w2)
-            gen.Perform()
+        offset = _Curve.from_points(off_pts)
+        e1 = _build_occ_edge(curve)
+        e2 = _build_occ_edge(offset)
+        w1 = BRepBuilderAPI_MakeWire(e1).Wire()
+        w2 = BRepBuilderAPI_MakeWire(e2).Wire()
+
+        gen = BRepFill_Generator()
+        gen.AddWire(w1)
+        gen.AddWire(w2)
+        gen.Perform()
 
         # ── Extract geometry from generator ───────────────────────
         exp_g = TopExp_Explorer(gen.Shell(), TopAbs_FACE)
@@ -686,23 +657,23 @@ class Surface:
 
         geom = BRepAdaptor_Surface(ribbon_face).Surface().Surface()
 
-        if not symmetric and curve_edge is None:
-            # Find the edge in the ribbon face that matches the curve
-            p0_crv = curve.point_at(0)
-            p1_crv = curve.point_at(1)
-            ee = TopExp_Explorer(ribbon_face, TopAbs_EDGE)
-            while ee.More():
-                e = ee.Current()
-                v0 = topexp.FirstVertex(e)
-                v1 = topexp.LastVertex(e)
-                p0 = BRep_Tool.Pnt(v0)
-                p1 = BRep_Tool.Pnt(v1)
-                d0 = abs(p0.X() - p0_crv.x) + abs(p0.Y() - p0_crv.y) + abs(p0.Z() - p0_crv.z)
-                d1 = abs(p1.X() - p1_crv.x) + abs(p1.Y() - p1_crv.y) + abs(p1.Z() - p1_crv.z)
-                if d0 < 0.1 and d1 < 0.1:
-                    curve_edge = e
-                    break
-                ee.Next()
+        # Find the edge in the ribbon face that matches the curve
+        p0_crv = curve.point_at(0)
+        p1_crv = curve.point_at(1)
+        curve_edge: object | None = None
+        ee = TopExp_Explorer(ribbon_face, TopAbs_EDGE)
+        while ee.More():
+            e = ee.Current()
+            v0 = topexp.FirstVertex(e)
+            v1 = topexp.LastVertex(e)
+            p0 = BRep_Tool.Pnt(v0)
+            p1 = BRep_Tool.Pnt(v1)
+            d0 = abs(p0.X() - p0_crv.x) + abs(p0.Y() - p0_crv.y) + abs(p0.Z() - p0_crv.z)
+            d1 = abs(p1.X() - p1_crv.x) + abs(p1.Y() - p1_crv.y) + abs(p1.Z() - p1_crv.z)
+            if d0 < 0.1 and d1 < 0.1:
+                curve_edge = e
+                break
+            ee.Next()
 
         def _downcast(surf):
             try:
@@ -720,19 +691,12 @@ class Surface:
 
             n = n_pts
             pts = TColgp_Array2OfPnt(1, n, 1, 2)
-            if symmetric:
-                for i in range(n):
-                    t = i / (n - 1)
-                    p = curve.point_at(t)
-                    pts.SetValue(i + 1, 1, gp_Pnt(p.x, p.y, p.z))
-                    pts.SetValue(i + 1, 2, gp_Pnt(off_pos[i].x, off_pos[i].y, off_pos[i].z))
-            else:
-                for i in range(n):
-                    t = i / (n - 1)
-                    p = curve.point_at(t)
-                    pts.SetValue(i + 1, 1, gp_Pnt(p.x, p.y, p.z))
-                    off = off_pts[i]
-                    pts.SetValue(i + 1, 2, gp_Pnt(off.x, off.y, off.z))
+            for i in range(n):
+                t = i / (n - 1)
+                p = curve.point_at(t)
+                pts.SetValue(i + 1, 1, gp_Pnt(p.x, p.y, p.z))
+                off = off_pts[i]
+                pts.SetValue(i + 1, 2, gp_Pnt(off.x, off.y, off.z))
             occ_surf = GeomAPI_PointsToBSplineSurface(
                 pts,
                 1,
@@ -781,6 +745,60 @@ def _build_occ_edge(curve: "Curve") -> object:
         geom = Geom_BSplineCurve(poles, ukn, mul, curve.degree, curve.closed)
 
     return BRepBuilderAPI_MakeEdge(geom, curve.knots[0], curve.knots[-1]).Edge()
+
+
+def _build_occ_curve(curve: "Curve") -> object:
+    """Build an OCC ``Geom_BSplineCurve`` from an ifckit *Curve* (no edge wrapper)."""
+    from OCC.Core.Geom import Geom_BSplineCurve
+    from OCC.Core.gp import gp_Pnt
+    from OCC.Core.TColgp import TColgp_Array1OfPnt
+    from OCC.Core.TColStd import TColStd_Array1OfInteger, TColStd_Array1OfReal
+
+    n = len(curve.points)
+    poles = TColgp_Array1OfPnt(1, n)
+    for i, p in enumerate(curve.points):
+        poles.SetValue(i + 1, gp_Pnt(p.x, p.y, p.z))
+
+    ukn = TColStd_Array1OfReal(1, len(curve.knots))
+    for i, k in enumerate(curve.knots):
+        ukn.SetValue(i + 1, k)
+    mul = TColStd_Array1OfInteger(1, len(curve.multiplicities))
+    for i, m in enumerate(curve.multiplicities):
+        mul.SetValue(i + 1, m)
+
+    if curve.rational:
+        wgt = TColStd_Array1OfReal(1, n)
+        for i, w in enumerate(curve._weights):
+            wgt.SetValue(i + 1, w)
+        return Geom_BSplineCurve(poles, wgt, ukn, mul, curve.degree, curve.closed)
+
+    return Geom_BSplineCurve(poles, ukn, mul, curve.degree, curve.closed)
+
+
+def _curve_from_occ_bspline(bspline: object) -> "Curve":
+    """Extract an ifckit ``Curve`` from an OCC ``Geom_BSplineCurve``."""
+    from ifckit.geometry.curve import Curve as _Curve
+
+    poles = [
+        Vec(bspline.Pole(i + 1).X(), bspline.Pole(i + 1).Y(), bspline.Pole(i + 1).Z())
+        for i in range(bspline.NbPoles())
+    ]
+    knots = [bspline.Knot(i + 1) for i in range(bspline.NbKnots())]
+    mults = [bspline.Multiplicity(i + 1) for i in range(bspline.NbKnots())]
+    degree = bspline.Degree()
+    weights = (
+        [bspline.Weight(i + 1) for i in range(bspline.NbPoles())] if bspline.IsRational() else None
+    )
+    closed = bspline.IsPeriodic()
+
+    return _Curve(
+        control_points=poles,
+        knots=knots,
+        multiplicities=mults,
+        degree=degree,
+        weights=weights,
+        closed=closed,
+    )
 
 
 # ---------------------------------------------------------------------------

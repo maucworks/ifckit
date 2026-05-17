@@ -537,6 +537,64 @@ class Curve:
         )
 
     @classmethod
+    def assemble(
+        cls,
+        curves: "Sequence[Curve]",
+        tol: float = 1e-6,
+    ) -> "List[Curve]":
+        """Join end-to-start connected curves into continuous BSpline curves.
+
+        Uses OCC ``GeomConvert_CompCurveToBSplineCurve``.  Curves that
+        are not G0‑connected (gap larger than *tol*) are split into
+        separate groups.
+
+        Args:
+            curves:  Sequence of curves to join (must be G0 at
+                     connections within *tol*).
+            tol:     G0 tolerance for joining.
+
+        Returns:
+            List of joined ``Curve`` objects.
+        """
+        try:
+            from OCC.Core.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+        except ImportError:
+            raise ImportError("Curve.assemble() requires pythonocc-core") from None
+
+        from ifckit.geometry.surface import _build_occ_curve, _curve_from_occ_bspline
+
+        occ_curves = [_build_occ_curve(c) for c in curves]
+
+        from OCC.Core.gp import gp_Pnt
+
+        groups: list = []
+        joiner = GeomConvert_CompCurveToBSplineCurve()
+        joiner.Add(occ_curves[0], tol)
+
+        def _curve_end(bs):
+            """Return the last point of an OCC BSpline curve."""
+            p = bs.Value(bs.Knot(bs.NbKnots()))
+            return gp_Pnt(p.X(), p.Y(), p.Z())
+
+        def _curve_start(bs):
+            """Return the first point of an OCC BSpline curve."""
+            p = bs.Value(bs.Knot(1))
+            return gp_Pnt(p.X(), p.Y(), p.Z())
+
+        for i in range(1, len(occ_curves)):
+            prev_end = _curve_end(occ_curves[i - 1])
+            curr_start = _curve_start(occ_curves[i])
+            gap = prev_end.Distance(curr_start)
+            if gap > tol:
+                # Not G0‑connected → finalise current group
+                groups.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
+                joiner = GeomConvert_CompCurveToBSplineCurve()
+            joiner.Add(occ_curves[i], tol)
+
+        groups.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
+        return groups
+
+    @classmethod
     def from_occ_edge(cls, edge) -> "Curve":
         """Create a Curve from an OCC ``TopoDS_Edge``.
 
