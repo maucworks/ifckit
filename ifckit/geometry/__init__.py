@@ -12,6 +12,7 @@ path        — Path, assemble_path
 biarc       — solve_biarc, fit_biarcs
 curve       — Curve
 surface     — Surface (also: occ_eval_point, occ_intersect_plane)
+intersection — Intersection
 frames      — FrameField, transport_frames, fixed_ref_frames, upvector_frames
 """
 
@@ -23,6 +24,7 @@ from ifckit.geometry.frames import (
     transport_frames,
     upvector_frames,
 )
+from ifckit.geometry.intersection import Intersection
 from ifckit.geometry.path import Path, assemble_path
 from ifckit.geometry.primitives import (
     Arc,
@@ -53,6 +55,7 @@ __all__ = [
     "fit_biarcs",
     # surface
     "Surface",
+    "Intersection",
     # frames
     "FrameField",
     "transport_frames",
