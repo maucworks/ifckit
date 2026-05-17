@@ -324,6 +324,8 @@ class Surface:
             wire = BRepBuilderAPI_MakeWire(edge).Wire()
             lofter.AddWire(wire)
         lofter.Build()
+        if not lofter.IsDone():
+            raise RuntimeError("Loft failed — ThruSections returned IsDone=False")
 
         exp = TopExp_Explorer(lofter.Shape(), TopAbs_FACE)
         if not exp.More():
@@ -418,7 +420,7 @@ class Surface:
         curves,
         constraints=None,
         supports=None,
-        tolerance: float = 1e-3,
+        tol: float = 1e-3,
     ) -> "Surface":
         """Create a surface bounded by ≥2 curves via OCC MakeFilling.
 
@@ -432,7 +434,7 @@ class Surface:
             supports:    Per‑edge support ``Surface`` for G1 edges
                         (``None`` = no support). G1 edges require a
                         support.
-            tolerance:   3D tolerance for MakeFilling.  Higher values
+            tol:         3D tolerance for MakeFilling.  Higher values
                         (e.g. ``1e-2``) are faster but coarser.
 
         Returns:
@@ -482,7 +484,7 @@ class Surface:
                 )
 
         filler = BRepOffsetAPI_MakeFilling()
-        filler.SetConstrParam(tolerance, tolerance, 2 * tolerance, 2 * tolerance)
+        filler.SetConstrParam(tol, tol, 2 * tol, 2 * tol)
 
         for i, curve in enumerate(curves):
             gc = full_constraints[i]

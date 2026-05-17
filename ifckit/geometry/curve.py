@@ -615,7 +615,13 @@ class Curve:
             joiner = GeomConvert_CompCurveToBSplineCurve()
             for oc in occ:
                 joiner.Add(oc, tol)
-            result.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
+            try:
+                joined = joiner.BSplineCurve()
+                result.append(_curve_from_occ_bspline(joined))
+            except BaseException:
+                # Join failed — add curves individually
+                for c in grp:
+                    result.append(c)
 
         return result
 
@@ -679,7 +685,10 @@ class Curve:
                 u = first_param + (last_param - first_param) * i / (n - 1)
                 p = adaptor.Value(u)
                 pts.append(Vec(p.X(), p.Y(), p.Z()))
-            return cls.from_points(pts, degree=min(3, len(pts) - 1))
+            try:
+                return cls.from_points(pts, degree=min(3, len(pts) - 1))
+            except BaseException:
+                pass  # fall through to full-curve extraction below
 
         poles = []
         for i in range(bspline.NbPoles()):

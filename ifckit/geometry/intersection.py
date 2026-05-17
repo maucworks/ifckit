@@ -211,6 +211,8 @@ class Intersection:
 
         section = BRepAlgoAPI_Section(occ_face, occ_other)
         section.Build()
+        if not section.IsDone():
+            return cls(curves=[], points=[])
 
         curves: list = []
         exp = TopExp_Explorer(section.Shape(), TopAbs_EDGE)
