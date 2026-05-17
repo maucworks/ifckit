@@ -563,51 +563,61 @@ class Curve:
 
         from ifckit.geometry.surface import _build_occ_curve, _curve_from_occ_bspline
 
-        occ_curves = [_build_occ_curve(c) for c in curves]
-        if not occ_curves:
+        if not curves:
             return []
 
-        from OCC.Core.gp import gp_Pnt
+        # ── 1. Orient curves — try all 4 endpoint permutations ─────
+        oriented: list = [curves[0]]
+        groups: list[list] = []
 
-        groups: list = []
-        joiner = GeomConvert_CompCurveToBSplineCurve()
-        joiner.Add(occ_curves[0], tol)
+        def _p(pts, i):
+            return pts[i].point_at(0), pts[i].point_at(1)
 
-        def _curve_end(bs):
-            """Return the last point of an OCC BSpline curve."""
-            p = bs.Value(bs.Knot(bs.NbKnots()))
-            return gp_Pnt(p.X(), p.Y(), p.Z())
+        for i in range(1, len(curves)):
+            prev_start, prev_end = _p(oriented, -1)
+            curr_start, curr_end = _p(curves, i)
 
-        def _curve_start(bs):
-            """Return the first point of an OCC BSpline curve."""
-            p = bs.Value(bs.Knot(1))
-            return gp_Pnt(p.X(), p.Y(), p.Z())
+            def _dist(a, b):
+                return (a - b).length()
 
-        for i in range(1, len(occ_curves)):
-            prev_end = _curve_end(occ_curves[i - 1])
-            curr_start = _curve_start(occ_curves[i])
-            curr_end = _curve_end(occ_curves[i])
-            gap_fwd = prev_end.Distance(curr_start)
-            gap_rev = prev_end.Distance(curr_end)
+            fwd = _dist(prev_end, curr_start)  # c0 → c1
+            rev = _dist(prev_end, curr_end)  # c0 → c1⁻¹
+            p_rev = _dist(prev_start, curr_start)  # c0⁻¹ → c1
+            p_rev_r = _dist(prev_start, curr_end)  # c0⁻¹ → c1⁻¹
 
-            if gap_fwd <= tol:
-                # Forward connection — add as‑is
-                joiner.Add(occ_curves[i], tol)
+            if min(fwd, rev, p_rev, p_rev_r) > tol:
+                groups.append(oriented)
+                oriented = [curves[i]]
+                continue
 
-            elif gap_rev <= tol:
-                # Reversed connection — flip the ifckit Curve and retry
-                curves[i] = curves[i].reverse()
-                occ_curves[i] = _build_occ_curve(curves[i])
-                joiner.Add(occ_curves[i], tol)
+            def _apply(c, fl):
+                return c.reverse() if fl else c
 
-            else:
-                # Not G0‑connected → finalise current group
-                groups.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
-                joiner = GeomConvert_CompCurveToBSplineCurve()
-            joiner.Add(occ_curves[i], tol)
+            if fwd <= tol:
+                oriented.append(curves[i])
+            elif rev <= tol:
+                oriented.append(curves[i].reverse())
+            elif p_rev <= tol:
+                oriented[-1] = oriented[-1].reverse()
+                oriented.append(curves[i])
+            else:  # p_rev_r
+                oriented[-1] = oriented[-1].reverse()
+                oriented.append(curves[i].reverse())
 
-        groups.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
-        return groups
+        groups.append(oriented)
+
+        # ── 2. Build OCC BSplineJoin for each group ────────────────
+        from OCC.Core.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+
+        result: list = []
+        for grp in groups:
+            occ = [_build_occ_curve(c) for c in grp]
+            joiner = GeomConvert_CompCurveToBSplineCurve()
+            for oc in occ:
+                joiner.Add(oc, tol)
+            result.append(_curve_from_occ_bspline(joiner.BSplineCurve()))
+
+        return result
 
     @classmethod
     def from_occ_edge(cls, edge) -> "Curve":
