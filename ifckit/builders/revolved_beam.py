@@ -75,6 +75,21 @@ class RevolvedBeamBuilder(BaseBuilder):
         cpo = arc.start
         cpx = (arc.start - arc.center).normalized()
         cpn = -arc.tangent_at_start().normalized()
+        local_y = (cpn**cpx).normalized()  # = arc.normal
+
+        if has_plane:
+            # Revolution axis = plane.z_axis (constant for all arcs)
+            pz = pending.plane.z_axis.normalized()
+            axis_dir = dir3(
+                ifc_file,
+                pz @ cpx,
+                pz @ local_y,
+                pz @ cpn,
+            )
+        else:
+            # Revolution axis = local Y → arc.normal
+            axis_dir = dir3(ifc_file, 0.0, 1.0, 0.0)
+
         rev_pos = ifc_file.create_entity(
             "IfcAxis2Placement3D",
             Location=pt3(ifc_file, *cpo.to_tuple()),
@@ -82,11 +97,10 @@ class RevolvedBeamBuilder(BaseBuilder):
             RefDirection=dir3(ifc_file, *cpx.to_tuple()),
         )
 
-        # Revolution axis = local Y = (0,1,0) → resolves to arc.normal
         rev_axis = ifc_file.create_entity(
             "IfcAxis1Placement",
             Location=pt3(ifc_file, axis_dist, 0, 0),
-            Axis=dir3(ifc_file, 0.0, 1.0, 0.0),
+            Axis=axis_dir,
         )
 
         # Create revolved solid - negative angle for CW sweep
