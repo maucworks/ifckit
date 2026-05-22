@@ -421,21 +421,35 @@ class Path:
                     return False
             return True
 
-        # For Lines only — check if all collinear.
-        # isinstance is safe here — Line is a module-internal primitive,
-        # not a reloadable user class.
-        all_lines = all(
-            isinstance(seg, Line) for seg in self._segments
-        )  # safe: Line never reloaded
-        if len(self._segments) >= 2 and all_lines:
-            # Check if all lines are collinear (same direction or opposite)
-            first_dir = self._segments[0].direction.normalized()
-            for seg in self._segments[1:]:
-                dir_normalized = seg.direction.normalized()
-                if (
-                    abs(first_dir @ dir_normalized) < 0.999
-                    and abs((first_dir @ dir_normalized) + 1.0) > 0.001
-                ):
+        # For Lines only — check coplanarity by verifying all points lie in
+        # the same plane (defined by the first non-collinear triple).
+        all_lines = all(isinstance(seg, Line) for seg in self._segments)
+        if len(self._segments) >= 3 and all_lines:
+            pts = []
+            seen = set()
+            for seg in self._segments:
+                key = (round(seg.start.x, 6), round(seg.start.y, 6), round(seg.start.z, 6))
+                if key not in seen:
+                    seen.add(key)
+                    pts.append(seg.start)
+            # Need at least 3 unique points to define a plane
+            if len(pts) < 3:
+                return True
+            # Find normal from first non-collinear triple
+            normal = None
+            for i in range(2, len(pts)):
+                d1 = pts[1] - pts[0]
+                d2 = pts[i] - pts[0]
+                cross = d1**d2
+                if cross.length_squared() > 1e-12:
+                    normal = cross.normalized()
+                    break
+            if normal is None:
+                return True  # all collinear
+            # Every point must have the same signed distance to the plane
+            d0 = normal @ pts[0]
+            for pt in pts[1:]:
+                if abs(normal @ pt - d0) > 1e-6:
                     return False
             return True
 
@@ -757,7 +771,7 @@ class Path:
 
     def reverse(self) -> "Path":
         """Reverse the order and direction of all segments. Returns self."""
-        reversed_segs = []
+        reversed_segs: list[Line | Arc] = []
         for seg in reversed(self._segments):
             if isinstance(seg, Line):
                 reversed_segs.append(Line(seg.end, seg.start))
@@ -768,7 +782,7 @@ class Path:
 
     def move(self, delta: "Vec") -> "Path":
         """Translate all segment points by *delta*. Returns ``self``."""
-        new_segs = []
+        new_segs: list[Line | Arc] = []
         for seg in self._segments:
             if isinstance(seg, Line):
                 new_segs.append(Line(seg.start + delta, seg.end + delta))
@@ -794,7 +808,7 @@ class Path:
         axis = Vec(0, 0, 1)
         ctr = center if center is not None else Vec(0, 0, 0)
         angle = _math.radians(degrees)
-        new_segs = []
+        new_segs: list[Line | Arc] = []
         for seg in self._segments:
             if isinstance(seg, Line):
                 new_segs.append(
@@ -833,7 +847,7 @@ class Path:
         target = plane or self._plane
         if target is None:
             raise ValueError("make_planar() requires a plane argument or self._plane to be set")
-        new_segs = []
+        new_segs: list[Line | Arc] = []
         for seg in self._segments:
             if isinstance(seg, Line):
                 new_start = target.closest_point(seg.start)
@@ -1222,7 +1236,7 @@ class Path:
             p1, d1 = _seg_end_line_repr(seg_a)
             p2, d2 = _seg_line_repr(seg_b)
 
-            ip = _line_line_intersect_2d(p1, d1, p2, d2)
+            ip = _line_line_intersect_in_plane(p1, d1, p2, d2, n)
             if ip is None:
                 # Parallel/collinear — use the midpoint of the gap
                 ip = (seg_a.end + seg_b.start) * 0.5
@@ -1236,7 +1250,6 @@ class Path:
         if self.is_closed:
             result = Path(plane=self._plane)
             result._segments = list(offset_segs)
-            result._closed = True
             return result
 
         # Open path
@@ -1253,7 +1266,6 @@ class Path:
         for i in range(len(orig_pts) - 1, 0, -1):
             result.add_line(orig_pts[i], orig_pts[i - 1])
         result.add_line(orig_pts[0], offset_segs[0].start)
-        result._closed = True
         return result
 
     def to_profile_points(
@@ -1558,15 +1570,38 @@ def _segments_connected(
     return a.end.equals(b.start, tol)
 
 
-def _line_line_intersect_2d(p1: "Vec", d1: "Vec", p2: "Vec", d2: "Vec") -> "Optional[Vec]":
-    """Find intersection of two lines in the XY plane."""
-    denom = d1.x * (-d2.y) - d1.y * (-d2.x)
+def _line_line_intersect_in_plane(
+    p1: "Vec", d1: "Vec", p2: "Vec", d2: "Vec", normal: "Vec"
+) -> "Optional[Vec]":
+    """Intersect two lines guaranteed to lie in the same plane.
+
+    Uses the scalar triple product against *normal* so the result is correct
+    for any plane orientation, not just XY.
+
+    Args:
+        p1, d1:  point + direction of line 1.
+        p2, d2:  point + direction of line 2.
+        normal:  normal of the plane containing both lines.
+
+    Returns:
+        Intersection point, or ``None`` if lines are parallel.
+    """
+    denom = (d1**d2) @ normal
     if abs(denom) < 1e-12:
         return None
-    dx = p2.x - p1.x
-    dy = p2.y - p1.y
-    t = (dx * (-d2.y) - dy * (-d2.x)) / denom
+    dp = p2 - p1
+    t = ((dp**d2) @ normal) / denom
     return Vec(p1.x + t * d1.x, p1.y + t * d1.y, p1.z + t * d1.z)
+
+
+def _line_line_intersect_2d(p1: "Vec", d1: "Vec", p2: "Vec", d2: "Vec") -> "Optional[Vec]":
+    """Find intersection of two lines in the XY plane.
+
+    .. deprecated::
+        Prefer :func:`_line_line_intersect_in_plane` which works for any
+        plane orientation.
+    """
+    return _line_line_intersect_in_plane(p1, d1, p2, d2, Vec(0, 0, 1))
 
 
 def _segments_fit(
@@ -1620,11 +1655,11 @@ def assemble_path(
                     added = True
                     unused.remove(i)
                     if isinstance(nxt, Line):
-                        flipped = nxt.reverse()
-                        path.add_line(flipped.start, flipped.end)
+                        rev_line = nxt.reverse()
+                        path.add_line(rev_line.start, rev_line.end)
                     elif isinstance(nxt, Arc):
-                        flipped = nxt.reverse()
-                        path.add_arc(flipped.center, flipped.normal, flipped.start, flipped.angle)
+                        rev_arc = nxt.reverse()
+                        path.add_arc(rev_arc.center, rev_arc.normal, rev_arc.start, rev_arc.angle)
                     break
             if not added:
                 break

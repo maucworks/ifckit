@@ -37,10 +37,8 @@ def _coerce_profile(profile: ProfileInput) -> List[Vec]:
     for p in profile:
         if isinstance(p, Vec):
             result.append(p)
-        elif len(p) == 2:  # type: ignore[arg-type]
-            result.append(Vec(p[0], p[1], 0.0))
         else:
-            result.append(Vec(p[0], p[1], p[2]))  # type: ignore[index]
+            result.append(Vec(p[0], p[1], p[2] if len(p) > 2 else 0.0))
     return result
 
 
@@ -233,7 +231,7 @@ class PendingBeam(PendingExtrudedElement):
         self.ref_line = ref_line
 
     @classmethod
-    def from_plane(  # type: ignore[override]
+    def from_plane(
         cls,
         axis: Line,
         profile: "List[Vec]",
@@ -264,7 +262,7 @@ class PendingBeam(PendingExtrudedElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBeam":
-        obj = cls._from_dict_fields(d)  # type: ignore[return-value]
+        obj: PendingExtrudedElement = cls._from_dict_fields(d)
         ref_line_d = d.get("ref_line")
         if ref_line_d is not None:
             obj.ref_line = Line(Vec(*ref_line_d["start"]), Vec(*ref_line_d["end"]))

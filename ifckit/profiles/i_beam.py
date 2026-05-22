@@ -99,6 +99,7 @@ class IBeamProfile(Profile):
             raise ValueError(f"anchor must be one of {sorted(VALID_ANCHORS)}, got '{self.anchor}'")
 
     def _origin_offset(self) -> Tuple[float, float]:
+        assert self.anchor is not None
         fx, fy = _ANCHOR_OFFSETS[self.anchor]
         return fx * self.width, fy * self.height
 

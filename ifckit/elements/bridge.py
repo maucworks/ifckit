@@ -54,20 +54,25 @@ class AlignmentSegment:
         return self.geometry.length
 
     def to_dict(self) -> Dict[str, Any]:
+        geom_d: Dict[str, Any] = {}
         if isinstance(self.geometry, Line):
-            geom_d = {
-                "segment_type": "line",
-                "start": self.geometry.start.to_tuple(),
-                "end": self.geometry.end.to_tuple(),
-            }
+            geom_d.update(
+                {
+                    "segment_type": "line",
+                    "start": self.geometry.start.to_tuple(),
+                    "end": self.geometry.end.to_tuple(),
+                }
+            )
         else:
-            geom_d = {
-                "segment_type": "arc",
-                "center": self.geometry.center.to_tuple(),
-                "normal": self.geometry.normal.to_tuple(),
-                "start": self.geometry.start.to_tuple(),
-                "angle_deg": math.degrees(self.geometry.angle),
-            }
+            geom_d.update(
+                {
+                    "segment_type": "arc",
+                    "center": self.geometry.center.to_tuple(),
+                    "normal": self.geometry.normal.to_tuple(),
+                    "start": self.geometry.start.to_tuple(),
+                    "angle_deg": math.degrees(self.geometry.angle),
+                }
+            )
         return {"geometry": geom_d, "station_start": self.station_start}
 
     @classmethod

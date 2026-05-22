@@ -2,11 +2,11 @@
 tests/test_profiles_new.py
 ==========================
 
-Tests for the new profile system:
+Tests for the ifckit.profiles system:
+  - IBeamProfile and LBeamProfile (basic + extended + to_ifc + from_dict)
   - Profile ABC + registry
   - PolygonProfile, RoundedPolygonProfile, RectangleProfile,
     CircleProfile, HollowCircleProfile
-  - IBeamProfile and LBeamProfile: to_ifc(), from_dict(), round-trips
   - SteelProfile lookup table
   - profile_to_ifc() builder helper
   - PendingBeam round-trip with Profile object
@@ -15,18 +15,18 @@ Tests for the new profile system:
 from __future__ import annotations
 
 import math
-import pytest
 import ifcopenshell
+import pytest
 
 from ifckit.profiles import (
+    IBeamProfile,
+    LBeamProfile,
     Profile,
     PolygonProfile,
     RoundedPolygonProfile,
     RectangleProfile,
     CircleProfile,
     HollowCircleProfile,
-    IBeamProfile,
-    LBeamProfile,
     SteelProfile,
 )
 from ifckit.profiles.base import RegisterProfileType
@@ -113,11 +113,9 @@ class TestPolygonProfile:
         assert ent.OuterCurve.is_a("IfcPolyline")
 
     def test_to_ifc_ccw(self, ifc4_file):
-        # CW winding → must be reversed to CCW
         p = PolygonProfile([(0, 0), (0, 1), (1, 1), (1, 0)])
         ent = p.to_ifc(ifc4_file)
         coords = [(pt.Coordinates[0], pt.Coordinates[1]) for pt in ent.OuterCurve.Points[:-1]]
-        # Signed area must be positive (CCW)
         n = len(coords)
         area = (
             sum(
@@ -131,7 +129,6 @@ class TestPolygonProfile:
     def test_get_profile_points(self):
         pts = [(0, 0), (2, 0), (2, 1), (0, 1)]
         p = PolygonProfile(pts)
-        # Default anchor=None — raw coordinates, no transformation
         assert p.get_profile_points() == pts
 
 
@@ -160,13 +157,12 @@ class TestRoundedPolygonProfile:
         pts = [(0, 0), (4, 0), (4, 3), (0, 3)]
         p = RoundedPolygonProfile(pts, radius=0.0)
         outline = p.get_profile_points()
-        assert len(outline) == 4  # no arc points added
+        assert len(outline) == 4
 
     def test_nonzero_radius_adds_arc_points(self):
         pts = [(0, 0), (4, 0), (4, 3), (0, 3)]
         p = RoundedPolygonProfile(pts, radius=0.2, arc_segments=4)
         outline = p.get_profile_points()
-        # Each corner gets 1 tangent pt + 4 arc pts = 5 pts; 4 corners × 5 = 20
         assert len(outline) == 4 * 5
 
     def test_to_dict_round_trip(self):
@@ -309,11 +305,79 @@ class TestHollowCircleProfile:
 
 
 # ---------------------------------------------------------------------------
-# IBeamProfile — extended tests (to_ifc, from_dict)
+# IBeamProfile
 # ---------------------------------------------------------------------------
 
 
-class TestIBeamProfileExtended:
+class TestIBeamProfile:
+    def test_default_construction(self):
+        p = IBeamProfile()
+        assert p.height == 0.5
+        assert p.width == 0.3
+
+    def test_area(self):
+        p = IBeamProfile(height=0.6, width=0.3, web_thickness=0.01, flange_thickness=0.01)
+        assert math.isclose(p.area, 0.0118, rel_tol=1e-6)
+
+    def test_web_height(self):
+        p = IBeamProfile(height=0.6, width=0.3, web_thickness=0.01, flange_thickness=0.01)
+        assert math.isclose(p.web_height, 0.58, rel_tol=1e-9)
+
+    def test_centroid_symmetric(self):
+        p = IBeamProfile(height=0.6, width=0.3, web_thickness=0.01, flange_thickness=0.01)
+        assert math.isclose(p.centroid_z, 0.3, rel_tol=1e-9)
+
+    def test_profile_points_count(self):
+        p = IBeamProfile()
+        pts = p.get_profile_points()
+        assert len(pts) == 12
+
+    def test_anchor_s_bottom_at_zero(self):
+        p = IBeamProfile(height=0.6, width=0.3, web_thickness=0.01, flange_thickness=0.01, anchor='s')
+        pts = p.get_profile_points()
+        zs = [z for _, z in pts]
+        assert math.isclose(min(zs), 0.0, abs_tol=1e-9)
+        assert math.isclose(max(zs), 0.6, rel_tol=1e-9)
+
+    def test_anchor_c_centred(self):
+        p = IBeamProfile(height=0.6, width=0.3, web_thickness=0.01, flange_thickness=0.01, anchor='c')
+        pts = p.get_profile_points()
+        zs = [z for _, z in pts]
+        assert math.isclose(min(zs), -0.3, abs_tol=1e-9)
+        assert math.isclose(max(zs),  0.3, abs_tol=1e-9)
+
+    def test_anchor_n_top_at_zero(self):
+        p = IBeamProfile(height=0.6, width=0.3, web_thickness=0.01, flange_thickness=0.01, anchor='n')
+        pts = p.get_profile_points()
+        zs = [z for _, z in pts]
+        assert math.isclose(max(zs), 0.0, abs_tol=1e-9)
+        assert math.isclose(min(zs), -0.6, abs_tol=1e-9)
+
+    def test_invalid_anchor(self):
+        with pytest.raises(ValueError, match="anchor"):
+            IBeamProfile(anchor='x')
+
+    def test_invalid_web_thickness(self):
+        with pytest.raises(ValueError):
+            IBeamProfile(width=0.3, web_thickness=0.4)
+
+    def test_invalid_flange_thickness(self):
+        with pytest.raises(ValueError):
+            IBeamProfile(height=0.6, flange_thickness=0.35)
+
+    def test_to_dict(self):
+        p = IBeamProfile(name="HEA200")
+        d = p.to_dict()
+        assert d["name"] == "HEA200"
+        assert "area" in d
+        assert "centroid_z" in d
+
+    def test_all_anchors_smoke(self):
+        for anchor in ('sw', 's', 'se', 'w', 'c', 'e', 'nw', 'n', 'ne'):
+            p = IBeamProfile(anchor=anchor)
+            pts = p.get_profile_points()
+            assert len(pts) == 12
+
     def test_to_ifc_is_i_shape_profile_def(self, ifc4_file):
         p = IBeamProfile(
             height=0.3, width=0.15, web_thickness=0.007, flange_thickness=0.011, name="IPE300"
@@ -328,12 +392,8 @@ class TestIBeamProfileExtended:
 
     def test_from_dict_round_trip(self):
         p = IBeamProfile(
-            height=0.3,
-            width=0.15,
-            web_thickness=0.007,
-            flange_thickness=0.011,
-            anchor="c",
-            name="IPE300",
+            height=0.3, width=0.15, web_thickness=0.007, flange_thickness=0.011,
+            anchor="c", name="IPE300",
         )
         d = p.to_dict()
         assert d["profile_type"] == "i_beam"
@@ -347,11 +407,69 @@ class TestIBeamProfileExtended:
 
 
 # ---------------------------------------------------------------------------
-# LBeamProfile — extended tests (to_ifc, from_dict)
+# LBeamProfile
 # ---------------------------------------------------------------------------
 
 
-class TestLBeamProfileExtended:
+class TestLBeamProfile:
+    def test_default_construction(self):
+        p = LBeamProfile()
+        assert p.height == 0.3
+        assert p.width == 0.3
+
+    def test_area(self):
+        p = LBeamProfile(height=0.3, width=0.2, thickness=0.02)
+        assert math.isclose(p.area, 0.0096, rel_tol=1e-6)
+
+    def test_profile_points_count(self):
+        p = LBeamProfile()
+        pts = p.get_profile_points()
+        assert len(pts) == 6
+
+    def test_anchor_sw_bottom_left_at_zero(self):
+        p = LBeamProfile(height=0.3, width=0.2, thickness=0.02, anchor='sw')
+        pts = p.get_profile_points()
+        ys = [y for y, _ in pts]
+        zs = [z for _, z in pts]
+        assert math.isclose(min(ys), 0.0, abs_tol=1e-9)
+        assert math.isclose(min(zs), 0.0, abs_tol=1e-9)
+
+    def test_anchor_sw_extents(self):
+        p = LBeamProfile(height=0.3, width=0.2, thickness=0.02, anchor='sw')
+        pts = p.get_profile_points()
+        ys = [y for y, _ in pts]
+        zs = [z for _, z in pts]
+        assert math.isclose(max(ys), 0.2, rel_tol=1e-9)
+        assert math.isclose(max(zs), 0.3, rel_tol=1e-9)
+
+    def test_invalid_anchor(self):
+        with pytest.raises(ValueError, match="anchor"):
+            LBeamProfile(anchor='x')
+
+    def test_invalid_thickness(self):
+        with pytest.raises(ValueError):
+            LBeamProfile(height=0.3, width=0.3, thickness=0.4)
+
+    def test_centroid_y_positive(self):
+        p = LBeamProfile(height=0.3, width=0.2, thickness=0.02)
+        assert 0 < p.centroid_y < p.width
+
+    def test_centroid_z_positive(self):
+        p = LBeamProfile(height=0.3, width=0.2, thickness=0.02)
+        assert 0 < p.centroid_z < p.height
+
+    def test_to_dict(self):
+        p = LBeamProfile(name="L100x100x10")
+        d = p.to_dict()
+        assert d["name"] == "L100x100x10"
+        assert "area" in d
+
+    def test_all_anchors_smoke(self):
+        for anchor in ('sw', 's', 'se', 'w', 'c', 'e', 'nw', 'n', 'ne'):
+            p = LBeamProfile(anchor=anchor)
+            pts = p.get_profile_points()
+            assert len(pts) == 6
+
     def test_to_ifc_is_l_shape_profile_def(self, ifc4_file):
         p = LBeamProfile(height=0.1, width=0.1, thickness=0.01, name="L100x100x10")
         ent = p.to_ifc(ifc4_file)
@@ -407,7 +525,6 @@ class TestSteelProfile:
         assert math.isclose(p.wall_thickness, 0.010, rel_tol=1e-6)
 
     def test_chs_on_the_fly(self):
-        # Not in table, parsed dynamically
         p = SteelProfile.from_name("CHS300x12")
         assert isinstance(p, HollowCircleProfile)
         assert math.isclose(p.radius, 0.150, rel_tol=1e-6)

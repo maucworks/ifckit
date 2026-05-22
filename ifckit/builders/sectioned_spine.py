@@ -207,7 +207,7 @@ class SectionedSpineBuilder(BaseBuilder):
 
         # Write properties if any
         if pending.properties:
-            write_psets(ifc_file, element, pending.properties)
+            write_psets(ifc_file, element, pending)
 
         return element
 

@@ -10,7 +10,7 @@ They are lightweight wrappers that delegate to IfcModel for actual operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import ifcopenshell
 
@@ -201,6 +201,7 @@ class EntityHandle(Handle):
     """Generic wrapper around any ifcopenshell product entity."""
 
     __slots__ = ("footprint_curves",)
+    footprint_curves: Any
 
     def __init__(self, entity: ifcopenshell.entity_instance, model: IfcModel) -> None:
         super().__init__(entity, model)

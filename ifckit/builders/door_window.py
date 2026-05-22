@@ -93,103 +93,28 @@ def _build_fill_from_graph(
     type_entity=None,
     opening_anchor: str = "sw",
 ) -> ifcopenshell.entity_instance:
-    """Create a fill element whose geometry comes from a component-graph preset.
-
-    The graph is evaluated with ``w=overall_width``, ``h=overall_height`` plus
-    any extra parameters from the type entity's property sets.  The anchor
-    offset is applied as a translation on each component's solid placement so
-    that the fill sits flush inside the opening void.
-
-    Returns the created ``IfcDoor`` or ``IfcWindow`` entity.
-    """
+    """Create a fill element whose geometry comes from a component-graph preset."""
     from ifckit.builders.component_graph import evaluate_component_graph
 
     params: dict = {"w": overall_width, "h": overall_height}
-    # Merge user-provided component graph parameters (occurrence-level overrides)
     if pending.parameters:
         params.update(pending.parameters)
 
     components = evaluate_component_graph(graph_name, ifc_file, context, params, pending.plane)
-
-    # Each component solid has its own placement (z_offset from the graph).
-    solids = []
-    for comp in components:
-        solid = comp.solid
-
-        # Apply material if defined in component or overridden by pending
-        material = comp.material
-        if pending.material_overrides and comp.role in pending.material_overrides:
-            # Occurrence-level material override takes precedence
-            material_override = pending.material_overrides[comp.role]
-            if material and material_override:
-                # Merge: override fills in missing keys from component default
-                merged_material = material.copy()
-                merged_material.update(material_override)
-                material = merged_material
-            elif material_override:
-                material = material_override
-
-        # Apply styling to solid — fall back to neutral grey if no material defined
-        if not material:
-            material = {
-                "color": {"r": 0.75, "g": 0.75, "b": 0.75},
-                "transparency": 0.0,
-                "name": "Default",
-            }
-        solid = _apply_material_to_solid(ifc_file, solid, material)
-
-        solids.append(solid)
-
-    # Build shape representation with all component solids.
-    # - SweptSolid: only when all items are IfcExtrudedAreaSolid
-    # - SolidModel: when mixing IfcBooleanResult with IfcExtrudedAreaSolid
-    # - CSG: only when ALL items are IfcBooleanResult (pure CSG tree)
-    has_boolean = any(s.is_a("IfcBooleanResult") for s in solids)
-    has_swept = any(s.is_a("IfcExtrudedAreaSolid") for s in solids)
-    if has_boolean and has_swept:
-        rep_type = "SolidModel"
-    elif has_boolean:
-        rep_type = "CSG"
-    else:
-        rep_type = "SweptSolid"
-    shape_rep = ifc_file.create_entity(
-        "IfcShapeRepresentation",
-        ContextOfItems=context,
-        RepresentationIdentifier="Body",
-        RepresentationType=rep_type,
-        Items=solids,
+    return _build_fill_from_components(
+        ifc_file=ifc_file,
+        ifc_class=ifc_class,
+        name=name,
+        overall_width=overall_width,
+        overall_height=overall_height,
+        components=components,
+        pending=pending,
+        opening_entity=opening_entity,
+        container=container,
+        context=context,
+        type_entity=type_entity,
+        opening_anchor=opening_anchor,
     )
-
-    product_def_shape = ifc_file.create_entity(
-        "IfcProductDefinitionShape",
-        Representations=[shape_rep],
-    )
-
-    fill = ifc_file.create_entity(
-        ifc_class,
-        GlobalId=ifcopenshell.guid.new(),
-        Name=name,
-        Description=None,
-        ObjectType="fill",
-        ObjectPlacement=_relative_to_opening(ifc_file, opening_entity.ObjectPlacement),
-        Representation=product_def_shape,
-    )
-
-    fill.OverallWidth = overall_width
-    fill.OverallHeight = overall_height
-
-    ifc_file.create_entity(
-        "IfcRelFillsElement",
-        GlobalId=ifcopenshell.guid.new(),
-        RelatingOpeningElement=opening_entity,
-        RelatedBuildingElement=fill,
-    )
-
-    if type_entity is not None:
-        _assign_type(ifc_file, fill, type_entity)
-
-    write_psets(ifc_file, fill, pending)
-    return fill
 
 
 def _split_by_role(components):
@@ -650,77 +575,56 @@ def _set_window_type_attr(
 # ---------------------------------------------------------------------------
 
 
+def _thickness_from_extruded(extruded) -> float | None:
+    """Extract thickness from an IfcExtrudedAreaSolid, or None if not possible."""
+    area = extruded.SweptArea
+    if area.is_a("IfcRectangleProfileDef"):
+        return float(area.YDim) * 1000.0
+    if area.is_a("IfcArbitraryClosedProfileDef"):
+        return _get_profile_thickness(area)
+    return None
+
+
 def _extract_wall_thickness(host_entity: ifcopenshell.entity_instance) -> float:
-    """
-    Extract wall thickness from an IfcWall or IfcSlab entity.
-
-    Strategy:
-    1. Look for IfcExtrudedAreaSolid in the host representation.
-    2. For IfcRectangleProfileDef: YDim = thickness
-    3. For IfcArbitraryClosedProfileDef: use bounding box Y extent
-    4. Fallback: return 200 (200 mm, a common default).
-
-    Args:
-        host_entity: An IfcWall, IfcWallStandardCase, or IfcSlab entity.
-
-    Returns:
-        Thickness in millimeters.
-    """
     try:
         rep = host_entity.Representation
         if rep is None:
-            return 200.0  # 200 mm default
+            return 200.0
         for shape_rep in rep.Representations:
             for item in shape_rep.Items:
-                # Direct IfcExtrudedAreaSolid
                 if item.is_a("IfcExtrudedAreaSolid"):
-                    area = item.SweptArea
-                    if area.is_a("IfcRectangleProfileDef"):
-                        # For a wall: XDim = length, YDim = thickness
-                        return float(area.YDim) * 1000.0
-                    elif area.is_a("IfcArbitraryClosedProfileDef"):
-                        # Calculate thickness from bounding box Y extent
-                        return _get_profile_thickness(area)
-                # IfcBooleanClippingResult wraps a solid
-                if item.is_a("IfcBooleanClippingResult"):
+                    thickness = _thickness_from_extruded(item)
+                    if thickness is not None:
+                        return thickness
+                elif item.is_a("IfcBooleanClippingResult"):
                     first_op = item.FirstOperand
                     if first_op.is_a("IfcExtrudedAreaSolid"):
-                        area = first_op.SweptArea
-                        if area.is_a("IfcRectangleProfileDef"):
-                            return float(area.YDim) * 1000.0
-                        elif area.is_a("IfcArbitraryClosedProfileDef"):
-                            return _get_profile_thickness(area)
+                        thickness = _thickness_from_extruded(first_op)
+                        if thickness is not None:
+                            return thickness
     except Exception:  # noqa: BLE001
         pass
-    return 200.0  # 200 mm default
+    return 200.0
 
 
 def _get_profile_thickness(area) -> float:
     """Extract thickness from profile by calculating bounding box Y extent."""
     try:
-        # Get outer curve points
         curve = area.OuterCurve
         if hasattr(curve, "Points"):
             coords_raw = [(p.Coordinates[0], p.Coordinates[1]) for p in curve.Points]
         else:
-            # CompositeCurve
             coords_raw = []
             for seg in curve:
                 if hasattr(seg, "Points"):
                     coords_raw.extend([(p.Coordinates[0], p.Coordinates[1]) for p in seg.Points])
         if not coords_raw:
             return 200.0
-
-        # Detect unit from magnitude
-        # If values are > 100, they're likely in mm; otherwise in metres
         test_y = max(p[1] for p in coords_raw)
         if test_y > 100:
-            # Values in mm - use as-is
             thickness = max(p[1] for p in coords_raw) - min(p[1] for p in coords_raw)
         else:
-            # Values in metres - convert to mm
             thickness = (max(p[1] for p in coords_raw) - min(p[1] for p in coords_raw)) * 1000.0
-
         if thickness > 0:
             return thickness
     except Exception:  # noqa: BLE001
@@ -799,56 +703,47 @@ def _apply_material_to_solid(
     return solid
 
 
-def build_window_model_b(
+def _build_model_b(
     ifc_file: ifcopenshell.file,
-    pending,  # PendingWindow with .plane and .component_graph set
+    ifc_class: str,
+    pending,
     host_entity: ifcopenshell.entity_instance,
-    container: ifcopenshell.entity_instance,  # IfcBuildingStorey
+    container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
+    params_extras: dict,
+    post_process,
 ) -> ifcopenshell.entity_instance:
-    """
-    Model B: create an IfcOpeningElement + IfcWindow in one call.
-
-    The opening geometry is produced by evaluating the preset's
-    ``opening_nodes`` section. The fill geometry comes from ``nodes``.
-    Both node lists share the same reference-space scaling:
-    ``scale_x = actual_w / ref_w``, ``scale_y = actual_h / ref_h``.
-
-    If the preset has no ``opening_nodes``, or all opening nodes have
-    ``output: false``, no IfcOpeningElement is created (niche scenario).
+    """Shared Model B: create IfcOpeningElement + fill (door/window) in one call.
 
     Args:
-        ifc_file:    Open ifcopenshell file.
-        pending:     PendingWindow — must have ``plane`` and ``component_graph``.
-        host_entity: IfcWall or IfcSlab entity to void.
-        container:   IfcBuildingStorey for spatial containment of the window.
-        context:     Body sub-context.
+        ifc_file:      Open ifcopenshell file.
+        ifc_class:     ``"IfcWindow"`` or ``"IfcDoor"``.
+        pending:       PendingWindow or PendingDoor with ``plane``, ``component_graph``.
+        host_entity:   IfcWall / IfcSlab to void.
+        container:     IfcBuildingStorey for containment.
+        context:       Body sub-context.
+        params_extras: Extra params dict merged into ``{"w", "h", "wall_thickness"}``.
+        post_process:  Callable ``(ifc_file, fill_entity, pending)`` called before
+                       returning (e.g. to set window type or door operation).
 
     Returns:
-        The created IfcWindow entity.
-
-    Raises:
-        ValueError: If pending.plane or pending.component_graph is not set.
+        The created IfcDoor or IfcWindow entity.
     """
     from ifckit.builders.component_graph import evaluate_opening_nodes
     from ifckit.builders.opening import build_opening_from_solids
 
     if pending.plane is None:
-        raise ValueError(
-            "build_window_model_b: pending.plane must be set for Model B. "
-            "Provide a Plane that defines the insert position in the host wall."
-        )
+        raise ValueError("_build_model_b: pending.plane must be set.")
     if not pending.component_graph:
-        raise ValueError("build_window_model_b: pending.component_graph must be set for Model B.")
+        raise ValueError("_build_model_b: pending.component_graph must be set.")
 
     wall_thickness = _extract_wall_thickness(host_entity)
     params = {
         "w": pending.overall_width,
         "h": pending.overall_height,
         "wall_thickness": wall_thickness,
-        "window_type": pending.window_type,
     }
-    # Merge user-provided component graph parameters (occurrence-level overrides)
+    params.update(params_extras)
     if pending.parameters:
         params.update(pending.parameters)
 
@@ -856,7 +751,6 @@ def build_window_model_b(
         pending.component_graph, ifc_file, context, params, pending.plane
     )
 
-    # Split components by role
     opening_solids, projection_solids, fill_components = _split_by_role(opening_components)
 
     opening_entity = build_opening_from_solids(
@@ -870,44 +764,41 @@ def build_window_model_b(
 
     if opening_entity is None:
         raise ValueError(
-            f"build_window_model_b: preset {pending.component_graph!r} "
+            f"_build_model_b: preset {pending.component_graph!r} "
             "produced no opening solid. Cannot create IfcOpeningElement."
         )
 
     # Boolean-union Projection solids into the host wall's body representation
-    for proj_solid in projection_solids:
-        body_reps = [
-            r
-            for r in host_entity.Representation.Representations
-            if r.RepresentationIdentifier == "Body"
-        ]
-        if not body_reps:
-            continue
+    body_reps = [
+        r
+        for r in host_entity.Representation.Representations
+        if r.RepresentationIdentifier == "Body"
+    ]
+    if body_reps:
         body_rep = body_reps[0]
         items = list(body_rep.Items)
-        if not items:
-            continue
-        current = items[0]
-        for item in items[1:]:
-            current = ifc_file.create_entity(
-                "IfcBooleanResult",
-                Operator="UNION",
-                FirstOperand=current,
-                SecondOperand=item,
-            )
-        union = ifc_file.create_entity(
-            "IfcBooleanResult",
-            Operator="UNION",
-            FirstOperand=current,
-            SecondOperand=proj_solid,
-        )
-        body_rep.Items = [union]
+        if items:
+            current = items[0]
+            for item in items[1:]:
+                current = ifc_file.create_entity(
+                    "IfcBooleanResult",
+                    Operator="UNION",
+                    FirstOperand=current,
+                    SecondOperand=item,
+                )
+            for proj_solid in projection_solids:
+                current = ifc_file.create_entity(
+                    "IfcBooleanResult",
+                    Operator="UNION",
+                    FirstOperand=current,
+                    SecondOperand=proj_solid,
+                )
+            body_rep.Items = [current]
 
-    # Build window fill - either from components or with graph
     if fill_components:
-        window = _build_fill_from_components(
+        fill = _build_fill_from_components(
             ifc_file=ifc_file,
-            ifc_class="IfcWindow",
+            ifc_class=ifc_class,
             name=pending.name,
             overall_width=pending.overall_width,
             overall_height=pending.overall_height,
@@ -920,9 +811,9 @@ def build_window_model_b(
             opening_anchor="sw",
         )
     else:
-        window = _build_fill(
+        fill = _build_fill(
             ifc_file=ifc_file,
-            ifc_class="IfcWindow",
+            ifc_class=ifc_class,
             name=pending.name,
             overall_width=pending.overall_width,
             overall_height=pending.overall_height,
@@ -931,145 +822,52 @@ def build_window_model_b(
             container=container,
             context=context,
             type_entity=None,
-            opening_anchor="s",
+            opening_anchor="sw",
             graph_name=pending.component_graph,
         )
-    _set_window_type_attr(ifc_file, window, pending.window_type)
-    return window
+
+    post_process(ifc_file, fill, pending)
+    return fill
+
+
+def build_window_model_b(
+    ifc_file: ifcopenshell.file,
+    pending,
+    host_entity: ifcopenshell.entity_instance,
+    container: ifcopenshell.entity_instance,
+    context: ifcopenshell.entity_instance,
+) -> ifcopenshell.entity_instance:
+    """Model B: IfcOpeningElement + IfcWindow from a component-graph preset."""
+    return _build_model_b(
+        ifc_file,
+        "IfcWindow",
+        pending,
+        host_entity,
+        container,
+        context,
+        params_extras={"window_type": pending.window_type},
+        post_process=lambda f, fill, p: _set_window_type_attr(f, fill, p.window_type),
+    )
 
 
 def build_door_model_b(
     ifc_file: ifcopenshell.file,
-    pending,  # PendingDoor with .plane and .component_graph set
+    pending,
     host_entity: ifcopenshell.entity_instance,
-    container: ifcopenshell.entity_instance,  # IfcBuildingStorey
+    container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
 ) -> ifcopenshell.entity_instance:
-    """
-    Model B: create an IfcOpeningElement + IfcDoor in one call.
-
-    See ``build_window_model_b`` for full documentation.
-
-    Args:
-        ifc_file:    Open ifcopenshell file.
-        pending:     PendingDoor — must have ``plane`` and ``component_graph``.
-        host_entity: IfcWall or IfcSlab entity to void.
-        container:   IfcBuildingStorey for spatial containment of the door.
-        context:     Body sub-context.
-
-    Returns:
-        The created IfcDoor entity.
-
-    Raises:
-        ValueError: If pending.plane or pending.component_graph is not set.
-    """
-    from ifckit.builders.component_graph import evaluate_opening_nodes
-    from ifckit.builders.opening import build_opening_from_solids
-
-    if pending.plane is None:
-        raise ValueError(
-            "build_door_model_b: pending.plane must be set for Model B. "
-            "Provide a Plane that defines the insert position in the host wall."
-        )
-    if not pending.component_graph:
-        raise ValueError("build_door_model_b: pending.component_graph must be set for Model B.")
-
-    wall_thickness = _extract_wall_thickness(host_entity)
-    params = {
-        "w": pending.overall_width,
-        "h": pending.overall_height,
-        "wall_thickness": wall_thickness,
-        "operation_type": pending.operation_type,
-    }
-    # Merge user-provided component graph parameters (occurrence-level overrides)
-    if pending.parameters:
-        params.update(pending.parameters)
-
-    opening_components = evaluate_opening_nodes(
-        pending.component_graph, ifc_file, context, params, pending.plane
-    )
-
-    # Split components by role
-    opening_solids, projection_solids, fill_components = _split_by_role(opening_components)
-
-    opening_entity = build_opening_from_solids(
+    """Model B: IfcOpeningElement + IfcDoor from a component-graph preset."""
+    return _build_model_b(
         ifc_file,
-        pending.plane,
-        opening_solids,
+        "IfcDoor",
+        pending,
         host_entity,
+        container,
         context,
-        name=f"Opening-{pending.name}" if pending.name else "",
+        params_extras={"operation_type": pending.operation_type},
+        post_process=lambda f, fill, p: _set_door_operation(f, fill, p.operation_type),
     )
-
-    if opening_entity is None:
-        raise ValueError(
-            f"build_door_model_b: preset {pending.component_graph!r} "
-            "produced no opening solid (all opening_nodes have output: false "
-            "or opening_nodes is absent). Cannot create IfcOpeningElement."
-        )
-
-    # Boolean-union Projection solids into the host wall's body representation
-    for proj_solid in projection_solids:
-        body_reps = [
-            r
-            for r in host_entity.Representation.Representations
-            if r.RepresentationIdentifier == "Body"
-        ]
-        if not body_reps:
-            continue
-        body_rep = body_reps[0]
-        items = list(body_rep.Items)
-        if not items:
-            continue
-        current = items[0]
-        for item in items[1:]:
-            current = ifc_file.create_entity(
-                "IfcBooleanResult",
-                Operator="UNION",
-                FirstOperand=current,
-                SecondOperand=item,
-            )
-        union = ifc_file.create_entity(
-            "IfcBooleanResult",
-            Operator="UNION",
-            FirstOperand=current,
-            SecondOperand=proj_solid,
-        )
-        body_rep.Items = [union]
-
-    # Build door fill - either from components or with graph
-    if fill_components:
-        door = _build_fill_from_components(
-            ifc_file=ifc_file,
-            ifc_class="IfcDoor",
-            name=pending.name,
-            overall_width=pending.overall_width,
-            overall_height=pending.overall_height,
-            components=fill_components,
-            pending=pending,
-            opening_entity=opening_entity,
-            container=container,
-            context=context,
-            type_entity=None,
-            opening_anchor="s",
-        )
-    else:
-        door = _build_fill(
-            ifc_file=ifc_file,
-            ifc_class="IfcDoor",
-            name=pending.name,
-            overall_width=pending.overall_width,
-            overall_height=pending.overall_height,
-            pending=pending,
-            opening_entity=opening_entity,
-            container=container,
-            context=context,
-            type_entity=None,
-            opening_anchor="s",
-            graph_name=pending.component_graph,
-        )
-    _set_door_operation(ifc_file, door, pending.operation_type)
-    return door
 
 
 # ---------------------------------------------------------------------------

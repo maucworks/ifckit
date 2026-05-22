@@ -95,6 +95,9 @@ class Vec:
     def __len__(self) -> int:
         return 3
 
+    def __bool__(self) -> bool:
+        return self.x != 0.0 or self.y != 0.0 or self.z != 0.0
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Vec):
             return False
@@ -125,7 +128,7 @@ class Vec:
 
     def normalized(self) -> "Vec":
         mag = abs(self)
-        if mag == 0.0:
+        if mag < 1e-12:
             raise ValueError("Cannot normalize a zero-length vector")
         return self / mag
 
@@ -292,9 +295,10 @@ class Plane:
         if ref_direction is not None:
             # Project ref_direction onto the plane (Gram-Schmidt against n)
             r = ref_direction.normalized()
-            x = (r - n * (r @ n)).normalized()
+            x_raw = r - n * (r @ n)
             # If projection is degenerate (ref_direction parallel to n), fall through
-            if x.length() > 0.1:
+            if x_raw.length() > 0.1:
+                x = x_raw.normalized()
                 y = (n**x).normalized()
                 return cls(origin, x, y)
         # Fallback: pick world axis least aligned with n

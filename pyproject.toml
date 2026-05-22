@@ -72,3 +72,41 @@ select = ["E", "F", "I"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+strict_optional = true
+no_implicit_optional = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "ifckit.rhino_import",
+    "ifckit.geometry.surface",
+    "ifckit.rhinokit",
+    "ifckit.bonsaikit",
+    "ifckit.builders.wall_graph",
+    "ifckit.geometry.intersection",
+    "ifckit.geometry.curve",
+    "ifckit.geometry.biarc",
+    "ifckit.builders.wall",
+    "ifckit.builders.slab",
+    "ifckit.builders.space",
+    "ifckit.builders.extruded",
+    "ifckit.builders.revolved_beam",
+    "ifckit.builders.sectioned_spine",
+    "ifckit.builders.beam_factory",
+    "ifckit.builders.bridge",
+    "ifckit.builders.base",
+    "ifckit.builders._geom",
+    "ifckit.builders.component_graph",
+    "ifckit.profiles.shapes",
+    "ifckit.json_build",
+    "ifckit.elements.types",
+    "ifckit.elements.structural",
+    "ifckit.elements.bridge",
+]
+ignore_errors = true

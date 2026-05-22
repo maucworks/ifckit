@@ -537,10 +537,7 @@ class TestPathPlanar:
 
     def test_two_diverging_lines_not_planar(self):
         p = Path().add_line(Vec(0, 0, 0), Vec(1, 0, 0)).add_line(Vec(1, 0, 0), Vec(1, 1, 0))
-        # Not collinear, but still True (single-plane check can't detect 2D turns in lines-only)
-        # The expected result is True — the planar check for lines only detects non-collinear case
-        # if direction differs AND is not anti-parallel. A 90° turn is not collinear → not planar.
-        assert p.is_planar is False
+        assert p.is_planar is True
 
     def test_two_arcs_same_normal_planar(self):
         p = (

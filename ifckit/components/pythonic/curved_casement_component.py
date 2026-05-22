@@ -12,8 +12,8 @@ from ifckit.geometry import Path, Plane, Vec
 from .utils import _build_profiled_spine, _path_to_opening_solid, _path_to_solid
 
 
-class FixedCasementComponent(FillComponent):
-    """Generative window: sectioned-spine frame with fixed glazing."""
+class CurvedCasementComponent(FillComponent):
+    """Generative window: sectioned-spine frame with fixed glazing and filleted corners."""
 
     ifc_class = "IfcWindow"
 

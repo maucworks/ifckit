@@ -176,7 +176,7 @@ class IfcModel:
         self.unit = unit
 
         schema_str = schema.value
-        self._file = ifcopenshell.file(schema=schema_str)
+        self._file = ifcopenshell.file(schema=schema_str)  # type: ignore[arg-type]
 
         # IFC2X3 requires OwnerHistory on every root entity.
         # Set up person + org + application before the first root.create_entity call
@@ -265,7 +265,7 @@ class IfcModel:
     def add(
         self,
         pending: "PendingElement",
-        container: "Union[StoreyHandle, BridgePartHandle]",
+        container: "Union[StoreyHandle, BridgePartHandle, EntityHandle]",
     ) -> "EntityHandle":
         """
         Validate and build a pending element, placing it in *container*.

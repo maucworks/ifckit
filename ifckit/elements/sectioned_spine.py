@@ -7,7 +7,7 @@ different profiles at each position along the spine.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ifckit.elements.base import PendingElement
 
@@ -59,8 +59,8 @@ class PendingSectionedSpine(PendingElement):
         profiles: List["Profile"],
         positions: List["Plane"],
         name: str = "",
-        style: Optional = None,
-        properties: Optional = None,
+        style: Any = None,
+        properties: Any = None,
         profile_segments: int = 32,
         closed: bool = False,
         profile_overrides: Optional[Dict[int, "Profile"]] = None,

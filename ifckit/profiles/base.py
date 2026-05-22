@@ -73,7 +73,7 @@ from __future__ import annotations
 
 import math
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles.anchor import VALID_ANCHORS, anchor_offset
@@ -85,14 +85,14 @@ if TYPE_CHECKING:
 _XY_PLANE = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
 
 
-class RegisterProfileType(type(Path)):
+class RegisterProfileType(type):
     """Metaclass that auto-registers profile classes by their ``profile_type`` string.
 
     Inherits from ``type(Path)`` (which is plain ``type``) so it is compatible
     with ``Path`` as a base class without a metaclass conflict.
     """
 
-    _registry: Dict[str, "RegisterProfileType"] = {}
+    _registry: "Dict[str, Type[Profile]]" = {}
 
     def __new__(mcs, name, bases, namespace):
         cls = super().__new__(mcs, name, bases, namespace)
