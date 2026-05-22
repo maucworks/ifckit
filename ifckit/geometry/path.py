@@ -22,6 +22,7 @@ from ifckit.geometry.primitives import (
     Vec,
     _signed_area,
 )
+from ifckit.geometry.transform import Transform
 
 
 class Path:
@@ -226,7 +227,12 @@ class Path:
             new_path._segments.append(Line(seg0.point_at(lt0), seg0.end))
         else:
             new_path._segments.append(
-                Arc(seg0.center, seg0.normal, seg0.point_at(lt0), seg0.angle * (1.0 - lt0))
+                Arc(
+                    seg0.center,
+                    seg0.normal,
+                    seg0.point_at(lt0),
+                    seg0.angle * (1.0 - lt0),
+                )
             )
 
         # Full middle segments
@@ -261,6 +267,27 @@ class Path:
         if len(pts) > 1 and pts[0].equals(pts[-1]):
             pts = pts[:-1]
         return Polyline(pts)
+
+    def tessellate(self, angle_step_deg: float = 5.0) -> "Path":
+        """Return a new Path with all Arc segments replaced by polyline approximations.
+
+        The result contains only ``Line`` segments.  The stored plane is
+        preserved so that ``to_ifc_profile()`` and other plane-dependent
+        operations still work correctly.
+
+        Useful when the downstream consumer cannot handle ``IfcTrimmedCurve``
+        (e.g. Bonsai's profile editor) but a tessellated polyline is fine::
+
+            solid = _path_to_solid(ifc_file, path.tessellate(5), depth, inset)
+
+        Args:
+            angle_step_deg: Arc sampling resolution in degrees (default 5°).
+
+        Returns:
+            New ``Path`` with only ``Line`` segments.
+        """
+        pts = self.sample(angle_step_deg).points
+        return Path.from_pts(pts, plane=self._plane, closed=self.is_closed)
 
     def to_mesh_dict(
         self,
@@ -512,6 +539,8 @@ class Path:
         """Return the plane if the path is planar, otherwise raise ValueError."""
         if not self._segments:
             raise ValueError("Path has no segments")
+        if self._plane is not None:
+            return self._plane
         if not self.is_planar:
             raise ValueError("Path is not planar")
         normal = self.normal
@@ -852,6 +881,96 @@ class Path:
         new_path._holes = [h.duplicate() for h in self._holes]
         return new_path
 
+    # ------------------------------------------------------------------
+    # Affine transforms  (return new Path)
+    # ------------------------------------------------------------------
+
+    def transformed(self, t: "Transform") -> "Path":
+        """Apply a 4×4 affine transform to all segments + holes + plane.
+
+        Returns a new Path.  Under non-uniform scale, Arc segments are
+        sampled to polylines (since arcs become ellipses).
+        """
+        new_path = Path(plane=self._plane.transformed(t) if self._plane else None)
+        new_path._segments = []
+        # Use self.segments (property) to trigger lazy building (e.g. Profile)
+        for seg in self.segments:
+            if isinstance(seg, Line):
+                new_path._segments.append(seg.transformed(t))
+            elif t.is_uniform_scale():
+                new_path._segments.append(seg.transformed(t))
+            else:
+                pts = seg.sample()
+                for i in range(len(pts) - 1):
+                    new_path._segments.append(Line(t.apply(pts[i]), t.apply(pts[i + 1])))
+        new_path._holes = [h.transformed(t) for h in self._holes]
+        return new_path
+
+    def mirrored(self, plane: "Plane") -> "Path":
+        """Mirror over an arbitrary plane. Returns a new Path."""
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Path":
+        """Translate by *delta*. Returns a new Path."""
+        return self.transformed(Transform.translation(delta))
+
+    def rotated(self, axis: "Vec", angle: float, center: "Optional[Vec]" = None) -> "Path":
+        """Rotate around *axis* by *angle* radians. Returns a new Path.
+
+        Args:
+            axis:   Rotation axis (world space).
+            angle:  Rotation angle in radians.
+            center: Center of rotation. Defaults to world origin.
+        """
+        if center is not None:
+            return (
+                self.translated(-center)
+                .transformed(Transform.rotation(axis, angle))
+                .translated(center)
+            )
+        return self.transformed(Transform.rotation(axis, angle))
+
+    def scaled(
+        self,
+        sx: float,
+        sy: "Optional[float]" = None,
+        sz: "Optional[float]" = None,
+        center: "Optional[Vec]" = None,
+    ) -> "Path":
+        """Scale by factors *sx*, *sy*, *sz*. Returns a new Path.
+
+        Args:
+            sx:     X-axis scale factor.
+            sy:     Y-axis scale factor (defaults to sx).
+            sz:     Z-axis scale factor (defaults to sx).
+            center: Center of scaling. Defaults to world origin.
+        """
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        t = Transform.scaling(sx, sy, sz)
+        if center is not None:
+            return self.translated(-center).transformed(t).translated(center)
+        return self.transformed(t)
+
+    def copy(self, delta: Optional["Vec"] = None) -> "Path":
+        """Return an independent deep copy, optionally translated by *delta*.
+
+        When *delta* is ``None`` (default) this is an alias for
+        ``duplicate()``.
+
+        Args:
+            delta:  Optional translation vector.
+
+        Returns:
+            New Path (moved if *delta* was given).
+        """
+        cpy = self.duplicate()
+        if delta is not None:
+            cpy.move(delta)
+        return cpy
+
     def project_to_plane(self, target_plane: "Plane") -> "Path":
         """Project this Path onto a target plane and return a new Path.
 
@@ -981,39 +1100,35 @@ class Path:
         return _directrix(ifc_file, self)
 
     def offset(self, dist: float, cap: bool = False) -> "Path":
-        """Return a new offset Path at distance dist.
+        """Return a new offset Path at distance *dist*, preserving arc segments.
 
-        Supports closed paths with both Line and Arc segments, and open
-        paths (with optional end caps).  Arc segments are internally
-        sampled to a polyline before the offset algorithm runs.
+        Each ``Line`` segment is shifted perpendicular to its direction.
+        Each ``Arc`` segment keeps its center, normal and sweep angle; only
+        the radius changes by ±*dist* (the sign depends on whether the arc
+        curves toward or away from the offset direction).
 
-        For **closed** paths: positive *dist* offsets inward.
-        For **open** paths: positive *dist* offsets to the left of the
-        travel direction, negative to the right.  When *cap* is ``True``
-        the result is a closed path whose footprint is the offset curve
-        plus the original curve and perpendicular end caps — useful for
-        creating wall footprints from a centerline.
+        Consecutive offset segments are joined at their miter intersection so
+        the result is a continuous path with no gaps.
 
-        Only correct for convex polygons / gentle curvature.
+        For **closed** paths: positive *dist* offsets inward (toward the
+        centroid for a CCW-wound path).
+        For **open** paths: positive *dist* offsets to the left of the travel
+        direction, negative to the right.  When *cap* is ``True`` the result
+        is a closed path (original + offset + end caps).
 
         Args:
-            dist: Offset distance.
-            cap:  If ``True`` and the path is open, cap the ends to
-                  produce a closed path (ignored for closed paths).
+            dist: Offset distance (same units as path coordinates).
+            cap:  If ``True`` and the path is open, cap the ends to produce a
+                  closed path (ignored for closed paths).
 
         Returns:
-            New Path with offset geometry.  *self* is not modified.
+            New ``Path`` with offset geometry.  *self* is not modified.
 
         Raises:
-            ValueError: If path has too few points or offset is degenerate.
+            ValueError: If the path is degenerate or the offset distance is
+                        too large (arc radius would go negative).
         """
-        # Sample all segments (Line and Arc) to a polyline
-        pts = self.sample().points
-
-        if len(pts) < 2:
-            raise ValueError("offset() needs at least 2 points after sampling")
-
-        # Compute plane normal
+        # Compute plane normal from stored plane or geometry
         n: "Vec | None" = None
         if self._plane is not None:
             n = self._plane.z_axis
@@ -1022,88 +1137,122 @@ class Path:
         if n is None:
             raise ValueError("Cannot determine plane normal for offset")
 
-        # ── Closed path ──────────────────────────────────────────────
-        if self.is_closed:
-            if len(pts) < 3:
-                raise ValueError("offset() closed path needs at least 3 points after sampling")
+        segs = self._segments
+        if not segs:
+            raise ValueError("offset() requires at least one segment")
 
-            shifted: "list[tuple[Vec, Vec]]" = []
-            for i in range(len(pts)):
-                p0 = pts[i]
-                p1 = pts[(i + 1) % len(pts)]
-                direction = (p1 - p0).normalized()
-                inward_n = (n**direction).normalized()
-                anchor = Vec(
-                    p0.x + inward_n.x * dist,
-                    p0.y + inward_n.y * dist,
-                    p0.z + inward_n.z * dist,
+        # ------------------------------------------------------------------
+        # Step 1 – offset each segment independently.
+        # A Line is shifted by (n × direction) * dist.
+        # An Arc keeps its center; start is moved radially.  The sign of the
+        # radius delta depends on whether the arc normal is aligned with the
+        # plane normal (positive sweep = CCW = inward side is toward center).
+        # ------------------------------------------------------------------
+        def _offset_seg(seg: "Line | Arc") -> "Line | Arc":
+            if isinstance(seg, Line):
+                d = (seg.end - seg.start).normalized()
+                perp = (n**d).normalized() * dist
+                return Line(seg.start + perp, seg.end + perp)
+
+            # Arc: offset radius.
+            # The arc sweeps CCW around seg.normal.  The "inward" side of the
+            # arc (toward the center) has n × tangent pointing toward center.
+            # sign: if arc normal aligns with plane normal → positive sweep →
+            # center is to the left → inward offset *reduces* radius.
+            sign = 1.0 if (seg.normal @ n) > 0 else -1.0
+            new_radius = seg.radius - sign * dist
+            if new_radius <= 0:
+                raise ValueError(
+                    f"offset(): arc radius {seg.radius:.3f} becomes non-positive "
+                    f"({new_radius:.3f}) with dist={dist:.3f}"
                 )
-                shifted.append((anchor, direction))
+            radial = (seg.start - seg.center).normalized()
+            new_start = seg.center + radial * new_radius
+            return Arc(seg.center, seg.normal, new_start, seg.angle)
 
-            new_pts: "list[Vec]" = []
-            for i in range(len(shifted)):
-                prev_i = (i - 1) % len(shifted)
-                p1, d1 = shifted[prev_i]
-                p2, d2 = shifted[i]
-                pt = _line_line_intersect_2d(p1, d1, p2, d2)
-                if pt is None:
-                    raise ValueError(
-                        f"offset(): parallel adjacent edges at corner {i} — "
-                        "path may be degenerate or dist too large"
-                    )
-                new_pts.append(pt)
+        offset_segs = [_offset_seg(s) for s in segs]
 
-            return Path.from_pts(new_pts, plane=self._plane, closed=True)
+        # ------------------------------------------------------------------
+        # Step 2 – reconnect: intersect each consecutive pair of offset
+        # segments so they share an exact endpoint.
+        # ------------------------------------------------------------------
+        def _seg_line_repr(seg: "Line | Arc") -> "tuple[Vec, Vec]":
+            """Return (point_on_line, direction) for the tangent line at the
+            *start* of the segment — used for miter intersection."""
+            if isinstance(seg, Line):
+                return seg.start, (seg.end - seg.start).normalized()
+            # Arc: tangent at start = normal × radial_start
+            radial = (seg.start - seg.center).normalized()
+            tangent = (seg.normal**radial).normalized()
+            return seg.start, tangent
 
-        # ── Open path ────────────────────────────────────────────────
-        n_pts = len(pts)
+        def _seg_end_line_repr(seg: "Line | Arc") -> "tuple[Vec, Vec]":
+            """Return (point_on_line, direction) for the tangent at the *end*."""
+            if isinstance(seg, Line):
+                return seg.start, (seg.end - seg.start).normalized()
+            radial_end = (seg.end - seg.center).normalized()
+            tangent_end = (seg.normal**radial_end).normalized()
+            return seg.end, tangent_end
 
-        # Build offset segments: each edge shifted perpendicular by dist
-        # Convention: n × d = left side (matches closed-path inward convention)
-        segs: "list[tuple[Vec, Vec]]" = []
-        for i in range(n_pts - 1):
-            d = (pts[i + 1] - pts[i]).normalized()
-            perp = (n**d).normalized()
-            segs.append((pts[i] + perp * dist, d))
+        def _set_start(seg: "Line | Arc", pt: "Vec") -> "Line | Arc":
+            if isinstance(seg, Line):
+                return Line(pt, seg.end)
+            # radial = (pt - seg.center).normalized()
+            return Arc(seg.center, seg.normal, pt, seg.angle)
 
-        # End point of the last offset segment (anchor only)
-        d_last = (pts[-1] - pts[-2]).normalized() if n_pts >= 2 else Vec(0, 0, 0)
-        perp_last = (n**d_last).normalized()
-        end_pt = pts[-1] + perp_last * dist
+        def _set_end(seg: "Line | Arc", pt: "Vec") -> "Line | Arc":
+            if isinstance(seg, Line):
+                return Line(seg.start, pt)
+            # Adjust angle so the arc ends at pt
+            radial_start = (seg.start - seg.center).normalized()
+            radial_end = (pt - seg.center).normalized()
+            cos_a = max(-1.0, min(1.0, radial_start @ radial_end))
+            sin_a = seg.normal @ (radial_start**radial_end)
+            new_angle = math.atan2(sin_a, cos_a)
+            return Arc(seg.center, seg.normal, seg.start, new_angle)
 
-        # Miter intersections at corners
-        offset_pts: "list[Vec]" = [segs[0][0]]
-        for i in range(1, len(segs)):
-            p1, d1 = segs[i - 1]
-            p2, d2 = segs[i]
+        n_segs = len(offset_segs)
+        indices = range(n_segs) if self.is_closed else range(n_segs - 1)
+
+        for i in indices:
+            j = (i + 1) % n_segs
+            seg_a = offset_segs[i]
+            seg_b = offset_segs[j]
+
+            p1, d1 = _seg_end_line_repr(seg_a)
+            p2, d2 = _seg_line_repr(seg_b)
+
             ip = _line_line_intersect_2d(p1, d1, p2, d2)
-            offset_pts.append(ip if ip is not None else p2)
-        offset_pts.append(end_pt)
+            if ip is None:
+                # Parallel/collinear — use the midpoint of the gap
+                ip = (seg_a.end + seg_b.start) * 0.5
 
-        if not cap:
-            # Return the offset curve as an open path
+            offset_segs[i] = _set_end(seg_a, ip)
+            offset_segs[j] = _set_start(seg_b, ip)
+
+        # ------------------------------------------------------------------
+        # Step 3 – assemble result path
+        # ------------------------------------------------------------------
+        if self.is_closed:
             result = Path(plane=self._plane)
-            for i in range(len(offset_pts) - 1):
-                result.add_line(offset_pts[i], offset_pts[i + 1])
+            result._segments = list(offset_segs)
+            result._closed = True
             return result
 
-        # Cap: produce a closed footprint
-        #   offset curve → end cap → original pts reversed → start cap
-        d0 = (pts[1] - pts[0]).normalized()
-        perp0 = (n**d0).normalized()
-        start_pt = pts[0] + perp0 * dist  # same as offset_pts[0]
+        # Open path
+        if not cap:
+            result = Path(plane=self._plane)
+            result._segments = list(offset_segs)
+            return result
 
-        cap_start = pts[0]
-        cap_end = pts[-1]
-
-        # Build closed path: offset → end cap → original reverse → start cap
+        # Cap: offset curve → end cap → original reversed → start cap
+        orig_pts = self.sample().points
         result = Path(plane=self._plane)
-        for i in range(len(offset_pts) - 1):
-            result.add_line(offset_pts[i], offset_pts[i + 1])
-        result.add_line(offset_pts[-1], cap_end)  # end cap
-        for i in range(n_pts - 1, 0, -1):
-            result.add_line(pts[i], pts[i - 1])
-        result.add_line(cap_start, start_pt)  # start cap
+        result._segments = list(offset_segs)
+        result.add_line(offset_segs[-1].end, orig_pts[-1])
+        for i in range(len(orig_pts) - 1, 0, -1):
+            result.add_line(orig_pts[i], orig_pts[i - 1])
+        result.add_line(orig_pts[0], offset_segs[0].start)
         result._closed = True
         return result
 
@@ -1156,6 +1305,143 @@ class Path:
 
         return result
 
+    # ------------------------------------------------------------------
+    # IFC profile conversion (preserves arcs as IfcCircle + IfcTrimmedCurve)
+    # ------------------------------------------------------------------
+
+    def to_ifc_profile(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert this closed Path to an ``IfcProfileDef``, preserving arcs.
+
+        Unlike ``to_profile_points()`` (which tessellates arcs to line
+        segments), this method creates a proper ``IfcCompositeCurve``
+        whose arc segments become ``IfcTrimmedCurve`` + ``IfcCircle``
+        entities.  Holes become an ``IfcArbitraryProfileDefWithVoids``
+        with the inner curve wound CW per IFC convention.
+
+        Args:
+            ifc_file:  Open ifcopenshell file.
+
+        Returns:
+            ``IfcArbitraryClosedProfileDef`` (or *WithVoids) ready for use
+            as ``SweptArea`` in ``IfcExtrudedAreaSolid``.
+
+        Raises:
+            ValueError: If the path is not closed.
+        """
+        if not self.is_closed:
+            raise ValueError("to_ifc_profile() requires a closed path")
+
+        outer_curve = self._build_composite_curve(ifc_file, self._segments, same_sense=True)
+
+        if not self._holes:
+            return ifc_file.create_entity(
+                "IfcArbitraryClosedProfileDef",
+                ProfileType="AREA",
+                OuterCurve=outer_curve,
+            )
+
+        inner_curves = []
+        for hole in self._holes:
+            rev = [seg.reverse() for seg in reversed(hole._segments)]
+            inner_curves.append(self._build_composite_curve(ifc_file, rev, same_sense=True))
+
+        return ifc_file.create_entity(
+            "IfcArbitraryProfileDefWithVoids",
+            ProfileType="AREA",
+            OuterCurve=outer_curve,
+            InnerCurves=inner_curves,
+        )
+
+    # ------------------------------------------------------------------
+    # IFC curve-building helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _seg_to_ifc(
+        ifc_file: "ifcopenshell.file",
+        seg: "Line | Arc",
+    ) -> "ifcopenshell.entity_instance":
+        """Convert a single segment to an IFC curve entity.
+
+        - ``Line`` → ``IfcPolyline``
+        - ``Arc``  → ``IfcTrimmedCurve`` + ``IfcCircle``
+        """
+        from ifckit.geometry.primitives import Arc as _Arc, Line as _Line  # noqa: I001
+
+        def _pt3(f, x, y, z):
+            return f.create_entity(
+                "IfcCartesianPoint",
+                Coordinates=[round(x, 4), round(y, 4), round(z, 4)],
+            )
+
+        def _dir3(f, x, y, z):
+            return f.create_entity(
+                "IfcDirection",
+                DirectionRatios=[round(x, 4), round(y, 4), round(z, 4)],
+            )
+
+        if isinstance(seg, _Line):
+            return ifc_file.create_entity(
+                "IfcPolyline",
+                Points=[
+                    _pt3(ifc_file, seg.start.x, seg.start.y, seg.start.z),
+                    _pt3(ifc_file, seg.end.x, seg.end.y, seg.end.z),
+                ],
+            )
+
+        if isinstance(seg, _Arc):
+            center = seg.center
+            if seg.angle >= 0:
+                normal = seg.normal
+                angle = seg.angle
+            else:
+                normal = -seg.normal
+                angle = -seg.angle
+
+            ref_dir = (seg.start - center).normalized()
+
+            pos = ifc_file.create_entity(
+                "IfcAxis2Placement3D",
+                Location=_pt3(ifc_file, center.x, center.y, center.z),
+                Axis=_dir3(ifc_file, normal.x, normal.y, normal.z),
+                RefDirection=_dir3(ifc_file, ref_dir.x, ref_dir.y, ref_dir.z),
+            )
+
+            circle = ifc_file.create_entity("IfcCircle", Position=pos, Radius=seg.radius)
+
+            return ifc_file.create_entity(
+                "IfcTrimmedCurve",
+                BasisCurve=circle,
+                Trim1=[ifc_file.create_entity("IfcParameterValue", 0.0)],
+                Trim2=[ifc_file.create_entity("IfcParameterValue", angle)],
+                SenseAgreement=True,
+                MasterRepresentation="PARAMETER",
+            )
+
+        raise TypeError(f"Unsupported segment type: {type(seg).__name__}")
+
+    @classmethod
+    def _build_composite_curve(
+        cls,
+        ifc_file: "ifcopenshell.file",
+        segments: "List[Line | Arc]",
+        same_sense: bool = True,
+    ) -> "ifcopenshell.entity_instance":
+        """Wrap a list of segments into an ``IfcCompositeCurve``."""
+        seg_entities = []
+        n = len(segments)
+        for i, seg in enumerate(segments):
+            curve = cls._seg_to_ifc(ifc_file, seg)
+            seg_entities.append(
+                ifc_file.create_entity(
+                    "IfcCompositeCurveSegment",
+                    Transition="CONTINUOUS" if i < n - 1 else "DISCONTINUOUS",
+                    SameSense=same_sense,
+                    ParentCurve=curve,
+                )
+            )
+        return ifc_file.create_entity("IfcCompositeCurve", Segments=seg_entities)
+
     def to_pts(self, plane: Optional["Plane"] = None) -> List["Vec"]:
         """Return segment endpoint Vecs (3D world coords by default).
 
@@ -1182,7 +1468,11 @@ class Path:
 
         if plane is not None:
             return [
-                Vec((p - plane.origin) @ plane.x_axis, (p - plane.origin) @ plane.y_axis, 0.0)
+                Vec(
+                    (p - plane.origin) @ plane.x_axis,
+                    (p - plane.origin) @ plane.y_axis,
+                    0.0,
+                )
                 for p in pts
             ]
         return pts

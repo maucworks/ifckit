@@ -1526,6 +1526,35 @@ def get_body_context(
     )
 
 
+def get_or_create_footprint_context(
+    ifc_file: ifcopenshell.file,
+) -> ifcopenshell.entity_instance:
+    """
+    Return an existing 'FootPrint' sub-context or create one.
+
+    Uses ``ContextIdentifier="FootPrint"`` and ``ContextType="Model"``
+    matching FreeCAD/Bonsai convention for toggleable plan-view
+    footprint curves on building elements.
+    """
+    for ctx in ifc_file.by_type("IfcGeometricRepresentationSubContext"):
+        if ctx.ContextIdentifier == "FootPrint":
+            return ctx
+    parent = None
+    for ctx in ifc_file.by_type("IfcGeometricRepresentationContext"):
+        if ctx.ContextType == "Model":
+            parent = ctx
+            break
+    if parent is None:
+        raise RuntimeError("No Model context found. Call IfcModel() first.")
+    return ifc_file.create_entity(
+        "IfcGeometricRepresentationSubContext",
+        ContextIdentifier="FootPrint",
+        ContextType="Model",
+        ParentContext=parent,
+        TargetView="MODEL_VIEW",
+    )
+
+
 def _arbitrary_perp(v: "Vec") -> "Vec":
     """Return an arbitrary unit vector perpendicular to v."""
     from ifckit.geometry import Vec as _Vec

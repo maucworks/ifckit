@@ -90,7 +90,7 @@ class PendingOpening(PendingElement):
     An opening voided into a host element.
 
     Args:
-        plane:        Insert plane.  Origin = insert point (bottom-centre of
+        plane:        Insert plane.  Origin = insert point (bottom-left of
                      opening).  X-axis = width direction.  Z-axis = outward
                      normal of the host face (points away from the host).
         width:       Opening width (metres, positive).
@@ -111,7 +111,7 @@ class PendingOpening(PendingElement):
         height: float,
         opening_depth: float | None = None,
         name: str = "",
-        anchor: str = "s",
+        anchor: str = "sw",
         clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
@@ -147,7 +147,7 @@ class PendingOpening(PendingElement):
         d["height"] = self.height
         if self.opening_depth is not None:
             d["opening_depth"] = self.opening_depth
-        if self.anchor != "s":
+        if self.anchor != "sw":
             d["anchor"] = self.anchor
         return d
 
@@ -161,7 +161,7 @@ class PendingOpening(PendingElement):
             width=width,
             height=height,
             opening_depth=d.get("opening_depth"),
-            anchor=d.get("anchor", "s"),
+            anchor=d.get("anchor", "sw"),
             name=d.get("name", ""),
             clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),

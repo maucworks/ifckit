@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
-from ifckit.geometry.primitives import Arc, Line, Vec
+from ifckit.geometry.primitives import Arc, Line, Plane, Vec
+from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
     import ifcopenshell
@@ -246,6 +247,57 @@ class Curve:
             multiplicities=self.multiplicities,
             degree=self.degree,
             weights=new_weights,
+            closed=self.closed,
+        )
+
+    # --- affine transforms (pure Python, no OCC needed) ------------------
+
+    def transformed(self, t: "Transform") -> "Curve":
+        """Apply a 4×4 affine transform to all control points.
+
+        Works for any affine transform (translation, rotation, scale,
+        reflection).  No OCC dependency needed — NURBS control points
+        are transformed directly (Piegl & Tiller §6.5).
+        """
+        return Curve(
+            control_points=[t.apply(cp) for cp in self.points],
+            knots=list(self.knots),
+            multiplicities=list(self.multiplicities),
+            degree=self.degree,
+            weights=list(self._weights) if self._weights else None,
+            closed=self.closed,
+        )
+
+    def mirrored(self, plane: "Plane") -> "Curve":
+        """Mirror over an arbitrary plane. Returns a new Curve."""
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Curve":
+        """Translate by *delta*. Returns a new Curve."""
+        return self.transformed(Transform.translation(delta))
+
+    def rotated(self, axis: "Vec", angle: float) -> "Curve":
+        """Rotate around *axis* by *angle* radians. Returns a new Curve."""
+        return self.transformed(Transform.rotation(axis, angle))
+
+    def scaled(
+        self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
+    ) -> "Curve":
+        """Scale by *sx*, *sy*, *sz*. Returns a new Curve."""
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        return self.transformed(Transform.scaling(sx, sy, sz))
+
+    def copy(self) -> "Curve":
+        """Return an independent deep copy."""
+        return Curve(
+            control_points=[cp.copy() for cp in self.points],
+            knots=list(self.knots),
+            multiplicities=list(self.multiplicities),
+            degree=self.degree,
+            weights=list(self._weights) if self._weights else None,
             closed=self.closed,
         )
 

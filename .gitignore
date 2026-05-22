@@ -1,4 +1,6 @@
 # Python
+__archive
+PLAN*.md
 __pycache__/
 *.py[cod]
 *.pyo
@@ -68,3 +70,4 @@ tmp/
 tmp-*/
 *.tmp
 *.log
+_ref_ifcs/

@@ -8,9 +8,10 @@ Intersection — auto‑dispatch for geometric intersections.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from ifckit.geometry.primitives import Plane, Vec
+from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
     from ifckit.geometry.curve import Curve
@@ -28,6 +29,37 @@ class Intersection:
 
     curves: List["Curve"] = field(default_factory=list)
     points: List[Vec] = field(default_factory=list)
+
+    # --- affine transforms ---------------------------------------------
+
+    def transformed(self, t: "Transform") -> "Intersection":
+        """Apply a 4×4 affine transform to all curves and points. Returns new Intersection."""
+        return Intersection(
+            curves=[c.transformed(t) for c in self.curves],
+            points=[t.apply(p) for p in self.points],
+        )
+
+    def mirrored(self, plane: "Plane") -> "Intersection":
+        """Mirror over an arbitrary plane. Returns new Intersection."""
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Intersection":
+        """Translate by *delta*. Returns new Intersection."""
+        return self.transformed(Transform.translation(delta))
+
+    def rotated(self, axis: "Vec", angle: float) -> "Intersection":
+        """Rotate around *axis* by *angle* radians. Returns new Intersection."""
+        return self.transformed(Transform.rotation(axis, angle))
+
+    def scaled(
+        self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
+    ) -> "Intersection":
+        """Scale by *sx*, *sy*, *sz*. Returns new Intersection."""
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        return self.transformed(Transform.scaling(sx, sy, sz))
 
     # ── Auto‑dispatch ─────────────────────────────────────────────
 

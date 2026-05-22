@@ -91,7 +91,7 @@ def _build_fill_from_graph(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,
-    opening_anchor: str = "s",
+    opening_anchor: str = "sw",
 ) -> ifcopenshell.entity_instance:
     """Create a fill element whose geometry comes from a component-graph preset.
 
@@ -104,8 +104,6 @@ def _build_fill_from_graph(
     """
     from ifckit.builders.component_graph import evaluate_component_graph
 
-    dx, dy = anchor_offset(opening_anchor, overall_width, overall_height)
-
     params: dict = {"w": overall_width, "h": overall_height}
     # Merge user-provided component graph parameters (occurrence-level overrides)
     if pending.parameters:
@@ -114,12 +112,9 @@ def _build_fill_from_graph(
     components = evaluate_component_graph(graph_name, ifc_file, context, params, pending.plane)
 
     # Each component solid has its own placement (z_offset from the graph).
-    # Apply the anchor (dx, dy) as an additional XY translation on each placement.
-    # IfcBooleanResult has no Position — _shift_solid_placement recurses into leaves.
     solids = []
     for comp in components:
         solid = comp.solid
-        _shift_solid_placement(ifc_file, solid, dx, dy)
 
         # Apply material if defined in component or overridden by pending
         material = comp.material
@@ -197,6 +192,27 @@ def _build_fill_from_graph(
     return fill
 
 
+def _split_by_role(components):
+    """Split EvaluatedComponents by role into opening/projection/fill lists.
+
+    Returns:
+        Tuple of ``(opening_solids, projection_solids, fill_components)``.
+    """
+    opening_solids = []
+    projection_solids = []
+    fill_components = []
+    for comp in components:
+        solid = comp.solid
+
+        if comp.role == "Opening":
+            opening_solids.append(solid)
+        elif comp.role == "Projection":
+            projection_solids.append(solid)
+        else:
+            fill_components.append(comp)
+    return opening_solids, projection_solids, fill_components
+
+
 def _build_fill_from_components(
     ifc_file: ifcopenshell.file,
     ifc_class: str,
@@ -209,7 +225,7 @@ def _build_fill_from_components(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,
-    opening_anchor: str = "s",
+    opening_anchor: str = "sw",
 ) -> ifcopenshell.entity_instance:
     """Create a fill element from pre-built EvaluatedComponent list.
 
@@ -305,7 +321,7 @@ def _build_fill(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,  # Optional IfcDoorType / IfcWindowType
-    opening_anchor: str = "s",  # anchor from the parent PendingOpening
+    opening_anchor: str = "sw",  # anchor from the parent PendingOpening
     graph_name: "str | None" = None,
 ) -> ifcopenshell.entity_instance:
     """
@@ -451,31 +467,6 @@ def _build_fill(
     return fill
 
 
-def _shift_solid_placement(
-    ifc_file: ifcopenshell.file,
-    solid: ifcopenshell.entity_instance,
-    dx: float,
-    dy: float,
-) -> None:
-    """Recursively shift all leaf solid placements by (dx, dy, 0)."""
-    from ifckit.geometry import Vec
-
-    if solid.is_a("IfcBooleanResult"):
-        _shift_solid_placement(ifc_file, solid.FirstOperand, dx, dy)
-        _shift_solid_placement(ifc_file, solid.SecondOperand, dx, dy)
-    elif solid.is_a("IfcTriangulatedFaceSet"):
-        # Tessellated geometry: shift vertex coordinates directly
-        c = solid.Coordinates
-        shifted = [(pt[0] + dx, pt[1] + dy, pt[2]) for pt in c.CoordList]
-        solid.Coordinates = ifc_file.createIfcCartesianPointList3D(shifted)
-    elif hasattr(solid, "Position"):
-        old_origin = solid.Position.Location
-        ox = old_origin.Coordinates[0] + dx
-        oy = old_origin.Coordinates[1] + dy
-        oz = old_origin.Coordinates[2]
-        solid.Position = axis2placement3d(ifc_file, Vec(ox, oy, oz), Vec(0, 0, 1), Vec(1, 0, 0))
-
-
 def _relative_to_opening(
     ifc_file: ifcopenshell.file,
     opening_placement: ifcopenshell.entity_instance,
@@ -535,7 +526,7 @@ def build_door(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,
-    opening_anchor: str = "s",
+    opening_anchor: str = "sw",
     graph_name: "Optional[str]" = None,
 ) -> ifcopenshell.entity_instance:
     """
@@ -579,7 +570,7 @@ def build_window(
     container: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     type_entity=None,
-    opening_anchor: str = "s",
+    opening_anchor: str = "sw",
     graph_name: "Optional[str]" = None,
 ) -> ifcopenshell.entity_instance:
     """
@@ -855,6 +846,7 @@ def build_window_model_b(
         "w": pending.overall_width,
         "h": pending.overall_height,
         "wall_thickness": wall_thickness,
+        "window_type": pending.window_type,
     }
     # Merge user-provided component graph parameters (occurrence-level overrides)
     if pending.parameters:
@@ -864,23 +856,8 @@ def build_window_model_b(
         pending.component_graph, ifc_file, context, params, pending.plane
     )
 
-    # Apply anchor offset to all components first
-    opening_anchor = "s"
-    dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
-    for comp in opening_components:
-        _shift_solid_placement(ifc_file, comp.solid, dx, dy)
-
-    # Separate Opening/Projection components from Fill components by role
-    opening_solids = []
-    projection_solids = []
-    fill_components = []
-    for comp in opening_components:
-        if comp.role == "Opening":
-            opening_solids.append(comp.solid)
-        elif comp.role == "Projection":
-            projection_solids.append(comp.solid)
-        else:
-            fill_components.append(comp)
+    # Split components by role
+    opening_solids, projection_solids, fill_components = _split_by_role(opening_components)
 
     opening_entity = build_opening_from_solids(
         ifc_file,
@@ -940,7 +917,7 @@ def build_window_model_b(
             container=container,
             context=context,
             type_entity=None,
-            opening_anchor=opening_anchor,
+            opening_anchor="sw",
         )
     else:
         window = _build_fill(
@@ -1002,6 +979,7 @@ def build_door_model_b(
         "w": pending.overall_width,
         "h": pending.overall_height,
         "wall_thickness": wall_thickness,
+        "operation_type": pending.operation_type,
     }
     # Merge user-provided component graph parameters (occurrence-level overrides)
     if pending.parameters:
@@ -1011,19 +989,8 @@ def build_door_model_b(
         pending.component_graph, ifc_file, context, params, pending.plane
     )
 
-    # Apply anchor offset to opening solids and apply materials
-
-    opening_anchor = "s"
-    dx, dy = anchor_offset(opening_anchor, pending.overall_width, pending.overall_height)
-    opening_solids = []
-    for comp in opening_components:
-        solid = comp.solid
-        _shift_solid_placement(ifc_file, solid, dx, dy)
-
-        # Opening solids are voids — do NOT wrap in IfcStyledItem.
-        # Styling an opening solid puts an IfcStyledItem into the SweptSolid
-        # representation, which breaks ifcopenshell geometry processing.
-        opening_solids.append(solid)
+    # Split components by role
+    opening_solids, projection_solids, fill_components = _split_by_role(opening_components)
 
     opening_entity = build_opening_from_solids(
         ifc_file,
@@ -1041,20 +1008,66 @@ def build_door_model_b(
             "or opening_nodes is absent). Cannot create IfcOpeningElement."
         )
 
-    door = _build_fill(
-        ifc_file=ifc_file,
-        ifc_class="IfcDoor",
-        name=pending.name,
-        overall_width=pending.overall_width,
-        overall_height=pending.overall_height,
-        pending=pending,
-        opening_entity=opening_entity,
-        container=container,
-        context=context,
-        type_entity=None,
-        opening_anchor="s",
-        graph_name=pending.component_graph,
-    )
+    # Boolean-union Projection solids into the host wall's body representation
+    for proj_solid in projection_solids:
+        body_reps = [
+            r
+            for r in host_entity.Representation.Representations
+            if r.RepresentationIdentifier == "Body"
+        ]
+        if not body_reps:
+            continue
+        body_rep = body_reps[0]
+        items = list(body_rep.Items)
+        if not items:
+            continue
+        current = items[0]
+        for item in items[1:]:
+            current = ifc_file.create_entity(
+                "IfcBooleanResult",
+                Operator="UNION",
+                FirstOperand=current,
+                SecondOperand=item,
+            )
+        union = ifc_file.create_entity(
+            "IfcBooleanResult",
+            Operator="UNION",
+            FirstOperand=current,
+            SecondOperand=proj_solid,
+        )
+        body_rep.Items = [union]
+
+    # Build door fill - either from components or with graph
+    if fill_components:
+        door = _build_fill_from_components(
+            ifc_file=ifc_file,
+            ifc_class="IfcDoor",
+            name=pending.name,
+            overall_width=pending.overall_width,
+            overall_height=pending.overall_height,
+            components=fill_components,
+            pending=pending,
+            opening_entity=opening_entity,
+            container=container,
+            context=context,
+            type_entity=None,
+            opening_anchor="s",
+        )
+    else:
+        door = _build_fill(
+            ifc_file=ifc_file,
+            ifc_class="IfcDoor",
+            name=pending.name,
+            overall_width=pending.overall_width,
+            overall_height=pending.overall_height,
+            pending=pending,
+            opening_entity=opening_entity,
+            container=container,
+            context=context,
+            type_entity=None,
+            opening_anchor="s",
+            graph_name=pending.component_graph,
+        )
     _set_door_operation(ifc_file, door, pending.operation_type)
     return door
 

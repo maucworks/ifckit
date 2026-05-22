@@ -12,6 +12,7 @@ import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
 from ifckit.geometry.primitives import Vec
+from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
     import ifcopenshell
@@ -256,6 +257,69 @@ class Surface:
     def __repr__(self) -> str:
         w_str = ", rational" if self.rational else ""
         return f"Surface({self.nu}×{self.nv} pts, U{self.udegree}/V{self.vdegree}{w_str})"
+
+    # --- affine transforms (pure Python, no OCC needed) ------------------
+
+    def transformed(self, t: "Transform") -> "Surface":
+        """Apply a 4×4 affine transform to all control points.
+
+        Works for any affine transform. Pure Python — no OCC dependency.
+        """
+        weights = None
+        if self._weights is not None:
+            weights = [list(w) for w in self._weights]
+        return Surface(
+            control_points=[[t.apply(cp) for cp in row] for row in self.control_points],
+            uknots=list(self.uknots),
+            vknots=list(self.vknots),
+            umults=list(self.umults),
+            vmults=list(self.vmults),
+            udegree=self.udegree,
+            vdegree=self.vdegree,
+            weights=weights,
+            uclosed=self.uclosed,
+            vclosed=self.vclosed,
+        )
+
+    def mirrored(self, plane: "Plane") -> "Surface":
+        """Mirror over an arbitrary plane. Returns a new Surface."""
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Surface":
+        """Translate by *delta*. Returns a new Surface."""
+        return self.transformed(Transform.translation(delta))
+
+    def rotated(self, axis: "Vec", angle: float) -> "Surface":
+        """Rotate around *axis* by *angle* radians. Returns a new Surface."""
+        return self.transformed(Transform.rotation(axis, angle))
+
+    def scaled(
+        self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
+    ) -> "Surface":
+        """Scale by *sx*, *sy*, *sz*. Returns a new Surface."""
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        return self.transformed(Transform.scaling(sx, sy, sz))
+
+    def copy(self) -> "Surface":
+        """Return an independent deep copy."""
+        weights = None
+        if self._weights is not None:
+            weights = [[w for w in row] for row in self._weights]
+        return Surface(
+            control_points=[[cp.copy() for cp in row] for row in self.control_points],
+            uknots=list(self.uknots),
+            vknots=list(self.vknots),
+            umults=list(self.umults),
+            vmults=list(self.vmults),
+            udegree=self.udegree,
+            vdegree=self.vdegree,
+            weights=weights,
+            uclosed=self.uclosed,
+            vclosed=self.vclosed,
+        )
 
     # ── OCC bridge ─────────────────────────────────────────────────
 

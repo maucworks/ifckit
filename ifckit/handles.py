@@ -200,6 +200,12 @@ class AlignmentHandle(Handle):
 class EntityHandle(Handle):
     """Generic wrapper around any ifcopenshell product entity."""
 
+    __slots__ = ("footprint_curves",)
+
+    def __init__(self, entity: ifcopenshell.entity_instance, model: IfcModel) -> None:
+        super().__init__(entity, model)
+        object.__setattr__(self, "footprint_curves", None)
+
     def add(self, pending: "PendingElement") -> "EntityHandle":
         """Build *pending* with this entity as host (Model B).
 

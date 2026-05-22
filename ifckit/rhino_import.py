@@ -48,6 +48,8 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any, Optional
 
+import ifckit.draw as ifckit_draw
+
 # (linear_deflection, angular_deflection)
 # linear_deflection: max chord deviation in metres
 # angular_deflection: max angle between facet normals in radians
@@ -1409,6 +1411,7 @@ class IfcSvgImporter:
                 f" {n_paths} paths  ({_time.time() - t0:.1f}s)"
             )
             t1 = _time.time()
+            svg_bytes = ifckit_draw.inject_symbols(svg_bytes, ifc_file)
             result = self._process_svg(
                 svg_bytes, drawing_name, uf, destination_plane=destination_plane
             )
@@ -1580,62 +1583,16 @@ class IfcSvgImporter:
         hlr_poly: bool = True,
         mesher_deflection: Optional[float] = 0.01,
     ) -> Optional[bytes]:
-        """Generate an in-memory SVG for a single drawing (section plane).
-
-        Uses a bbox dot-product prefilter to split elements into cut and
-        projection sets.  Cut elements go through the full HLR SVG serializer
-        with ``subtract_before_hlr=True``.  Projection elements bypass HLR
-        entirely — their edges are projected directly onto the drawing plane,
-        which is ~100x faster for large element counts.
-
-        The two SVG fragments are merged before being returned; ``_process_svg``
-        handles both the ``<g class="section">`` groups in the combined output.
-
-        Args:
-            ifc_model:          ``ifcopenshell.file`` or ``ifckit.IfcModel``.
-            drawing_guid:       GlobalId of the ``IfcAnnotation[ObjectType="DRAWING"]``
-                                to render.
-            hlr_poly:           Use polygonal HLR (``HLRBRep_PolyAlgo``) instead of
-                                exact BREP HLR.  Polygonal is significantly faster and
-                                accurate enough for technical drawings at standard
-                                scales.  Default ``True`` (same as Bonsai).
-            mesher_deflection:  Linear deflection for the OCC mesher used during
-                                tessellation.  Smaller = finer mesh = slower HLR.
-                                ``None`` uses the ifcopenshell default (~0.001 m).
-                                Try ``0.01`` for a ~4× speedup on curved profiles
-                                with negligible quality loss at drawing scale.
-        """
         try:
-            import ifcopenshell.draw as ifc_draw
-            import ifcopenshell.geom as _geom
-            import ifcopenshell.ifcopenshell_wrapper as _W
-
-            ifc_file = getattr(ifc_model, "ifc_file", ifc_model)
-
-            svg_geom = _geom.settings(ELEMENT_HIERARCHY=True, REORIENT_SHELLS=True)
-            svg_geom.set("dimensionality", _W.SURFACES_AND_SOLIDS)
-            svg_geom.set("iterator-output", _W.NATIVE)
-            svg_geom.set("apply-default-materials", True)
-            if mesher_deflection is not None:
-                svg_geom.set("mesher-linear-deflection", mesher_deflection)
-
-            settings = ifc_draw.draw_settings(
-                auto_floorplan=False,
-                auto_elevation=False,
-                auto_section=False,
-                drawing_object_type="DRAWING",
+            svg = ifckit_draw.generate_svg(
+                ifc_model,
                 drawing_guid=drawing_guid,
-                cells=True,
-                merge_cells=False,
+                door_arcs=True,
+                include_curves=True,
                 hlr_poly=hlr_poly,
-                subtract_before_hlr=True,
-                include_projection=True,
+                mesher_deflection=mesher_deflection,
             )
-            svg = ifc_draw.main(settings, files=[ifc_file])
-            if isinstance(svg, bytes):
-                svg = svg.decode()
-            return svg.encode()
-
+            return svg
         except Exception as exc:
             import warnings
 

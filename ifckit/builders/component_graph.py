@@ -268,7 +268,10 @@ def _resolve_parameters(
             result[name] = float(default)
     for name, val in overrides.items():
         if name not in result:
-            result[name] = float(val)
+            try:
+                result[name] = float(val)
+            except (ValueError, TypeError):
+                pass  # skip non-numeric override keys (e.g. operation_type)
     return result
 
 

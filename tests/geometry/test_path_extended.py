@@ -179,10 +179,10 @@ class TestOffset:
         p = Path()
         p._segments.append(Arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), 1.57))
         p._segments.append(Line(p.end_point(), p.start_point()))
-        # Arc segments are now sampled to polyline — offset succeeds
-        result = p.offset(5)
-        assert len(result._segments) >= 8
+        # Arc segments are preserved — offset produces 2 segments (arc + line)
+        result = p.offset(0.1)
         assert result.is_closed
+        assert any(isinstance(s, Arc) for s in result.segments)
 
     def test_offset_does_not_mutate_original(self):
         pl = Plane.world_xy()
@@ -192,6 +192,68 @@ class TestOffset:
         pts_after = [seg.start for seg in p.segments]
         for a, b in zip(pts_before, pts_after):
             assert a.equals(b)
+
+    def test_offset_filleted_rect_preserves_arc_segments(self):
+        """Offset of a filleted rectangle must keep Arc segments, not tessellate."""
+        import math
+        from ifckit.geometry.primitives import Arc as _Arc
+        pl = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+        p = Path.from_pts(
+            [Vec(0, 0, 0), Vec(1000, 0, 0), Vec(1000, 800, 0), Vec(0, 800, 0)],
+            pl, closed=True,
+        )
+        p.fillet([0, 1, 2, 3], 100)
+        off = p.offset(27)
+        assert off.is_closed
+        assert len(off.segments) == len(p.segments), "segment count must be preserved"
+        arc_segs = [s for s in off.segments if isinstance(s, _Arc)]
+        assert len(arc_segs) == 4, "all 4 arc corners must be preserved"
+        for s in arc_segs:
+            assert abs(s.radius - 73.0) < 0.01, f"expected r=73, got {s.radius}"
+
+    def test_offset_arc_radius_decreases_inward(self):
+        """Inward offset of a CCW arc reduces its radius."""
+        import math
+        from ifckit.geometry.primitives import Arc as _Arc
+        pl = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+        p = Path.from_pts(
+            [Vec(0, 0, 0), Vec(1000, 0, 0), Vec(1000, 800, 0), Vec(0, 800, 0)],
+            pl, closed=True,
+        )
+        p.fillet([0, 1, 2, 3], 100)
+        off = p.offset(50)
+        for s in off.segments:
+            if isinstance(s, _Arc):
+                assert abs(s.radius - 50.0) < 0.01
+
+    def test_offset_arc_continuity(self):
+        """All consecutive segment pairs in offset result must share an endpoint."""
+        from ifckit.geometry.primitives import Arc as _Arc
+        pl = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+        p = Path.from_pts(
+            [Vec(0, 0, 0), Vec(600, 0, 0), Vec(600, 600, 0), Vec(0, 600, 0)],
+            pl, closed=True,
+        )
+        p.fillet([0, 1, 2, 3], 80)
+        off = p.offset(30)
+        segs = off.segments
+        for i, s in enumerate(segs):
+            nxt = segs[(i + 1) % len(segs)]
+            gap = s.end.distance_to(nxt.start)
+            assert gap < 1e-6, f"gap {gap:.2e} between seg {i} and {i+1}"
+
+    def test_offset_preserves_plane(self):
+        """Offset result must carry the same _plane as the original."""
+        pl = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+        p = Path.from_pts(
+            [Vec(0, 0, 0), Vec(500, 0, 0), Vec(500, 400, 0), Vec(0, 400, 0)],
+            pl, closed=True,
+        )
+        p.fillet([0, 1, 2, 3], 60)
+        off = p.offset(20)
+        assert off._plane is not None
+        assert off._plane.x_axis.equals(Vec(1, 0, 0))
+        assert off._plane.y_axis.equals(Vec(0, 1, 0))
 
 
 class TestToProfilePoints:

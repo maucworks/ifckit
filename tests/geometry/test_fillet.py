@@ -23,7 +23,7 @@ import warnings
 
 import pytest
 
-from ifckit.geometry import Arc, Line, Path, Vec
+from ifckit.geometry import Arc, Line, Path, Plane, Vec
 
 
 # ---------------------------------------------------------------------------
@@ -338,3 +338,62 @@ class TestFilletWarnings:
                     p.fillet(idx, r)
                 except Exception as exc:
                     pytest.fail(f"fillet({idx}, {r}) raised unexpectedly: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Plane stability — regression tests for the bug where Path.plane ignored
+# _plane and recomputed from scratch after fillet, producing a rotated result.
+# ---------------------------------------------------------------------------
+
+def _rect_with_plane(wx=1000.0, wy=800.0):
+    """Closed rectangle in XY with explicit _plane set."""
+    return Path.from_pts(
+        [Vec(0, 0, 0), Vec(wx, 0, 0), Vec(wx, wy, 0), Vec(0, wy, 0)],
+        Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        closed=True,
+    )
+
+
+class TestPlaneSurvivesMutation:
+    """Path.plane must return the stored _plane unchanged after in-place ops."""
+
+    def test_plane_unchanged_after_single_fillet(self):
+        p = _rect_with_plane()
+        p.fillet(1, 100)
+        assert p.plane.x_axis.equals(Vec(1, 0, 0))
+        assert p.plane.y_axis.equals(Vec(0, 1, 0))
+
+    def test_plane_unchanged_after_all_corner_fillet(self):
+        """Filleting all 4 corners must not rotate the stored plane."""
+        p = _rect_with_plane()
+        p.fillet([0, 1, 2, 3], 100)
+        assert p.plane.x_axis.equals(Vec(1, 0, 0))
+        assert p.plane.y_axis.equals(Vec(0, 1, 0))
+
+    def test_plane_origin_unchanged_after_fillet(self):
+        """Origin of _plane must not shift to the new start_point after fillet."""
+        p = _rect_with_plane()
+        p.fillet([0, 1, 2, 3], 100)
+        assert p.plane.origin.equals(Vec(0, 0, 0))
+
+    def test_plane_z_axis_unchanged_after_fillet(self):
+        """z_axis derived from plane must stay (0,0,1) after fillet."""
+        p = _rect_with_plane()
+        p.fillet([0, 1, 2, 3], 100)
+        z = (p.plane.x_axis ** p.plane.y_axis).normalized()
+        assert z.equals(Vec(0, 0, 1))
+
+    def test_plane_unchanged_after_move(self):
+        p = _rect_with_plane()
+        p.move(Vec(10, 20, 0))
+        assert p.plane.x_axis.equals(Vec(1, 0, 0))
+        assert p.plane.y_axis.equals(Vec(0, 1, 0))
+
+    def test_plane_no_stored_plane_falls_back_to_computed(self):
+        """Path with an arc but no _plane set still returns a usable plane."""
+        p = Path()
+        import math
+        p.add_arc(Vec(50, 0, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+        p.add_line(Vec(50, 50, 0), Vec(0, 50, 0))
+        plane = p.plane  # must not raise
+        assert plane is not None

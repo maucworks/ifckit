@@ -45,7 +45,7 @@ def anchor_offset(anchor: str, width: float, height: float) -> tuple[float, floa
 
     Example::
 
-        anchor="s"  → dx = -width/2,  dy = 0        (bottom-centre)
+        anchor="sw"  → dx = 0,              dy = 0        (bottom-left)
         anchor="c"  → dx = -width/2,  dy = -height/2 (centre)
         anchor="sw" → dx = 0,         dy = 0        (bottom-left, no shift)
 

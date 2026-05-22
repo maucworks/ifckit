@@ -346,7 +346,150 @@ class IfcModel:
             entity = build_window_model_b(self._file, pending, host.entity, storey, ctx)
         else:
             entity = build_door_model_b(self._file, pending, host.entity, storey, ctx)
-        return EntityHandle(entity, self)
+        handle = EntityHandle(entity, self)
+
+        self._attach_footprint(handle, pending)
+
+        return handle
+
+    def _attach_footprint(
+        self,
+        handle: "EntityHandle",
+        pending,
+    ) -> None:
+        """Look up the component's ``footprint()`` method and store curves on *handle*."""
+        graph_name = getattr(pending, "component_graph", None)
+        if not graph_name:
+            return
+
+        from ifckit.components import get_component
+
+        comp_cls = get_component(graph_name)
+        if comp_cls is None:
+            return
+        fp_method = getattr(comp_cls, "footprint", None)
+        if fp_method is None:
+            return
+
+        p_plane = getattr(pending, "plane", None)
+        if p_plane is None:
+            return
+
+        params: dict = {
+            "w": getattr(pending, "overall_width", 0),
+            "h": getattr(pending, "overall_height", 0),
+        }
+        for attr in ("operation_type", "window_type"):
+            val = getattr(pending, attr, None)
+            if val is not None:
+                params[attr] = val
+        extra = getattr(pending, "parameters", None) or {}
+        params.update(extra)
+
+        curves = fp_method(p_plane, params["w"], params["h"], params)
+
+        # Transform curves from world space to entity-local coordinate system.
+        # Footprint methods generate world-space curves, but IfcShapeRepresentation
+        # on the entity expects coordinates relative to the entity's ObjectPlacement.
+        if p_plane is not None:
+            curves = self._footprint_to_local(curves, p_plane)
+
+        handle.footprint_curves = curves
+        self._attach_footprint_representation(handle, curves)
+
+    def _attach_footprint_representation(
+        self,
+        handle: "EntityHandle",
+        curves,
+    ) -> None:
+        """Append a 'FootPrint' IfcShapeRepresentation to the entity itself.
+
+        Per IFC4 spec (FootPrint Geometry concept template), presentation
+        geometry directly related to a single product belongs on the product's
+        ``IfcProductDefinitionShape`` as an additional ``IfcShapeRepresentation``
+        with ``RepresentationIdentifier='FootPrint'`` and
+        ``RepresentationType='GeometricCurveSet'``, items wrapped in a single
+        ``IfcGeometricCurveSet``.
+        """
+        if not curves:
+            return
+        from ifckit.builders._geom import get_or_create_footprint_context
+        from ifckit.types.ifc_curves import curves_to_ifc
+
+        ifc_curves = curves_to_ifc(self._file, curves)
+        if not ifc_curves:
+            return
+
+        ctx = get_or_create_footprint_context(self._file)
+        curve_set = self._file.create_entity(
+            "IfcGeometricCurveSet",
+            Elements=ifc_curves,
+        )
+        shape_rep = self._file.create_entity(
+            "IfcShapeRepresentation",
+            ContextOfItems=ctx,
+            RepresentationIdentifier="FootPrint",
+            RepresentationType="GeometricCurveSet",
+            Items=[curve_set],
+        )
+
+        prod_def = handle.entity.Representation
+        if prod_def is None:
+            handle.entity.Representation = self._file.create_entity(
+                "IfcProductDefinitionShape",
+                Representations=[shape_rep],
+            )
+        else:
+            prod_def.Representations = list(prod_def.Representations) + [shape_rep]
+
+    @staticmethod
+    def _footprint_to_local(curves, plane):
+        """Transform world-space footprint curves to entity-local coordinates."""
+        from ifckit.geometry import Arc, Line
+
+        z_axis = plane.z_axis
+        result = []
+        for c in curves:
+            if isinstance(c, Line):
+                result.append(
+                    Line(
+                        IfcModel._world_to_local(c.start, plane, z_axis),
+                        IfcModel._world_to_local(c.end, plane, z_axis),
+                    )
+                )
+            elif isinstance(c, Arc):
+                result.append(
+                    Arc(
+                        IfcModel._world_to_local(c.center, plane, z_axis),
+                        IfcModel._dir_to_local(c.normal, plane, z_axis),
+                        IfcModel._world_to_local(c.start, plane, z_axis),
+                        c.angle,
+                    )
+                )
+            else:
+                result.append(c)
+        return result
+
+    @staticmethod
+    def _world_to_local(pt, plane, z_axis):
+        from ifckit.geometry import Vec
+
+        delta = pt - plane.origin
+        return Vec(
+            delta @ plane.x_axis,
+            delta @ plane.y_axis,
+            delta @ z_axis,
+        )
+
+    @staticmethod
+    def _dir_to_local(dir_vec, plane, z_axis):
+        from ifckit.geometry import Vec
+
+        return Vec(
+            dir_vec @ plane.x_axis,
+            dir_vec @ plane.y_axis,
+            dir_vec @ z_axis,
+        )
 
     def _find_containing_storey(
         self,
@@ -880,7 +1023,7 @@ class IfcModel:
         opening: "EntityHandle",
         container: "StoreyHandle",
         door_type: "Optional[EntityHandle]" = None,
-        opening_anchor: str = "s",
+        opening_anchor: str = "sw",
     ) -> "EntityHandle":
         """
         Create an ``IfcDoor`` filling *opening* and place it in *container*.
@@ -933,7 +1076,7 @@ class IfcModel:
         opening: "EntityHandle",
         container: "StoreyHandle",
         window_type: "Optional[EntityHandle]" = None,
-        opening_anchor: str = "s",
+        opening_anchor: str = "sw",
     ) -> "EntityHandle":
         """
         Create an ``IfcWindow`` filling *opening* and place it in *container*.

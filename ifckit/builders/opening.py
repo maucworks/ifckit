@@ -13,7 +13,7 @@ Opening geometry convention (IFC spec):
   - The solid is centred on the wall face: placement is shifted by
     ``-depth/2`` along ``plane.z_axis`` so the opening penetrates equally
     on both sides of the face.
-  - The ``anchor`` on ``PendingOpening`` (default ``"s"`` = bottom-centre)
+  - The ``anchor`` on ``PendingOpening`` (default ``"sw"`` = bottom-left)
     controls where the ``plane.origin`` sits relative to the opening
     bounding box.
 
@@ -79,11 +79,11 @@ def build_opening(
     # ------------------------------------------------------------------
     # Profile rectangle in wall-face plane (width × height).
     # anchor_offset gives (dx, dy) so that plane.origin lands at the
-    # requested anchor position (default "s" = bottom-centre).
+    # requested anchor position (default "sw" = bottom-left).
     # ------------------------------------------------------------------
     w = pending.width
     h = pending.height
-    dx, dy = anchor_offset(getattr(pending, "anchor", "s"), w, h)
+    dx, dy = anchor_offset(getattr(pending, "anchor", "sw"), w, h)
 
     pts_2d = [
         (dx, dy),

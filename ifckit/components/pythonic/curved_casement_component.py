@@ -1,126 +1,98 @@
 """
-Curved Casement Component — Windows met IfcSectionedSpine
+Fixed Casement Component — Python Generative Window
 
-Voorbeeld component dat IfcSectionedSpine gebruikt voor het maken
-van complexe kozijnen langs een 3D curve (boog/hellend).
-
-NB: Dit is een proof-of-concept. De Arc support in Path moet nog
-worden uitgebreid voor echte gebogen kozijnen.
+Alternative to fixed_casement.json. Creates a simple
+window with sectioned-spine lining and glazing panel.
 """
 
-from ifckit.builders._geom import (
-    axis2placement3d,
-    directrix_from_path,
-    profile_from_points,
-    sectioned_spine,
-)
 from ifckit.components import EvaluatedComponent, FillComponent
 from ifckit.components.materials import ALUMINUM, GLASS, VOID
-from ifckit.geometry import Vec
+from ifckit.geometry import Path, Plane, Vec
+
+from .utils import _build_profiled_spine, _path_to_opening_solid, _path_to_solid
 
 
-class CurvedCasementComponent(FillComponent):
-    """Boogkozijn met IfcSectionedSpine.
-
-    Dit is een proof-of-concept. Gebruikt een rechte lijn als spine.
-    Kan worden uitgebreid met echte bogen via directrix_from_path().
-    """
+class FixedCasementComponent(FillComponent):
+    """Generative window: sectioned-spine frame with fixed glazing."""
 
     ifc_class = "IfcWindow"
 
     def build(self, ifc_file, plane, w, h, params):
-        lt = params.get("lining_thickness", 55)
-        ld = params.get("lining_depth", 70)
-        gd = params.get("panel_depth", 6)
-        wt = params.get("wall_thickness", 200)
-
-        comps = []
+        lt = float(params.get("lining_thickness", 55))
+        ld = float(params.get("lining_depth", 70))
+        gd = float(params.get("panel_depth", 24))
+        gi = float(params.get("panel_inset", 50))
+        wt = float(params.get("wall_thickness", 200))
+        a_step = float(params.get("angle_step_deg", 5.0))
+        p_segs = int(params.get("profile_segments", 16))
 
         wx = float(w)
         wy = float(h)
-        ltx = float(lt)
 
-        # Opening void - rechte extrusie (standaard)
-        opening_profile = profile_from_points(
-            ifc_file,
+        comps = []
+        spine = Path.from_pts(
             [
-                (0.0, 0.0),
-                (wx, 0.0),
-                (wx, wy),
-                (0.0, wy),
+                Vec(0, 0, 0),
+                Vec(wx, 0, 0),
+                Vec(wx, wy, 0),
+                Vec(0, wy, 0),
             ],
+            Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+            closed=True,
         )
-        opening_solid = ifc_file.create_entity(
-            "IfcExtrudedAreaSolid",
-            SweptArea=opening_profile,
-            Position=axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0)),
-            ExtrudedDirection=ifc_file.create_entity(
-                "IfcDirection", DirectionRatios=[0.0, 0.0, -1.0]
-            ),
-            Depth=wt * 2,
-        )
+        dist = min(wx / 2.1, wy / 2.1)
+        spine.fillet([0, 1, 2, 3], dist)
+
         comps.append(
             EvaluatedComponent(
-                solid=opening_solid,
+                solid=_path_to_opening_solid(ifc_file, spine.tessellate(a_step), wt),
                 role="Opening",
                 node_id="opening_void",
                 material=VOID,
             )
         )
-
-        # Lining met SectionedSpine
-        # NB: Dit is een voorbeeld met rechte lijn.
-        # Voor echte boog: gebruik directrix_from_path() met boog-segmenten.
-        lining_solid = self._build_sectioned_spine(
-            ifc_file,
-            wx=wx,
-            wy=wy,
-            ltx=ltx,
-            ld=ld,
-        )
-        comps.append(
-            EvaluatedComponent(
-                solid=lining_solid,
-                role="Lining",
-                node_id="lining",
-                material=ALUMINUM,
-            )
-        )
-
-        # Glazing - standaard recht kozijn (rechthoekig glas)
-        glass_x0 = ltx
-        glass_y0 = ltx
-        glass_x1 = wx - ltx
-        glass_y1 = wy - ltx
-
-        if glass_x1 > glass_x0 and glass_y1 > glass_y0:
-            glass_profile = profile_from_points(
-                ifc_file,
+        # ── Lining: closed sectioned-spine with rectangular profile ───
+        min_lt = lt / 5
+        padding = 0
+        if lt > 0 and ld > 0:
+            section = Path.from_pts(
                 [
-                    (glass_x0, glass_y0),
-                    (glass_x1, glass_y0),
-                    (glass_x1, glass_y1),
-                    (glass_x0, glass_y1),
+                    Vec(-lt, 0, 0),
+                    Vec(ld, 0, 0),
+                    Vec(ld, min_lt, 0),
+                    Vec(gi + gd + padding, min_lt, 0),
+                    Vec(gi + gd + padding, lt, 0),
+                    Vec(gi + gd, lt, 0),
+                    Vec(gi + gd, lt - padding, 0),
+                    Vec(gi, lt - padding, 0),
+                    Vec(gi, lt, 0),
+                    Vec(-lt, min_lt, 0),
                 ],
+                Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+                closed=True,
             )
-            z_offset = -(ld / 2 - gd / 2)
-            glass_solid = ifc_file.create_entity(
-                "IfcExtrudedAreaSolid",
-                SweptArea=glass_profile,
-                Position=axis2placement3d(
-                    ifc_file,
-                    Vec(0, 0, z_offset),
-                    Vec(0, 0, 1),
-                    Vec(1, 0, 0),
-                ),
-                ExtrudedDirection=ifc_file.create_entity(
-                    "IfcDirection", DirectionRatios=[0.0, 0.0, -1.0]
-                ),
-                Depth=gd,
-            )
+            section.fillet(3, gd)
+            lining_solid = _build_profiled_spine(ifc_file, spine, section, a_step, p_segs)
             comps.append(
                 EvaluatedComponent(
-                    solid=glass_solid,
+                    solid=lining_solid,
+                    role="Lining",
+                    node_id="lining",
+                    material=ALUMINUM,
+                )
+            )
+
+        # ── Glazing ───────────────────────────────────────────────────
+        glass_x0 = lt / 2
+        glass_y0 = lt / 2
+        glass_x1 = wx - lt / 2
+        glass_y1 = wy - lt / 2
+
+        if glass_x1 > glass_x0 and glass_y1 > glass_y0:
+            glass_spine = spine.offset(lt - padding).tessellate(a_step)
+            comps.append(
+                EvaluatedComponent(
+                    solid=_path_to_solid(ifc_file, glass_spine, gd, gi),
                     role="Glazing",
                     node_id="glazing",
                     material=GLASS,
@@ -129,61 +101,4 @@ class CurvedCasementComponent(FillComponent):
 
         return comps
 
-    def _build_sectioned_spine(self, ifc_file, wx, wy, ltx, ld):
-        """Build lining using IfcSectionedSpine.
-
-        NB: Dit voorbeeld gebruikt een recht lijn-pad (geen boog).
-        Voor een echte boog moet de geometry module Arc segments
-        ondersteunen die naar directrix_from_path() kunnen.
-        """
-
-        # Spine curve - rechte lijn langs de breedte
-        # Dit zou een boog worden via Path met Arc segments
-        spine_pts = [
-            Vec(0, 0, 0),
-            Vec(wx, 0, 0),
-        ]
-        from ifckit.geometry import Path
-
-        spine_path = Path.from_pts(spine_pts)
-        spine_curve = directrix_from_path(ifc_file, spine_path)
-
-        # Profiel - rechthoekig kozijnprofiel
-        # Dit is hetzelfde profiel op elke positie langs de spine
-        lining_w = ltx
-        lining_h = ld
-        profile = profile_from_points(
-            ifc_file,
-            [
-                (0.0, 0.0),
-                (lining_w, 0.0),
-                (lining_w, lining_h),
-                (0.0, lining_h),
-            ],
-        )
-
-        # Posities langs de spine (begin en einde)
-        # NB: Voor een echte boog moeten we tangenten berekenen
-        pos_start = axis2placement3d(
-            ifc_file,
-            Vec(0, 0, 0),
-            Vec(0, 0, -1),  # Z richting: naar binnen
-            Vec(1, 0, 0),
-        )
-        pos_end = axis2placement3d(
-            ifc_file,
-            Vec(wx, 0, 0),
-            Vec(0, 0, -1),  # Z richting: naar binnen
-            Vec(1, 0, 0),
-        )
-
-        # Maak SectionedSpine met 2 identieke profielen
-        # (Dit is de basis voor complexe vormen - profielen kunnen varieren langs de curve)
-        spine = sectioned_spine(
-            ifc_file,
-            spine_curve,
-            cross_sections=[profile, profile],
-            positions=[pos_start, pos_end],
-        )
-
-        return spine
+    # ── Lining via closed sectioned-spine ─────────────────────────

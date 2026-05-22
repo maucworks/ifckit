@@ -38,6 +38,7 @@ from ifckit.geometry.primitives import (
 )
 from ifckit.geometry.subdivision import catmull_clark, extract_patches, write_obj
 from ifckit.geometry.surface import Surface
+from ifckit.geometry.transform import Transform
 
 __all__ = [
     # primitives
@@ -67,4 +68,6 @@ __all__ = [
     "transport_frames",
     "fixed_ref_frames",
     "upvector_frames",
+    # transform
+    "Transform",
 ]

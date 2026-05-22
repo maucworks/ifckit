@@ -152,9 +152,10 @@
                                     },
                                     "overall_width": 1000.0,
                                     "overall_height": 1000.0,
-                                    "component_graph": "rounded_casement_component",
+                                    "component_graph": "curved_casement_component",
                                     "parameters": {
-                                        "lining_depth": 300.0
+                                        "lining_depth": 300.0,
+                                        "angle_step_deg": 5
                                     }
                                 },
                                 {
@@ -178,9 +179,10 @@
                                     },
                                     "overall_width": 2000.0,
                                     "overall_height": 500.0,
-                                    "component_graph": "rounded_casement_component",
+                                    "component_graph": "curved_casement_component",
                                     "parameters": {
-                                        "lining_depth": 300.0
+                                        "lining_depth": 300.0,
+                                        "angle_step_deg": 5
                                     }
                                 }
                             ],

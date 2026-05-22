@@ -10,7 +10,10 @@ No external dependencies beyond the standard library.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    from ifckit.geometry.transform import Transform
 
 
 class Vec:
@@ -174,6 +177,46 @@ class Vec:
         sin_a = math.sin(angle)
         return self * cos_a + (k**self) * sin_a + k * (k @ self) * (1 - cos_a)
 
+    # --- affine transforms --------------------------------------------------
+
+    def transformed(self, t: "Transform") -> "Vec":
+        """Apply a 4×4 affine transform to this point."""
+        return t.apply(self)
+
+    def mirrored(self, plane: "Plane") -> "Vec":
+        """Mirror over an arbitrary plane. Returns a new Vec."""
+        from ifckit.geometry.transform import Transform
+
+        return Transform.reflection(plane).apply(self)
+
+    def translated(self, delta: "Vec") -> "Vec":
+        """Translate by *delta*. Returns a new Vec."""
+        from ifckit.geometry.transform import Transform
+
+        return Transform.translation(delta).apply(self)
+
+    def rotated(self, axis: "Vec", angle: float) -> "Vec":
+        """Rotate around *axis* by *angle* radians. Returns a new Vec."""
+        from ifckit.geometry.transform import Transform
+
+        return Transform.rotation(axis, angle).apply(self)
+
+    def scaled(
+        self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
+    ) -> "Vec":
+        """Scale by *sx*, *sy*, *sz* (default sy/sz = sx). Returns a new Vec."""
+        from ifckit.geometry.transform import Transform
+
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        return Transform.scaling(sx, sy, sz).apply(self)
+
+    def copy(self) -> "Vec":
+        """Return an independent copy."""
+        return Vec(self.x, self.y, self.z)
+
     # --- conversion ---------------------------------------------------------
 
     def to_tuple(self) -> Tuple[float, float, float]:
@@ -315,6 +358,35 @@ class Plane:
             y_axis=Vec.from_dict(d["y_axis"]),
         )
 
+    def transformed(self, t: "Transform") -> "Plane":
+        """Apply a 4×4 affine transform. Returns a new Plane."""
+        return Plane(
+            t.apply(self.origin),
+            t.apply_vector(self.x_axis),
+            t.apply_vector(self.y_axis),
+        )
+
+    def mirrored(self, plane: "Plane") -> "Plane":
+        """Mirror over an arbitrary plane. Returns a new Plane."""
+        from ifckit.geometry.transform import Transform
+
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Plane":
+        """Translate by *delta* (axes unchanged). Returns a new Plane."""
+        return Plane(self.origin + delta, self.x_axis, self.y_axis)
+
+    def rotated(self, axis: "Vec", angle: float) -> "Plane":
+        """Rotate around *axis* by *angle* radians. Returns a new Plane."""
+        from ifckit.geometry.transform import Transform
+
+        t = Transform.rotation(axis, angle)
+        return Plane(t.apply(self.origin), t.apply_vector(self.x_axis), t.apply_vector(self.y_axis))
+
+    def copy(self) -> "Plane":
+        """Return an independent copy."""
+        return Plane(self.origin.copy(), self.x_axis.copy(), self.y_axis.copy())
+
     def __repr__(self) -> str:
         return f"Plane(origin={self.origin}, x={self.x_axis}, y={self.y_axis})"
 
@@ -351,6 +423,42 @@ class Line:
 
     def reverse(self) -> "Line":
         return Line(self.end, self.start)
+
+    def transformed(self, t: "Transform") -> "Line":
+        """Apply a 4×4 affine transform. Returns a new Line."""
+        return Line(t.apply(self.start), t.apply(self.end))
+
+    def mirrored(self, plane: "Plane") -> "Line":
+        """Mirror over an arbitrary plane. Returns a new Line."""
+        from ifckit.geometry.transform import Transform
+
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Line":
+        """Translate by *delta*. Returns a new Line."""
+        return Line(self.start + delta, self.end + delta)
+
+    def rotated(self, axis: "Vec", angle: float) -> "Line":
+        """Rotate around *axis* by *angle* radians. Returns a new Line."""
+        from ifckit.geometry.transform import Transform
+
+        return self.transformed(Transform.rotation(axis, angle))
+
+    def scaled(
+        self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
+    ) -> "Line":
+        """Scale by *sx*, *sy*, *sz*. Returns a new Line."""
+        from ifckit.geometry.transform import Transform
+
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        return self.transformed(Transform.scaling(sx, sy, sz))
+
+    def copy(self) -> "Line":
+        """Return an independent copy."""
+        return Line(self.start.copy(), self.end.copy())
 
     @property
     def length(self) -> float:
@@ -427,6 +535,61 @@ class Arc:
 
     def reverse(self) -> "Arc":
         return Arc(self.center, -self.normal, self.end, self.angle)
+
+    def transformed(self, t: "Transform") -> "Arc":
+        """Apply a 4×4 affine transform.
+
+        Under uniform transforms (rotation, translation, reflection, uniform
+        scale) the arc stays a circular arc.  Under non-uniform scale the arc
+        would become an ellipse — raises ValueError; use ``to_path()`` instead.
+        """
+        if not t.is_uniform_scale():
+            raise ValueError(
+                "Arc.transformed() does not support non-uniform scale "
+                "(would produce an ellipse). Use arc.to_path().transformed(t) instead."
+            )
+        new_center = t.apply(self.center)
+        new_start = t.apply(self.start)
+        new_normal = t.apply_vector(self.normal)
+        return Arc(new_center, new_normal, new_start, self.angle)
+
+    def mirrored(self, plane: "Plane") -> "Arc":
+        """Mirror over an arbitrary plane. Returns a new Arc."""
+        from ifckit.geometry.transform import Transform
+
+        return self.transformed(Transform.reflection(plane))
+
+    def translated(self, delta: "Vec") -> "Arc":
+        """Translate by *delta*. Returns a new Arc."""
+        return Arc(self.center + delta, self.normal, self.start + delta, self.angle)
+
+    def rotated(self, axis: "Vec", angle: float) -> "Arc":
+        """Rotate around *axis* by *angle* radians. Returns a new Arc."""
+        from ifckit.geometry.transform import Transform
+
+        r = Transform.rotation(axis, angle)
+        c = r.apply(self.center)
+        n = r.apply_vector(self.normal)
+        s = r.apply(self.start)
+        return Arc(c, n, s, self.angle)
+
+    def scaled(
+        self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
+    ) -> "Arc":
+        """Scale by *sx*, *sy*, *sz*. Non-uniform raises ValueError."""
+
+        from ifckit.geometry.transform import Transform
+
+        if sy is None:
+            sy = sx
+        if sz is None:
+            sz = sx
+        t = Transform.scaling(sx, sy, sz)
+        return self.transformed(t)
+
+    def copy(self) -> "Arc":
+        """Return an independent copy."""
+        return Arc(self.center.copy(), self.normal.copy(), self.start.copy(), self.angle)
 
     def point_at(self, t: float) -> "Vec":
         """t=0 → start, t=1 → end."""
