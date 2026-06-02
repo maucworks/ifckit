@@ -37,6 +37,7 @@ from ifckit.elements.bridge import (
 from ifckit.elements.building import PendingSlab, PendingWall
 from ifckit.elements.opening import PendingDoor, PendingOpening, PendingWindow
 from ifckit.elements.registry import ElementRegistry
+from ifckit.elements.sectioned_spine import PendingSectionedSpine
 from ifckit.elements.space import PendingSpace
 from ifckit.elements.structural import (
     PendingBeam,
@@ -505,6 +506,35 @@ def _validate_tapered(t: PendingTaperedExtrusion) -> ValidationResult:
         warnings.append(
             f"PendingTaperedExtrusion '{t.name}': height is very small ({t.height:.4f} m)"
         )
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingSectionedSpine)
+def _validate_sectioned_spine(s: PendingSectionedSpine) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if len(s.spine.segments) < 2:
+        errors.append(f"sectioned_spine '{s.name}': spine must have at least 2 segments")
+
+    if len(s.profiles) < 2:
+        errors.append(
+            f"sectioned_spine '{s.name}': need at least 2 profiles, got {len(s.profiles)}"
+        )
+
+    if len(s.profiles) != len(s.positions):
+        errors.append(
+            f"sectioned_spine '{s.name}': profiles ({len(s.profiles)}) "
+            f"must have same length as positions ({len(s.positions)})"
+        )
+
+    for i, profile in enumerate(s.profiles):
+        area = getattr(profile, "area", 0)
+        if area is not None and area <= 0:
+            warnings.append(
+                f"sectioned_spine '{s.name}': profile[{i}] has zero or negative area"
+            )
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 

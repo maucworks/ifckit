@@ -2,8 +2,8 @@
 Tests for ifckit.builders.component_graph
 
 Covers:
-  - _eval_expr: literals, $params, binary ops, errors
-  - _eval_point
+  - eval_expr: literals, $params, binary ops, errors (from _expr)
+  - eval_point
   - _load_preset: success and missing file
   - _resolve_parameters: defaults, overrides, missing required
   - _eval_node_rect: returns Path, correct corners
@@ -15,13 +15,12 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
 import ifcopenshell
+import pytest
 
+from ifckit.builders._expr import eval_expr
 from ifckit.builders._geom import axis2placement3d, profile_from_points
 from ifckit.builders.component_graph import (
-    EvaluatedComponent,
-    _eval_expr,
     _eval_node_difference,
     _eval_node_rect,
     _load_preset,
@@ -29,8 +28,8 @@ from ifckit.builders.component_graph import (
     evaluate_component_graph,
     evaluate_opening_nodes,
 )
+from ifckit.components import EvaluatedComponent
 from ifckit.geometry import Path, Vec
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -57,85 +56,85 @@ def _make_ifc():
 
 class TestEvalExpr:
     def test_literal_int(self):
-        assert _eval_expr(3, {}) == 3.0
+        assert eval_expr(3, {}) == 3.0
 
     def test_literal_float(self):
-        assert _eval_expr(1.5, {}) == 1.5
+        assert eval_expr(1.5, {}) == 1.5
 
     def test_simple_param(self):
-        assert _eval_expr("$w", {"w": 2.0}) == 2.0
+        assert eval_expr("$w", {"w": 2.0}) == 2.0
 
     def test_add(self):
-        assert _eval_expr("$a + $b", {"a": 1.0, "b": 2.0}) == pytest.approx(3.0)
+        assert eval_expr("$a + $b", {"a": 1.0, "b": 2.0}) == pytest.approx(3.0)
 
     def test_subtract(self):
-        assert _eval_expr("$w - $t", {"w": 1.0, "t": 0.055}) == pytest.approx(0.945)
+        assert eval_expr("$w - $t", {"w": 1.0, "t": 0.055}) == pytest.approx(0.945)
 
     def test_multiply(self):
-        assert _eval_expr("$d * 2", {"d": 0.5}) == pytest.approx(1.0)
+        assert eval_expr("$d * 2", {"d": 0.5}) == pytest.approx(1.0)
 
     def test_divide(self):
-        assert _eval_expr("$h / 2", {"h": 1.2}) == pytest.approx(0.6)
+        assert eval_expr("$h / 2", {"h": 1.2}) == pytest.approx(0.6)
 
     def test_left_to_right(self):
         # "$a - $b + $c" = (a - b) + c left-to-right
-        assert _eval_expr("$a - $b + $c", {"a": 10.0, "b": 3.0, "c": 1.0}) == pytest.approx(8.0)
+        assert eval_expr("$a - $b + $c", {"a": 10.0, "b": 3.0, "c": 1.0}) == pytest.approx(8.0)
 
     def test_mul_before_add(self):
         # 2 + 3 * 4 = 14, not 20
-        assert _eval_expr("2 + 3 * 4", {}) == pytest.approx(14.0)
+        assert eval_expr("2 + 3 * 4", {}) == pytest.approx(14.0)
 
     def test_mul_before_sub(self):
         # 10 - 2 * 3 = 4, not 24
-        assert _eval_expr("10 - 2 * 3", {}) == pytest.approx(4.0)
+        assert eval_expr("10 - 2 * 3", {}) == pytest.approx(4.0)
 
     def test_div_before_add(self):
         # $h / 2 + 10 = 0.6 + 10 = 10.6
-        assert _eval_expr("$h / 2 + 10", {"h": 1.2}) == pytest.approx(10.6)
+        assert eval_expr("$h / 2 + 10", {"h": 1.2}) == pytest.approx(10.6)
 
     def test_mixed_precedence_with_params(self):
         # "$lining_depth / 2 + $lining_thickness * 3"
-        assert _eval_expr(
+        assert eval_expr(
             "$lining_depth / 2 + $lining_thickness * 3",
             {"lining_depth": 100.0, "lining_thickness": 10.0},
         ) == pytest.approx(80.0)  # 50 + 30
 
     def test_parentheses_override_precedence(self):
         # (2 + 3) * 4 = 20, not 14
-        assert _eval_expr("(2 + 3) * 4", {}) == pytest.approx(20.0)
+        assert eval_expr("(2 + 3) * 4", {}) == pytest.approx(20.0)
 
     def test_parentheses_in_denominator(self):
         # $h / ($lining_depth / 2) = 1.2 / 0.6 = 2.0
-        assert _eval_expr(
+        assert eval_expr(
             "$h / ($lining_depth / 2)",
             {"h": 1.2, "lining_depth": 1.2},
         ) == pytest.approx(2.0)
 
     def test_nested_parentheses(self):
         # ((2 + 3) * (4 - 1)) = 5 * 3 = 15
-        assert _eval_expr("((2 + 3) * (4 - 1))", {}) == pytest.approx(15.0)
+        assert eval_expr("((2 + 3) * (4 - 1))", {}) == pytest.approx(15.0)
 
     def test_unary_minus(self):
-        assert _eval_expr("-$x", {"x": 5.0}) == pytest.approx(-5.0)
+        assert eval_expr("-$x", {"x": 5.0}) == pytest.approx(-5.0)
 
     def test_param_times_literal_plus_param(self):
         # "2 * $lining_thickness + $door_width" = 2*50 + 1000 = 1100
-        assert _eval_expr(
+        assert eval_expr(
             "2 * $lining_thickness + $door_width",
             {"lining_thickness": 50.0, "door_width": 1000.0},
         ) == pytest.approx(1100.0)
 
     def test_unknown_param(self):
         with pytest.raises(KeyError, match="unknown_param"):
-            _eval_expr("$unknown_param", {})
+            eval_expr("$unknown_param", {})
 
     def test_division_by_zero(self):
         with pytest.raises(ValueError, match="division by zero"):
-            _eval_expr("$x / 0", {"x": 1.0})
+            eval_expr("$x / 0", {"x": 1.0})
 
     def test_bad_type(self):
         with pytest.raises(ValueError):
-            _eval_expr({"not": "valid"}, {})
+            eval_expr({"not": "valid"}, {})
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +216,6 @@ class TestEvalNodeRect:
         node = {"id": "r", "op": "rect", "p0": [0, 0], "p1": ["$w", "$h"]}
         result = _eval_node_rect(node, {"w": 1.5, "h": 2.0})
         # Check x extent via to_profile_points
-        from ifckit.geometry import Plane
         pts = result.to_profile_points()
         xs = [p[0] for p in pts]
         ys = [p[1] for p in pts]

@@ -5,11 +5,10 @@ ifckit.builders
 Builder implementations and default registry.
 """
 
-from ifckit.builders._geom import get_precision, set_precision
+from ifckit.builders._precision import get_precision, set_precision
 from ifckit.builders.base import BuilderRegistry, IIfcBuilder
 from ifckit.builders.beam_factory import PathType, build_beam, classify_path
 from ifckit.builders.bridge import AlignmentBuilder
-from ifckit.builders.door_window import DoorBuilder, WindowBuilder
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.opening import OpeningBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
@@ -34,8 +33,7 @@ def default_registry() -> BuilderRegistry:
     registry.register(SectionedSpineBuilder())
     registry.register(TaperedExtrusionBuilder())
     registry.register(OpeningBuilder())
-    registry.register(WindowBuilder())
-    registry.register(DoorBuilder())
+
     return registry
 
 
@@ -51,8 +49,7 @@ __all__ = [
     "SectionedSpineBuilder",
     "TaperedExtrusionBuilder",
     "OpeningBuilder",
-    "WindowBuilder",
-    "DoorBuilder",
+
     "AlignmentBuilder",
     "PathType",
     "classify_path",

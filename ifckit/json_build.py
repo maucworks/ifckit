@@ -167,11 +167,7 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     Uses a 2-pass approach:
 
     * **Pass 1** – spatial hierarchy + host elements (walls, slabs, spaces).
-      Elements with an ``"id"`` field are registered in a flat ``id_map``.
-    * **Pass 2** – door/window types (root-level arrays) + fills (nested
-      directly in elements via ``"windows"`` and ``"doors"`` keys).
-      Each fill references a type via ``type_ref``; the type carries
-      ``component_graph`` which drives Model B opening + fill geometry.
+    * **Pass 2** – door/window types + fills nested in elements.
 
     Args:
         data:        Validated JSON dict.
@@ -201,15 +197,23 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
     site_data = data.get("site") or {}
     site = model.add_site(site_data.get("name", "Site"))
 
-    # Flat map: user-assigned string id → EntityHandle.
+    id_map, storey_map = _pass1_spatial(model, data, site)
+    type_map, type_entity_map = _pass2a_types(model, data)
+    _pass2b_fills(model, data, id_map, type_map, type_entity_map)
+    _add_drawings(model, data)
+
+    if output_path:
+        model.save(output_path)
+
+    return model
+
+
+def _pass1_spatial(
+    model: IfcModel, data: Dict[str, Any], site: Any
+) -> tuple[Dict[str, Any], Dict[tuple, Any]]:
+    """:meta private:"""
     id_map: Dict[str, Any] = {}
-
-    # Storey handles keyed by (bldg_index, storey_index) for pass 2.
     storey_map: Dict[tuple, Any] = {}
-
-    # -----------------------------------------------------------------------
-    # Pass 1 — spatial hierarchy + host elements
-    # -----------------------------------------------------------------------
 
     for bi, bldg_data in enumerate(data.get("buildings", [])):
         building = site.add_building(bldg_data.get("name", "Building"))
@@ -252,7 +256,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     scoped_id = f"{elem_id}__s{si}" if elem_id in id_map else elem_id
                     id_map[scoped_id] = handle
 
-            # spaces[]
             from ifckit.elements.space import PendingSpace
 
             for space_data in storey_data.get("spaces", []):
@@ -269,14 +272,17 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     scoped_id = f"{space_id}__s{si}" if space_id in id_map else space_id
                     id_map[scoped_id] = handle
 
-    # -----------------------------------------------------------------------
-    # Pass 2a — door/window types (root-level)
-    # -----------------------------------------------------------------------
+    return id_map, storey_map
 
+
+def _pass2a_types(
+    model: IfcModel, data: Dict[str, Any]
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """:meta private:"""
     from ifckit.elements.types import PendingDoorType, PendingWindowType
 
-    type_map: Dict[str, Any] = {}  # name → PendingWindowType / PendingDoorType
-    type_entity_map: Dict[str, Any] = {}  # name → EntityHandle with IfcWindowType/IfcDoorType
+    type_map: Dict[str, Any] = {}
+    type_entity_map: Dict[str, Any] = {}
 
     for dt_data in data.get("door_types", []):
         pending_dt = PendingDoorType.from_dict(dt_data)
@@ -292,11 +298,19 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             type_map[pending_wt.name] = pending_wt
             type_entity_map[pending_wt.name] = wt_handle
 
-    # -----------------------------------------------------------------------
-    # Pass 2b — fills (windows + doors nested directly in elements)
-    # -----------------------------------------------------------------------
+    return type_map, type_entity_map
 
+
+def _pass2b_fills(
+    model: IfcModel,
+    data: Dict[str, Any],
+    id_map: Dict[str, Any],
+    type_map: Dict[str, Any],
+    type_entity_map: Dict[str, Any],
+) -> None:
+    """:meta private:"""
     from ifckit.elements.opening import PendingDoor, PendingWindow
+    from ifckit.elements.types import PendingDoorType, PendingWindowType
 
     for bi, bldg_data in enumerate(data.get("buildings", [])):
         for si, storey_data in enumerate(bldg_data.get("storeys", [])):
@@ -315,7 +329,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     type_ref = win_data.get("type_ref")
                     component_graph = win_data.get("component_graph")
 
-                    # Support inline component_graph (no type needed)
                     pending_wt = None
                     if type_ref:
                         pending_wt = type_map.get(type_ref)
@@ -336,7 +349,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                                 f"window type {type_ref!r} has no component_graph."
                             )
                     elif component_graph:
-                        # Inline component - create temporary type
                         pending_wt = PendingWindowType(
                             name=f"inline_{component_graph}",
                             overall_width=win_data.get("overall_width", 1000),
@@ -349,39 +361,8 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         )
 
                     plane = _parse_plane(win_data["plane"])
-
-                    # Merge window type parameters with occurrence parameters
-                    # (occurrence-level overrides type-level)
-                    merged_params = {}
-                    if pending_wt.lining_depth is not None:
-                        merged_params["lining_depth"] = pending_wt.lining_depth
-                    if pending_wt.lining_thickness is not None:
-                        merged_params["lining_thickness"] = pending_wt.lining_thickness
-                    if pending_wt.panel_depth is not None:
-                        merged_params["panel_depth"] = pending_wt.panel_depth
-                    if pending_wt.panel_height is not None:
-                        merged_params["panel_height"] = pending_wt.panel_height
-                    if pending_wt.panel_width is not None:
-                        merged_params["panel_width"] = pending_wt.panel_width
-                    # Occurrence parameters override type parameters
-                    if win_data.get("parameters"):
-                        merged_params.update(win_data["parameters"])
-
-                    # Merge material overrides: type-level + occurrence-level
-                    # (occurrence-level overrides type-level per role)
-                    merged_materials = {}
-                    if pending_wt.material_overrides:
-                        merged_materials.update(pending_wt.material_overrides)
-                    if win_data.get("material_overrides"):
-                        # Occurrence materials override/extend type materials per role
-                        for role, material_def in win_data["material_overrides"].items():
-                            if role in merged_materials and isinstance(
-                                merged_materials[role], dict
-                            ):
-                                # Merge material defs per role
-                                merged_materials[role] = {**merged_materials[role], **material_def}
-                            else:
-                                merged_materials[role] = material_def
+                    merged_params = _merge_params(pending_wt, win_data)
+                    merged_materials = _merge_materials(pending_wt, win_data)
 
                     pending_win = PendingWindow(
                         overall_width=float(win_data["overall_width"]),
@@ -394,7 +375,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     )
                     win_handle = model.add(pending_win, host_handle)
 
-                    # Assign type if defined
                     if type_ref and type_ref in type_entity_map:
                         from ifckit.builders.door_window import _assign_type
 
@@ -405,7 +385,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     type_ref = door_data.get("type_ref")
                     component_graph = door_data.get("component_graph")
 
-                    # Support inline component_graph (no type needed)
                     pending_dt = None
                     if type_ref:
                         pending_dt = type_map.get(type_ref)
@@ -425,7 +404,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                                 f"door type {type_ref!r} has no component_graph."
                             )
                     elif component_graph:
-                        # Inline component - create temporary type
                         pending_dt = PendingDoorType(
                             name=f"inline_{component_graph}",
                             overall_width=door_data.get("overall_width", 1000),
@@ -438,37 +416,8 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                         )
 
                     plane = _parse_plane(door_data["plane"])
-
-                    # Merge door type parameters with occurrence parameters
-                    # (occurrence-level overrides type-level)
-                    merged_params = {}
-                    if pending_dt.lining_depth is not None:
-                        merged_params["lining_depth"] = pending_dt.lining_depth
-                    if pending_dt.lining_thickness is not None:
-                        merged_params["lining_thickness"] = pending_dt.lining_thickness
-                    if pending_dt.panel_depth is not None:
-                        merged_params["panel_depth"] = pending_dt.panel_depth
-                    if pending_dt.panel_width is not None:
-                        merged_params["panel_width"] = pending_dt.panel_width
-                    # Occurrence parameters override type parameters
-                    if door_data.get("parameters"):
-                        merged_params.update(door_data["parameters"])
-
-                    # Merge material overrides: type-level + occurrence-level
-                    # (occurrence-level overrides type-level per role)
-                    merged_materials = {}
-                    if pending_dt.material_overrides:
-                        merged_materials.update(pending_dt.material_overrides)
-                    if door_data.get("material_overrides"):
-                        # Occurrence materials override/extend type materials per role
-                        for role, material_def in door_data["material_overrides"].items():
-                            if role in merged_materials and isinstance(
-                                merged_materials[role], dict
-                            ):
-                                # Merge material defs per role
-                                merged_materials[role] = {**merged_materials[role], **material_def}
-                            else:
-                                merged_materials[role] = material_def
+                    merged_params = _merge_params(pending_dt, door_data)
+                    merged_materials = _merge_materials(pending_dt, door_data)
 
                     pending_door = PendingDoor(
                         overall_width=float(door_data["overall_width"]),
@@ -481,17 +430,41 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
                     )
                     door_handle = model.add(pending_door, host_handle)
 
-                    # Assign type if defined
                     if type_ref and type_ref in type_entity_map:
                         from ifckit.builders.door_window import _assign_type
 
                         dt_entity = type_entity_map[type_ref].entity
                         _assign_type(model.ifc_file, door_handle.entity, dt_entity)
 
-    # -----------------------------------------------------------------------
-    # Drawings
-    # -----------------------------------------------------------------------
 
+def _merge_params(pending_type, data: Dict[str, Any]) -> Dict[str, float]:
+    """:meta private:"""
+    merged: Dict[str, float] = {}
+    for attr in ("lining_depth", "lining_thickness", "panel_depth", "panel_height", "panel_width"):
+        val = getattr(pending_type, attr, None)
+        if val is not None:
+            merged[attr] = val
+    if data.get("parameters"):
+        merged.update(data["parameters"])
+    return merged
+
+
+def _merge_materials(pending_type, data: Dict[str, Any]) -> Dict[str, Any]:
+    """:meta private:"""
+    merged: Dict[str, Any] = {}
+    if pending_type.material_overrides:
+        merged.update(pending_type.material_overrides)
+    if data.get("material_overrides"):
+        for role, material_def in data["material_overrides"].items():
+            if role in merged and isinstance(merged[role], dict):
+                merged[role] = {**merged[role], **material_def}
+            else:
+                merged[role] = material_def
+    return merged
+
+
+def _add_drawings(model: IfcModel, data: Dict[str, Any]) -> None:
+    """:meta private:"""
     for drawing_data in data.get("drawings", []):
         dname = drawing_data.get("name", "Drawing")
         target_view = drawing_data.get("target_view", "PLAN_VIEW")
@@ -516,11 +489,6 @@ def build(data: Dict[str, Any], output_path: Optional[str] = None) -> IfcModel:
             x_axis=(float(raw_x_axis[0]), float(raw_x_axis[1]), float(raw_x_axis[2])),
             z_axis=(float(raw_z_axis[0]), float(raw_z_axis[1]), float(raw_z_axis[2])),
         )
-
-    if output_path:
-        model.save(output_path)
-
-    return model
 
 
 def build_from_json(json_str: str, output_path: Optional[str] = None) -> IfcModel:

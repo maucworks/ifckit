@@ -31,201 +31,18 @@ from __future__ import annotations
 
 import importlib.resources
 import json
-import re
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import ifcopenshell
 
+from ifckit.builders._expr import eval_expr, eval_point
 from ifckit.builders._geom import (
     axis2placement3d,
     extrude_profile,
     profile_from_points,
 )
+from ifckit.components import EvaluatedComponent
 from ifckit.geometry import Path, Plane, Vec
-
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class EvaluatedComponent:
-    """A single output component produced by the graph evaluator."""
-
-    role: str
-    solid: ifcopenshell.entity_instance
-    node_id: str
-    material: dict  # Optional material definition (color, transparency, name)
-
-
-# ---------------------------------------------------------------------------
-# Expression evaluator
-# ---------------------------------------------------------------------------
-
-
-def _eval_expr(expr: Any, params: Dict[str, float]) -> float:
-    """Evaluate a parameter expression to a float.
-
-    Supports +, -, *, / with correct precedence, parentheses, and $variables.
-    Uses a recursive descent parser: no regex token-list mutation.
-
-    Grammar:
-        expr   = term   (('+' | '-') term)*
-        term   = factor (('*' | '/') factor)*
-        factor = '(' expr ')' | number | '$' name | '-' factor
-    """
-    if isinstance(expr, (int, float)):
-        return float(expr)
-    if not isinstance(expr, str):
-        raise ValueError(f"_eval_expr: expected str or number, got {type(expr).__name__!r}")
-
-    src = expr.strip()
-    pos = [0]  # mutable int so nested functions can advance it
-
-    def peek() -> str:
-        while pos[0] < len(src) and src[pos[0]] == " ":
-            pos[0] += 1
-        return src[pos[0]] if pos[0] < len(src) else ""
-
-    def consume(expected: str | None = None) -> str:
-        ch = peek()
-        if expected is not None and ch != expected:
-            raise ValueError(f"_eval_expr: expected {expected!r} got {ch!r} in {expr!r}")
-        pos[0] += 1
-        return ch
-
-    def parse_number() -> float:
-        start = pos[0]
-        while pos[0] < len(src) and src[pos[0]] in "0123456789.":
-            pos[0] += 1
-        if pos[0] == start:
-            raise ValueError(f"_eval_expr: expected number at pos {start} in {expr!r}")
-        return float(src[start : pos[0]])
-
-    def parse_variable() -> float:
-        pos[0] += 1  # skip '$'
-        start = pos[0]
-        while pos[0] < len(src) and (src[pos[0]].isalnum() or src[pos[0]] == "_"):
-            pos[0] += 1
-        name = src[start : pos[0]]
-        if name not in params:
-            raise KeyError(f"Unknown parameter: {name!r}")
-        return float(params[name])
-
-    def parse_factor() -> float:
-        ch = peek()
-        if ch == "(":
-            consume("(")
-            val = parse_expr()
-            consume(")")
-            return val
-        if ch == "-":
-            consume("-")
-            return -parse_factor()
-        if ch == "$":
-            return parse_variable()
-        return parse_number()
-
-    def parse_term() -> float:
-        val = parse_factor()
-        while peek() in ("*", "/"):
-            op = consume()
-            rhs = parse_factor()
-            if op == "*":
-                val *= rhs
-            else:
-                if abs(rhs) < 1e-15:
-                    raise ValueError(f"_eval_expr: division by zero in {expr!r}")
-                val /= rhs
-        return val
-
-    def parse_expr() -> float:
-        val = parse_term()
-        while peek() in ("+", "-"):
-            op = consume()
-            rhs = parse_term()
-            if op == "+":
-                val += rhs
-            else:
-                val -= rhs
-        return val
-
-    result = parse_expr()
-    if pos[0] != len(src) and src[pos[0] :].strip():
-        raise ValueError(f"_eval_expr: unexpected trailing input {src[pos[0] :]!r} in {expr!r}")
-    return result
-
-
-def _contains_literal(expr: Any) -> bool:
-    """Check if expression contains any literal numbers (not just variables).
-
-    Returns True only if the expression has at least one numeric literal.
-    Variables like "$name" or expressions with only variables return False.
-
-    Args:
-        expr: Expression (str, int, float).
-
-    Returns:
-        True if contains at least one literal number; False if all tokens are variables.
-    """
-    # Numeric literals always have literals
-    if isinstance(expr, (int, float)):
-        return True
-
-    if not isinstance(expr, str):
-        return False
-
-    expr = expr.strip()
-    # Pure variable: "$name"
-    if re.fullmatch(r"\$[A-Za-z_][A-Za-z0-9_]*", expr):
-        return False
-
-    # Tokenize and check if any token is a literal (not starting with $)
-    tokens = re.split(r"\s*([\+\-\*\/])\s*", expr)
-    for tok in tokens:
-        tok = tok.strip()
-        if not tok:
-            continue
-        # Skip operators
-        if tok in ("+", "-", "*", "/"):
-            continue
-        # If token doesn't start with $, it's a literal
-        if not tok.startswith("$"):
-            return True
-
-    # All non-operator tokens are variables
-    return False
-
-
-def _eval_point(
-    raw: Any,
-    params: Dict[str, float],
-    scale_x: float = 1.0,
-    scale_y: float = 1.0,
-) -> Tuple[float, float]:
-    """Evaluate a 2-element [x, y] array and apply scale factors.
-
-    Scale factors map reference-space coordinates to actual dimensions.
-    ``scale_x = actual_w / ref_w``, ``scale_y = actual_h / ref_h``.
-
-    Literals in the array (e.g., 10, 20) are scaled.
-    Variables (e.g., "$w", "$h") are NOT scaled (they are occurrence values).
-    Expressions with both (e.g., "$w + 10") scale only the literals.
-    """
-    if not (isinstance(raw, (list, tuple)) and len(raw) == 2):
-        raise ValueError(f"Expected [x, y] point, got {raw!r}")
-
-    # Evaluate X: if it has literals, apply scale_x; else don't scale
-    x_val = _eval_expr(raw[0], params)
-    x = x_val * scale_x if _contains_literal(raw[0]) else x_val
-
-    # Evaluate Y: if it has literals, apply scale_y; else don't scale
-    y_val = _eval_expr(raw[1], params)
-    y = y_val * scale_y if _contains_literal(raw[1]) else y_val
-
-    return (x, y)
-
 
 # ---------------------------------------------------------------------------
 # Graph loader
@@ -296,8 +113,8 @@ def _eval_node_rect(
     Holes may themselves carry nested holes (though IFC only supports one level
     of void depth — inner holes of holes are silently ignored by the IFC spec).
     """
-    p0 = _eval_point(node["p0"], params, scale_x, scale_y)
-    p1 = _eval_point(node["p1"], params, scale_x, scale_y)
+    p0 = eval_point(node["p0"], params, scale_x, scale_y)
+    p1 = eval_point(node["p1"], params, scale_x, scale_y)
     x0, y0 = p0
     x1, y1 = p1
     xy_plane = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
@@ -319,7 +136,7 @@ def _eval_node_rect(
                 raise ValueError(
                     f"Hole with op='offset' in rect node {node.get('id')!r} missing 'dist'."
                 )
-            dist = _eval_expr(dist_raw, params)
+            dist = eval_expr(dist_raw, params)
             # Only inline offset (offset parent) supported in rect holes.
             # For named source offsets, use a standalone offset node.
             if hole_op == "offset" and hole_node.get("source"):
@@ -391,7 +208,7 @@ def _eval_node_polygon(
 
     pts = []
     for pt_raw in points_raw:
-        p = _eval_point(pt_raw, params, scale_x, scale_y)
+        p = eval_point(pt_raw, params, scale_x, scale_y)
         pts.append(Vec(p[0], p[1], 0.0))
 
     xy_plane = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
@@ -409,7 +226,7 @@ def _eval_node_polygon(
                 raise ValueError(
                     f"Hole with op='offset' in polygon node {node.get('id')!r} missing 'dist'."
                 )
-            dist = _eval_expr(dist_raw, params)
+            dist = eval_expr(dist_raw, params)
             if hole_node.get("source"):
                 raise ValueError(
                     "Source reference in polygon hole not supported. "
@@ -510,7 +327,7 @@ def _eval_node_list(
             dist_raw = node.get("dist")
             if dist_raw is None:
                 raise ValueError(f"'offset' node {node_id!r} missing 'dist'")
-            dist = _eval_expr(dist_raw, resolved)
+            dist = eval_expr(dist_raw, resolved)
             result = source_path.offset(dist)
             cache[node_id] = result
 
@@ -568,9 +385,9 @@ def _eval_node_list(
             #     so the placement origin moves in -Z before extruding further in -Z.
             # Both choices must stay consistent — changing one without the other
             # will silently mis-place all component geometry.
-            depth = _eval_expr(node.get("depth", 0.1), resolved)
+            depth = eval_expr(node.get("depth", 0.1), resolved)
             z_offset_raw = node.get("z_offset", 0)
-            z_offset_param = _eval_expr(z_offset_raw, resolved) if z_offset_raw != 0 else 0.0
+            z_offset_param = eval_expr(z_offset_raw, resolved) if z_offset_raw != 0 else 0.0
             z_offset = -z_offset_param  # negate: positive JSON value → move in -Z
 
             placement = axis2placement3d(ifc_file, Vec(0, 0, z_offset), Vec(0, 0, 1), Vec(1, 0, 0))

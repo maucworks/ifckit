@@ -268,8 +268,18 @@ class Plane:
 
     @classmethod
     def world_xy(cls) -> "Plane":
-        """Standard XY plane at origin."""
+        """Standard XY plane at origin (normal = +Z)."""
         return cls(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+
+    @classmethod
+    def world_xz(cls) -> "Plane":
+        """XZ plane at origin (normal = +Y)."""
+        return cls(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
+
+    @classmethod
+    def world_yz(cls) -> "Plane":
+        """YZ plane at origin (normal = +X)."""
+        return cls(Vec(0, 0, 0), Vec(0, 1, 0), Vec(0, 0, 1))
 
     @classmethod
     def from_origin_and_normal(

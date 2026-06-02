@@ -287,7 +287,12 @@ class Path:
             New ``Path`` with only ``Line`` segments.
         """
         pts = self.sample(angle_step_deg).points
-        return Path.from_pts(pts, plane=self._plane, closed=self.is_closed)
+        path = Path(plane=self._plane)
+        for i in range(len(pts) - 1):
+            path._segments.append(Line(pts[i], pts[i + 1]))
+        if self.is_closed and not pts[-1].equals(pts[0], tol=1e-9):
+            path._segments.append(Line(pts[-1], pts[0]))
+        return path
 
     def to_mesh_dict(
         self,
@@ -475,9 +480,14 @@ class Path:
     ) -> "Path":
         """Build a Path from a list of Vec points as consecutive Line segments.
 
+        When a *plane* is given, points are interpreted as local coordinates
+        in that plane's frame and transformed to world space.
+
         Args:
-            pts:    List of at least 2 Vec points.
-            plane:  Optional reference plane stored on the Path.
+            pts:    List of at least 2 Vec points (in local plane coords
+                    if *plane* is given, otherwise world coords).
+            plane:  Optional reference plane. Points are transformed from
+                    this plane's local frame to world coordinates.
             closed: If True, appends a closing segment from pts[-1] to pts[0].
 
         Raises:
@@ -485,6 +495,8 @@ class Path:
         """
         if len(pts) < 2:
             raise ValueError("from_pts requires at least 2 points")
+        if plane is not None:
+            pts = [plane.transform_point(p) for p in pts]
         path = cls(plane=plane)
         for i in range(len(pts) - 1):
             path._segments.append(Line(pts[i], pts[i + 1]))

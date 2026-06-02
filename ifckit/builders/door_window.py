@@ -34,7 +34,7 @@ from ifckit.builders._geom import (
     profile_from_points,
     shape_representation,
 )
-from ifckit.builders.base import BaseBuilder
+from ifckit.builders._material import apply_material_to_solid
 from ifckit.builders.psets import write_psets
 from ifckit.profiles.anchor import anchor_offset
 
@@ -179,7 +179,7 @@ def _build_fill_from_components(
                 "transparency": 0.0,
                 "name": "Default",
             }
-        solid = _apply_material_to_solid(ifc_file, solid, material)
+        solid = apply_material_to_solid(ifc_file, solid, material)
         solids.append(solid)
 
     if not solids:
@@ -632,76 +632,6 @@ def _get_profile_thickness(area) -> float:
     return 200.0
 
 
-def _apply_material_to_solid(
-    ifc_file: ifcopenshell.file,
-    solid: ifcopenshell.entity_instance,
-    material_def: Optional[dict],
-) -> ifcopenshell.entity_instance:
-    """
-    Create an IfcStyledItem referencing the solid with color and transparency.
-
-    The IfcStyledItem is created as a standalone entity in the file — it must
-    NOT replace the solid in the representation Items list, because SweptSolid
-    representations require raw solids as items. Returns the original solid
-    unchanged so callers can safely append it to the items list.
-
-    Args:
-        ifc_file: IFC file object
-        solid: IfcExtrudedAreaSolid or similar representation item
-        material_def: Dict with keys:
-            - color: {"r": 0.0-1.0, "g": 0.0-1.0, "b": 0.0-1.0}
-            - transparency: 0.0-1.0 (0=transparent, 1=opaque)
-            - name: optional material name
-
-    Returns:
-        The original solid (unchanged).
-    """
-    if not material_def:
-        return solid
-
-    color_def = material_def.get("color", {})
-    transparency = material_def.get("transparency", 1.0)
-    name = material_def.get("name", "")
-
-    # Create RGB color entity
-    color = ifc_file.create_entity(
-        "IfcColourRgb",
-        Red=float(color_def.get("r", 1.0)),
-        Green=float(color_def.get("g", 1.0)),
-        Blue=float(color_def.get("b", 1.0)),
-    )
-
-    # IfcSurfaceStyleRendering is the correct subtype — it is supported by all
-    # major viewers (Blender, web-ifc, Bonsai). IfcSurfaceStyleShading is the
-    # abstract base and may be ignored or handled inconsistently.
-    # ReflectanceMethod=FLAT gives flat shading without specular highlights.
-    shading = ifc_file.create_entity(
-        "IfcSurfaceStyleRendering",
-        SurfaceColour=color,
-        Transparency=float(transparency),
-        ReflectanceMethod="FLAT",
-    )
-
-    # BOTH: style applies to front and back faces.
-    surface_style = ifc_file.create_entity(
-        "IfcSurfaceStyle",
-        Name=name or "Material",
-        Side="BOTH",
-        Styles=[shading],
-    )
-
-    # Create styled item referencing the solid.
-    # IfcStyledItem must NOT be placed in the representation Items list —
-    # SweptSolid representations require raw solids as items. The styled item
-    # lives standalone in the file; geometry processors find it via Item=solid.
-    ifc_file.create_entity(
-        "IfcStyledItem",
-        Item=solid,
-        Styles=[surface_style],
-    )
-
-    return solid
-
 
 def _build_model_b(
     ifc_file: ifcopenshell.file,
@@ -875,77 +805,3 @@ def build_door_model_b(
 # ---------------------------------------------------------------------------
 
 
-class WindowBuilder(BaseBuilder):
-    """Builder for PendingWindow elements."""
-
-    entity_type = "basic_window"
-
-    def _create_geometry(
-        self,
-        ifc_file: ifcopenshell.file,
-        pending,  # PendingWindow
-        container: ifcopenshell.entity_instance,
-        context: ifcopenshell.entity_instance,
-    ) -> ifcopenshell.entity_instance:
-        if getattr(pending, "component_graph", None):
-            from ifckit.builders._geom import get_body_context
-            from ifckit.builders.door_window import build_window_model_b
-
-            storey = container
-            body_ctx = get_body_context(ifc_file)
-            host_entity = _find_wall_in_storey(ifc_file, storey)
-            if host_entity is None:
-                raise LookupError(
-                    "WindowBuilder cannot find host wall in storey. "
-                    "Use wall_handle.add(window) to specify the host explicitly."
-                )
-            return build_window_model_b(ifc_file, pending, host_entity, storey, body_ctx)
-
-        raise LookupError(
-            "PendingWindow without component_graph requires an opening. "
-            "Use model.add_window(pending, opening=..., container=...) instead."
-        )
-
-
-class DoorBuilder(BaseBuilder):
-    """Builder for PendingDoor elements."""
-
-    entity_type = "basic_door"
-
-    def _create_geometry(
-        self,
-        ifc_file: ifcopenshell.file,
-        pending,  # PendingDoor
-        container: ifcopenshell.entity_instance,
-        context: ifcopenshell.entity_instance,
-    ) -> ifcopenshell.entity_instance:
-        if getattr(pending, "component_graph", None):
-            from ifckit.builders._geom import get_body_context
-            from ifckit.builders.door_window import build_door_model_b
-
-            storey = container
-            body_ctx = get_body_context(ifc_file)
-            host_entity = _find_wall_in_storey(ifc_file, storey)
-            if host_entity is None:
-                raise LookupError(
-                    "DoorBuilder cannot find host wall in storey. "
-                    "Use wall_handle.add(door) to specify the host explicitly."
-                )
-            return build_door_model_b(ifc_file, pending, host_entity, storey, body_ctx)
-
-        raise LookupError(
-            "PendingDoor without component_graph requires an opening. "
-            "Use model.add_door(pending, opening=..., container=...) instead."
-        )
-
-
-def _find_wall_in_storey(
-    ifc_file: ifcopenshell.file,
-    storey: ifcopenshell.entity_instance,
-) -> ifcopenshell.entity_instance | None:
-    """Find the first IfcWall or IfcWallStandardCase in *storey*."""
-    for rel in storey.ContainsElements or []:
-        for item in rel.RelatedElements or []:
-            if item.is_a("IfcWall") or item.is_a("IfcWallStandardCase"):
-                return item
-    return None

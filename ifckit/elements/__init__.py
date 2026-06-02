@@ -59,7 +59,7 @@ __all__ = [
     "PendingExtrudedElement",
     "PendingRevolvedBeam",
     "PendingTaperedExtrusion",
-    "PendingSectionedSpine",  # NEW
+    "PendingSectionedSpine",
     "AlignmentSegment",
     "BridgePartType",
     "PendingAlignment",
