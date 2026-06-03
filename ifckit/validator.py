@@ -532,9 +532,7 @@ def _validate_sectioned_spine(s: PendingSectionedSpine) -> ValidationResult:
     for i, profile in enumerate(s.profiles):
         area = getattr(profile, "area", 0)
         if area is not None and area <= 0:
-            warnings.append(
-                f"sectioned_spine '{s.name}': profile[{i}] has zero or negative area"
-            )
+            warnings.append(f"sectioned_spine '{s.name}': profile[{i}] has zero or negative area")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 

@@ -275,9 +275,7 @@ def _pass1_spatial(
     return id_map, storey_map
 
 
-def _pass2a_types(
-    model: IfcModel, data: Dict[str, Any]
-) -> tuple[Dict[str, Any], Dict[str, Any]]:
+def _pass2a_types(model: IfcModel, data: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
     """:meta private:"""
     from ifckit.elements.types import PendingDoorType, PendingWindowType
 

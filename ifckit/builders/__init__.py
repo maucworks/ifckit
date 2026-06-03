@@ -49,7 +49,6 @@ __all__ = [
     "SectionedSpineBuilder",
     "TaperedExtrusionBuilder",
     "OpeningBuilder",
-
     "AlignmentBuilder",
     "PathType",
     "classify_path",

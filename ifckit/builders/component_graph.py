@@ -437,6 +437,7 @@ def evaluate_component_graph(
     context: ifcopenshell.entity_instance,
     params: Dict[str, float],
     plane=None,
+    path: "Path | None" = None,
 ) -> List[EvaluatedComponent]:
     """
     Evaluate a component graph preset and produce IFC fill geometry.
@@ -449,6 +450,9 @@ def evaluate_component_graph(
                      dimensions). Other keys override preset defaults.
         plane:       Reference plane for Python components.
                     If None, falls back to JSON-only evaluation.
+        path:        Optional closed ``Path`` for path-based Python
+                     components. When provided, *w* and *h* in *params*
+                     are ignored.
 
     Returns:
         List of EvaluatedComponent for nodes with ``output: true``.
@@ -469,6 +473,7 @@ def evaluate_component_graph(
                 params.get("w", 1000),
                 params.get("h", 1000),
                 params,
+                path=path,
             )
         raise  # Re-raise original error
 
@@ -498,8 +503,23 @@ def evaluate_opening_nodes(
     context: ifcopenshell.entity_instance,
     params: Dict[str, float],
     plane=None,
+    path: "Path | None" = None,
 ) -> List[EvaluatedComponent]:
-    """Evaluate opening geometry — JSON presets take precedence over Python."""
+    """Evaluate opening geometry — JSON presets take precedence over Python.
+
+    Args:
+        preset_name: Name of the preset (e.g., "fixed_casement").
+        ifc_file:    Open ifcopenshell file.
+        context:     Body sub-context.
+        params:      Override dict. Must include ``w`` and ``h`` (actual
+                     dimensions). Other keys override preset defaults.
+        plane:       Reference plane for Python components.
+        path:        Optional closed ``Path`` for path-based Python
+                     components.
+
+    Returns:
+        List of EvaluatedComponent for nodes with ``output: true``.
+    """
     # Try JSON preset first
     try:
         preset = _load_preset(preset_name)
@@ -536,7 +556,12 @@ def evaluate_opening_nodes(
         comp_cls = ifckit.components.get_component(preset_name)
         comp = comp_cls()
         opening_comps = comp.build(
-            ifc_file, plane, params.get("w", 1000), params.get("h", 1000), params
+            ifc_file,
+            plane,
+            params.get("w", 1000),
+            params.get("h", 1000),
+            params,
+            path=path,
         )
         return list(opening_comps)
 

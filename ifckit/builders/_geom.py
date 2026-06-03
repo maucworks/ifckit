@@ -41,17 +41,20 @@ if TYPE_CHECKING:
 # Coordinate precision: decimal places in IFC output (meters)
 # 4 = 0.1mm precision (default for mm-based projects)
 
+
 def pt3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
     return f.create_entity(
         "IfcCartesianPoint",
         Coordinates=[_round_coord(x), _round_coord(y), _round_coord(z)],
     )
 
+
 def dir3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
     return f.create_entity(
         "IfcDirection",
         DirectionRatios=[_round_coord(x), _round_coord(y), _round_coord(z)],
     )
+
 
 def axis2placement3d(
     f: ifcopenshell.file,
@@ -67,6 +70,7 @@ def axis2placement3d(
         RefDirection=dir3(f, x_axis.x, x_axis.y, x_axis.z),
     )
 
+
 def local_placement(
     f: ifcopenshell.file,
     plane: "Plane",
@@ -75,6 +79,7 @@ def local_placement(
     """Create IfcLocalPlacement from a Plane."""
     ax = axis2placement3d(f, plane.origin, plane.z_axis, plane.x_axis)
     return f.create_entity("IfcLocalPlacement", PlacementRelTo=relative_to, RelativePlacement=ax)
+
 
 def shift_plane_elevation(plane: "Plane", elev: float) -> "Plane":
     """Return a copy of *plane* with its origin shifted by ``-elev`` in Z.
@@ -86,6 +91,7 @@ def shift_plane_elevation(plane: "Plane", elev: float) -> "Plane":
 
     local_origin = Vec(plane.origin.x, plane.origin.y, plane.origin.z - elev)
     return plane.__class__(local_origin, plane.x_axis, plane.y_axis)
+
 
 def extrude_profile(
     f: ifcopenshell.file,
@@ -111,6 +117,7 @@ def extrude_profile(
         Depth=float(depth),
     )
 
+
 def mapped_item(
     f: ifcopenshell.file,
     representation_map: ifcopenshell.entity_instance,
@@ -129,6 +136,7 @@ def mapped_item(
         MappingSource=representation_map,
         MappingTarget=mapping_target,
     )
+
 
 def representation_map(
     f: ifcopenshell.file,
@@ -163,6 +171,7 @@ def representation_map(
         MappedRepresentation=shape_rep,
     )
 
+
 def shape_representation(
     f: ifcopenshell.file,
     context: ifcopenshell.entity_instance,
@@ -187,6 +196,7 @@ def shape_representation(
         Items=[solid],
     )
 
+
 def product_definition_shape(
     f: ifcopenshell.file,
     shape_rep: ifcopenshell.entity_instance,
@@ -195,6 +205,7 @@ def product_definition_shape(
         "IfcProductDefinitionShape",
         Representations=[shape_rep],
     )
+
 
 def project_profile_to_plane(
     points: List["Vec"],
@@ -208,6 +219,7 @@ def project_profile_to_plane(
         local = plane.to_local(p)
         result.append((local.x, local.y))
     return result
+
 
 def project_2d_to_plane(
     points_2d: list[tuple[float, float]],
@@ -247,6 +259,7 @@ def project_2d_to_plane(
 
     return result
 
+
 def storey_elevation(container: ifcopenshell.entity_instance) -> float:
     """
     Extract the Z-elevation from a storey's ObjectPlacement.
@@ -258,6 +271,7 @@ def storey_elevation(container: ifcopenshell.entity_instance) -> float:
         return float(coords[2]) if len(coords) > 2 else 0.0
     except AttributeError:
         return 0.0
+
 
 def directrix_from_line(
     f: ifcopenshell.file,
@@ -271,6 +285,7 @@ def directrix_from_line(
             pt3(f, line.end.x, line.end.y, line.end.z),
         ],
     )
+
 
 def directrix_from_arc(
     f: ifcopenshell.file,
@@ -307,6 +322,7 @@ def directrix_from_arc(
         MasterRepresentation="PARAMETER",
     )
 
+
 def directrix_from_path(
     f: ifcopenshell.file,
     path: "Path",
@@ -342,6 +358,7 @@ def directrix_from_path(
         SelfIntersect=False,
     )
 
+
 def get_body_context(
     ifc_file: ifcopenshell.file,
 ) -> ifcopenshell.entity_instance:
@@ -359,6 +376,7 @@ def get_body_context(
         "No suitable geometric representation context found. "
         "Call IfcModel() first, which creates a Model context."
     )
+
 
 def get_or_create_footprint_context(
     ifc_file: ifcopenshell.file,
@@ -388,6 +406,7 @@ def get_or_create_footprint_context(
         TargetView="MODEL_VIEW",
     )
 
+
 def _arbitrary_perp(v: "Vec") -> "Vec":
     """Return an arbitrary unit vector perpendicular to v."""
     from ifckit.geometry import Vec as _Vec
@@ -395,6 +414,7 @@ def _arbitrary_perp(v: "Vec") -> "Vec":
     n = v.normalized()
     candidate = _Vec(1.0, 0.0, 0.0) if abs(n @ _Vec(1, 0, 0)) < 0.9 else _Vec(0.0, 1.0, 0.0)
     return (candidate - n * (n @ candidate)).normalized()
+
 
 def apply_style(ifc_file: Any, product: Any, style: Any) -> None:
     """Assign a RenderStyle to an IFC product via IfcStyledItem.

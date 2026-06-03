@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import ifcopenshell
 
-from ifckit.geometry import Plane
+from ifckit.geometry import Path, Plane
 
 # Global registry: name -> Component class
 COMPONENT_REGISTRY: dict[str, type["FillComponent"]] = {}
@@ -91,9 +91,10 @@ class FillComponent(ABC):
         self,
         ifc_file: "ifcopenshell.file",
         plane: Plane,
-        width: float,
-        height: float,
-        params: dict[str, float],
+        width: float = 1000,
+        height: float = 1000,
+        params: dict[str, float] | None = None,
+        path: Path | None = None,
     ) -> list[EvaluatedComponent]:
         """Build component geometry.
 
@@ -101,10 +102,15 @@ class FillComponent(ABC):
             ifc_file: Active IFC file for entity creation.
             plane: Reference plane — local XY is the profile plane,
                    local Z is the default extrusion direction.
-            width: Overall width in mm.
-            height: Overall height in mm.
+            width: Overall width in mm (default 1000). Ignored when
+                   *path* is provided.
+            height: Overall height in mm (default 1000). Ignored when
+                    *path* is provided.
             params: Fully resolved parameters (type defaults + occurrence
                     overrides).  All values in mm.
+            path: Optional closed ``Path`` defining the component outline.
+                  When provided, *width* and *height* are ignored and the
+                  path geometry is used instead.
 
         Returns:
             List of :class:`EvaluatedComponent` objects.  Each becomes an

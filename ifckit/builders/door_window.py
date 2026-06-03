@@ -632,7 +632,6 @@ def _get_profile_thickness(area) -> float:
     return 200.0
 
 
-
 def _build_model_b(
     ifc_file: ifcopenshell.file,
     ifc_class: str,
@@ -801,7 +800,112 @@ def build_door_model_b(
 
 
 # ---------------------------------------------------------------------------
-# Builder classes for the default_registry
+# Standalone fill builder (no host / no opening)
 # ---------------------------------------------------------------------------
 
 
+def build_standalone_fill(
+    ifc_file: ifcopenshell.file,
+    ifc_class: str,
+    name: str,
+    components: list,
+    context: ifcopenshell.entity_instance,
+    container: ifcopenshell.entity_instance,
+    placement: ifcopenshell.entity_instance | None = None,
+    type_entity=None,
+) -> ifcopenshell.entity_instance:
+    """Create a fill product (window/door/plate) without a host opening.
+
+    The product is placed directly in *container* without an
+    ``IfcOpeningElement`` or ``IfcRelFillsElement`` — useful for
+    standalone elements such as storefronts, free-standing windows,
+    or shading devices that use path-based geometry.
+
+    Args:
+        ifc_file:   Open ifcopenshell file.
+        ifc_class:  IFC class (e.g. ``"IfcWindow"``, ``"IfcPlate"``).
+        name:       Product name.
+        components: List of ``EvaluatedComponent`` objects (no ``Opening``
+                    role — that would create a host relationship).
+        context:    Body sub-context.
+        container:  Spatial container (``IfcBuildingStorey`` or
+                    ``IfcSite``, etc.).
+        placement:  Optional ``IfcLocalPlacement``.  When ``None`` a
+                    direct (world-origin) placement is created.
+        type_entity: Optional type entity to assign (e.g. ``IfcWindowType``).
+
+    Returns:
+        The created IFC product entity.
+    """
+    solids: list = []
+
+    for comp in components:
+        material = comp.material or {
+            "color": {"r": 0.75, "g": 0.75, "b": 0.75},
+            "transparency": 0.0,
+            "name": "Default",
+        }
+        solid = apply_material_to_solid(ifc_file, comp.solid, material)
+        solids.append(solid)
+
+    if not solids:
+        raise ValueError("build_standalone_fill: no components")
+
+    has_boolean = any(s.is_a("IfcBooleanResult") for s in solids)
+    has_swept = any(s.is_a("IfcExtrudedAreaSolid") for s in solids)
+    if has_boolean and has_swept:
+        rep_type = "SolidModel"
+    elif has_boolean:
+        rep_type = "CSG"
+    else:
+        rep_type = "SweptSolid"
+
+    shape_rep = ifc_file.create_entity(
+        "IfcShapeRepresentation",
+        ContextOfItems=context,
+        RepresentationIdentifier="Body",
+        RepresentationType=rep_type,
+        Items=solids,
+    )
+
+    prod_def_shape = ifc_file.create_entity(
+        "IfcProductDefinitionShape",
+        Representations=[shape_rep],
+    )
+
+    if placement is None:
+        from ifckit.geometry import Vec
+
+        ax = axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
+        placement = ifc_file.create_entity("IfcLocalPlacement", RelativePlacement=ax)
+
+    fill = ifc_file.create_entity(
+        ifc_class,
+        GlobalId=ifcopenshell.guid.new(),
+        Name=name,
+        Description=None,
+        ObjectType="standalone",
+        ObjectPlacement=placement,
+        Representation=prod_def_shape,
+    )
+
+    if ifc_class in ("IfcWindow",):
+        fill.OverallWidth = 0.0
+        fill.OverallHeight = 0.0
+
+    if type_entity is not None:
+        _assign_type(ifc_file, fill, type_entity)
+
+    ifcopenshell.api.run(
+        "spatial.assign_container",
+        ifc_file,
+        products=[fill],
+        relating_structure=container,
+    )
+
+    return fill
+
+
+# ---------------------------------------------------------------------------
+# Builder classes for the default_registry
+# ---------------------------------------------------------------------------
