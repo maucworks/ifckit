@@ -467,13 +467,16 @@ def evaluate_component_graph(
         if preset_name in COMPONENT_REGISTRY and plane is not None:
             component_cls = get_component(preset_name)
             component = component_cls()
+            kwargs = {}
+            if path is not None:
+                kwargs["path"] = path
             return component.build(
                 ifc_file,
                 plane,
                 params.get("w", 1000),
                 params.get("h", 1000),
                 params,
-                path=path,
+                **kwargs,
             )
         raise  # Re-raise original error
 
@@ -555,13 +558,16 @@ def evaluate_opening_nodes(
     if preset_name in ifckit.components.COMPONENT_REGISTRY and plane is not None:
         comp_cls = ifckit.components.get_component(preset_name)
         comp = comp_cls()
+        kwargs = {}
+        if path is not None:
+            kwargs["path"] = path
         opening_comps = comp.build(
             ifc_file,
             plane,
             params.get("w", 1000),
             params.get("h", 1000),
             params,
-            path=path,
+            **kwargs,
         )
         return list(opening_comps)
 

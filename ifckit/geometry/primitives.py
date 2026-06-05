@@ -273,8 +273,12 @@ class Plane:
 
     @classmethod
     def world_xz(cls) -> "Plane":
-        """XZ plane at origin (normal = +Y)."""
-        return cls(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
+        """XZ plane at origin (normal = -Y).
+
+        2D ``(X, Y)`` maps to 3D ``(X, 0, Y)`` — ``X`` becomes world-X,
+        ``Y`` becomes world-Z.
+        """
+        return cls(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
 
     @classmethod
     def world_yz(cls) -> "Plane":

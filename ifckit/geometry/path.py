@@ -1280,6 +1280,168 @@ class Path:
         result.add_line(orig_pts[0], offset_segs[0].start)
         return result
 
+    # ------------------------------------------------------------------
+    # Path / Plane intersection
+    # ------------------------------------------------------------------
+
+    def intersect_plane(self, plane: "Plane", tol: float = 1e-9) -> "List[Tuple[float, Vec]]":
+        """Return ``(t, point)`` pairs where the path crosses *plane*.
+
+        *t* is normalized ``[0, 1]`` along the total path length.
+        Segments fully coplanar with *plane* (parallel, no crossing) are
+        silently skipped.
+
+        Args:
+            plane:  The cutting plane.
+            tol:    Tolerance for on-plane / parallel checks.
+
+        Returns:
+            List of ``(t, point)`` tuples, empty if no intersection.
+        """
+        total = self.length
+        if total < tol:
+            return []
+
+        results: "List[Tuple[float, Vec]]" = []
+        accumulated = 0.0
+        n = plane.z_axis
+
+        for seg in self._segments:
+            seg_len = seg.length
+            local_ts = _segment_plane_intersections(seg, plane, n, tol)
+            for lt in local_ts:
+                dist = accumulated + lt * seg_len
+                t = dist / total
+                pt = seg.point_at(lt)
+                # Deduplicate: skip if same point as last result
+                if results and pt.equals(results[-1][1], tol):
+                    continue
+                results.append((t, pt))
+            accumulated += seg_len
+
+        return results
+
+    # ------------------------------------------------------------------
+    # 2D Boolean operations  (optional shapely backend)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _shapely_available() -> bool:
+        try:
+            import shapely  # noqa: F401
+
+            return True
+        except ImportError:
+            return False
+
+    def _to_shapely(self) -> "Any":
+        """Convert this closed Path to a shapely ``Polygon``.
+
+        Arc segments are tessellated before conversion (shapely has no
+        arc primitives).  Holes are preserved as interior rings.
+        """
+        from shapely import Polygon
+
+        pts = [p.to_tuple()[:2] for p in self.sample().points]
+        if len(pts) < 3:
+            raise ValueError("Path must have at least 3 points for shapely conversion")
+
+        holes: "list[list[tuple[float, float]]]" = []
+        for hole in self._holes:
+            hpts = [p.to_tuple()[:2] for p in hole.sample().points]
+            if len(hpts) >= 3:
+                holes.append(hpts)
+
+        return Polygon(pts, holes=holes if holes else None)
+
+    @staticmethod
+    def _from_shapely(
+        poly: "Any",
+        plane: "Plane | None" = None,
+    ) -> "List[Path]":
+        """Convert a shapely ``Polygon`` (or ``MultiPolygon``) to ``Path`` list.
+
+        The result paths only contain ``Line`` segments (arcs are lost
+        during the boolean computation).  Holes become inner paths
+        attached via :meth:`with_hole`.
+        """
+        result: "List[Path]" = []
+
+        polys = [poly] if hasattr(poly, "exterior") else list(poly.geoms)
+
+        for p in polys:
+            # Exterior ring
+            ext = list(p.exterior.coords)
+            if len(ext) < 3:
+                continue
+            outer = Path(plane=plane)
+            for i in range(len(ext) - 1):
+                outer.add_line(
+                    Vec(ext[i][0], ext[i][1], 0),
+                    Vec(ext[i + 1][0], ext[i + 1][1], 0),
+                )
+            outer.close()
+
+            # Interior rings (holes)
+            for interior in p.interiors:
+                int_pts = list(interior.coords)
+                if len(int_pts) < 3:
+                    continue
+                hole = Path(plane=plane)
+                for i in range(len(int_pts) - 1):
+                    hole.add_line(
+                        Vec(int_pts[i][0], int_pts[i][1], 0),
+                        Vec(int_pts[i + 1][0], int_pts[i + 1][1], 0),
+                    )
+                hole.close()
+                outer = outer.with_hole(hole)
+
+            result.append(outer)
+
+        return result
+
+    def intersect(self, other: "Path") -> "List[Path]":
+        """Return the intersection (AND) of this path with *other*.
+
+        Both paths must be closed.  Requires ``shapely`` (optional dep).
+        """
+        from shapely import intersection as _shp_intersect
+
+        a = self._to_shapely()
+        b = other._to_shapely()
+        return self._from_shapely(_shp_intersect(a, b), plane=self._plane)
+
+    def __and__(self, other: "Path") -> "List[Path]":
+        return self.intersect(other)
+
+    def union(self, other: "Path") -> "List[Path]":
+        """Return the union (OR) of this path with *other*.
+
+        Both paths must be closed.  Requires ``shapely`` (optional dep).
+        """
+        from shapely import union as _shp_union
+
+        a = self._to_shapely()
+        b = other._to_shapely()
+        return self._from_shapely(_shp_union(a, b), plane=self._plane)
+
+    def __or__(self, other: "Path") -> "List[Path]":
+        return self.union(other)
+
+    def difference(self, other: "Path") -> "List[Path]":
+        """Return the difference (SUBTRACT) of this path minus *other*.
+
+        Both paths must be closed.  Requires ``shapely`` (optional dep).
+        """
+        from shapely import difference as _shp_diff
+
+        a = self._to_shapely()
+        b = other._to_shapely()
+        return self._from_shapely(_shp_diff(a, b), plane=self._plane)
+
+    def __sub__(self, other: "Path") -> "List[Path]":
+        return self.difference(other)
+
     def to_profile_points(
         self,
         plane: Optional["Plane"] = None,
@@ -1571,6 +1733,142 @@ class Path:
 # ---------------------------------------------------------------------------
 # Assemble unordered segments into continuous paths
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Segment / plane intersection helpers  (used by Path.intersect_plane)
+# ---------------------------------------------------------------------------
+
+
+def _segment_plane_intersections(
+    seg: "Line | Arc",
+    plane: "Plane",
+    normal: "Vec",
+    tol: float = 1e-9,
+) -> "List[float]":
+    """Return local ``t`` values ``[0, 1]`` where *seg* crosses *plane*."""
+    if isinstance(seg, Line):
+        return _line_plane_intersections(seg, normal, plane.origin, tol)
+    return _arc_plane_intersections(seg, normal, plane.origin, tol)
+
+
+def _line_plane_intersections(
+    line: "Line",
+    normal: "Vec",
+    point_on_plane: "Vec",
+    tol: float = 1e-9,
+) -> "List[float]":
+    """Local t [0,1] where line crosses plane defined by normal + point."""
+    d = line.end - line.start
+    denom = d @ normal
+    if abs(denom) < tol:
+        return []  # parallel
+    t = ((point_on_plane - line.start) @ normal) / denom
+    if -tol <= t <= 1 + tol:
+        return [max(0.0, min(1.0, t))]
+    return []
+
+
+def _arc_plane_intersections(
+    arc: "Arc",
+    normal: "Vec",
+    point_on_plane: "Vec",
+    tol: float = 1e-9,
+) -> "List[float]":
+    """Local t [0,1] where arc crosses plane.
+
+    Strategy: intersect the arc's circle with the plane, then filter
+    by the arc's angular range.
+    """
+    c = arc.center
+    na = arc.normal
+    r = arc.radius
+
+    # Direction of the intersection line of the two planes
+    line_dir = na**normal
+    dn_sq = line_dir @ line_dir
+    if dn_sq < tol * tol:
+        return []  # planes parallel → arc lies in plane or misses
+    dn = math.sqrt(dn_sq)
+    line_dir = line_dir / dn
+
+    # Find a point P0 on the intersection line by solving the 2×2 system
+    # in the subspace spanned by the two normals {na, normal}.
+    # na·P = c·na = d1
+    # normal·P = point_on_plane·normal = d2
+    d1 = c @ na
+    d2 = point_on_plane @ normal
+    n1n2 = na @ normal  # dot product of the two normals
+    n1_sq = na @ na  # = 1 (normalized)
+    n2_sq = normal @ normal  # = 1 (normalized)
+    denom = n1_sq * n2_sq - n1n2 * n1n2  # = |na × normal|² = dn²
+
+    if abs(denom) < tol * tol:
+        return []
+
+    u = (d1 * n2_sq - d2 * n1n2) / denom
+    v = (d2 * n1_sq - d1 * n1n2) / denom
+    p0 = na * u + normal * v
+
+    # Intersect line P = p0 + s * line_dir with the arc's circle.
+    # The circle in its plane: |(P - c) × na| = r
+    w = p0 - c
+    wx = w**na
+    ldx = line_dir**na
+
+    a_ = ldx @ ldx
+    b_ = 2.0 * (wx @ ldx)
+    c_ = (wx @ wx) - r * r
+
+    disc = b_ * b_ - 4.0 * a_ * c_
+    if disc < -tol:
+        return []
+    if disc < 0.0:
+        disc = 0.0
+
+    sqrt_disc = math.sqrt(disc)
+    s_vals = [(-b_ + sqrt_disc) / (2.0 * a_), (-b_ - sqrt_disc) / (2.0 * a_)]
+
+    results: "List[float]" = []
+    for s in s_vals:
+        pt = p0 + line_dir * s
+        lt = _arc_point_local_t(pt, arc, tol)
+        if lt is not None:
+            results.append(max(0.0, min(1.0, lt)))
+
+    return results
+
+
+def _arc_point_local_t(
+    pt: "Vec",
+    arc: "Arc",
+    tol: float = 1e-9,
+) -> "float | None":
+    """Return local t [0,1] of *pt* on *arc*, or None if off the arc."""
+    # Quick radius check
+    if abs((pt - arc.center).length() - arc.radius) > tol * max(1.0, arc.radius):
+        return None
+
+    v_pt = (pt - arc.center).normalized()
+    v_start = (arc.start - arc.center).normalized()
+
+    cos_a = max(-1.0, min(1.0, v_start @ v_pt))
+    cross = v_start**v_pt
+    sin_a = max(-1.0, min(1.0, cross @ arc.normal))
+    angle = math.atan2(sin_a, cos_a)
+
+    if abs(arc.angle) < tol:
+        return 0.0 if abs(angle) < tol else None
+
+    # Check angular range
+    if arc.angle > 0.0:
+        if angle < -tol or angle > arc.angle + tol:
+            return None
+    else:
+        if angle > tol or angle < arc.angle - tol:
+            return None
+
+    return angle / arc.angle
 
 
 def _segments_connected(
