@@ -100,7 +100,10 @@ def _build_fill_from_graph(
     if pending.parameters:
         params.update(pending.parameters)
 
-    components = evaluate_component_graph(graph_name, ifc_file, context, params, pending.plane)
+    path = getattr(pending, "path", None)
+    components = evaluate_component_graph(
+        graph_name, ifc_file, context, params, pending.plane, path=path
+    )
     return _build_fill_from_components(
         ifc_file=ifc_file,
         ifc_class=ifc_class,
@@ -676,8 +679,9 @@ def _build_model_b(
     if pending.parameters:
         params.update(pending.parameters)
 
+    path = getattr(pending, "path", None)
     opening_components = evaluate_opening_nodes(
-        pending.component_graph, ifc_file, context, params, pending.plane
+        pending.component_graph, ifc_file, context, params, pending.plane, path=path
     )
 
     opening_solids, projection_solids, fill_components = _split_by_role(opening_components)

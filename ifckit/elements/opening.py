@@ -38,12 +38,15 @@ Allowed window types (v1)::
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ifckit.elements.base import PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Plane
 from ifckit.profiles.anchor import VALID_ANCHORS
+
+if TYPE_CHECKING:
+    from ifckit.geometry import Path
 
 # ---------------------------------------------------------------------------
 # Allowed enum subsets (v1)
@@ -280,15 +283,17 @@ class PendingWindow(PendingElement):
     A window occurrence filling an opening.
 
     Args:
-        overall_width:  Overall width (metres, positive).
-        overall_height: Overall height (metres, positive).
+        overall_width:  Overall width (metres, positive). Ignored if *path* is provided.
+        overall_height: Overall height (metres, positive). Ignored if *path* is provided.
         window_type:    One of ``WINDOW_TYPES``.  Defaults to ``"NOTDEFINED"``.
         type_ref:       Optional stable string id / key of the
                         ``PendingWindowType`` to assign.
         plane:          Optional insert plane for Model B (component_graph mode).
                         Origin = insert point, X-axis = width direction,
                         Z-axis = outward normal.
-        component_graph: Optional component graph preset name (e.g., "fixed_casement").
+        component_graph: Optional component graph preset name (e.g., "path_pui").
+        path:           Optional closed ``Path`` defining the window outline (Model B only).
+                        When provided, *overall_width* and *overall_height* are ignored.
         name:           Element name (``IfcWindow.Name``).
         style:          Optional render style.
         properties:     Free-form user properties.
@@ -298,12 +303,13 @@ class PendingWindow(PendingElement):
 
     def __init__(
         self,
-        overall_width: float,
-        overall_height: float,
+        overall_width: float = 1000,
+        overall_height: float = 1000,
         window_type: str = "NOTDEFINED",
         type_ref: Optional[str] = None,
         plane: Optional[Plane] = None,
         component_graph: Optional[str] = None,
+        path: Optional[Path] = None,
         name: str = "",
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
@@ -311,26 +317,34 @@ class PendingWindow(PendingElement):
         material_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
-        if overall_width <= 0:
-            raise ValueError(
-                f"PendingWindow: overall_width must be positive, got {overall_width!r}"
-            )
-        if overall_height <= 0:
-            raise ValueError(
-                f"PendingWindow: overall_height must be positive, got {overall_height!r}"
-            )
+        if path is None:
+            # Traditional rectangular window
+            if overall_width <= 0:
+                raise ValueError(
+                    f"PendingWindow: overall_width must be positive, got {overall_width!r}"
+                )
+            if overall_height <= 0:
+                raise ValueError(
+                    f"PendingWindow: overall_height must be positive, got {overall_height!r}"
+                )
+            self.overall_width = float(overall_width)
+            self.overall_height = float(overall_height)
+        else:
+            # Path-based window — width/height come from path bounds
+            self.overall_width = float(overall_width)
+            self.overall_height = float(overall_height)
+
         wt = window_type.upper()
         if wt not in WINDOW_TYPES:
             raise ValueError(
                 f"PendingWindow: unknown window_type {window_type!r}. "
                 f"Allowed: {sorted(WINDOW_TYPES)}"
             )
-        self.overall_width = float(overall_width)
-        self.overall_height = float(overall_height)
         self.window_type = wt
         self.type_ref = type_ref
         self.plane = plane
         self.component_graph = component_graph
+        self.path = path
         self.parameters = parameters or {}
         self.material_overrides = material_overrides or {}
 
@@ -349,6 +363,8 @@ class PendingWindow(PendingElement):
             d["plane"] = self.plane.to_dict()
         if self.component_graph is not None:
             d["component_graph"] = self.component_graph
+        if self.path is not None:
+            d["path"] = self.path.to_dict()
         if self.parameters:
             d["parameters"] = self.parameters
         if self.material_overrides:
@@ -357,13 +373,19 @@ class PendingWindow(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingWindow":
+        from ifckit.geometry import Path as IFCPath
+
+        path_data = d.get("path")
+        path = IFCPath.from_dict(path_data) if path_data is not None else None
+
         return cls(
-            overall_width=cls._require(d, "overall_width"),
-            overall_height=cls._require(d, "overall_height"),
+            overall_width=d.get("overall_width", 1000),
+            overall_height=d.get("overall_height", 1000),
             window_type=d.get("window_type", "NOTDEFINED"),
             type_ref=d.get("type_ref"),
             plane=Plane.from_dict(d["plane"]) if "plane" in d else None,
             component_graph=d.get("component_graph"),
+            path=path,
             name=d.get("name", ""),
             style=cls._style_from_dict(d),
             properties=cls._properties_from_dict(d),
