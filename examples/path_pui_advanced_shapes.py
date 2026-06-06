@@ -24,9 +24,10 @@ def create_large_rectangular_path(center_x: float, center_y: float) -> Path:
             Vec(center_x - 0.75, center_y - 0.6, 0),
             Vec(center_x + 0.75, center_y - 0.6, 0),
             Vec(center_x + 0.75, center_y + 0.6, 0),
+            Vec(center_x, center_y + 1, 0),
             Vec(center_x - 0.75, center_y + 0.6, 0),
         ],
-        plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane.world_xy(),
         closed=True,
     )
 
@@ -39,9 +40,10 @@ def create_square_path(center_x: float, center_y: float, size: float) -> Path:
             Vec(center_x - half, center_y - half, 0),
             Vec(center_x + half, center_y - half, 0),
             Vec(center_x + half, center_y + half, 0),
+            Vec(center_x, center_y + 2 * half, 0),
             Vec(center_x - half, center_y + half, 0),
         ],
-        plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane.world_xy(),
         closed=True,
     )
 
@@ -53,9 +55,10 @@ def create_tall_narrow_path(center_x: float, center_y: float) -> Path:
             Vec(center_x - 0.3, center_y - 0.8, 0),
             Vec(center_x + 0.3, center_y - 0.8, 0),
             Vec(center_x + 0.3, center_y + 0.8, 0),
+            Vec(center_x, center_y + 1.2, 0),
             Vec(center_x - 0.3, center_y + 0.8, 0),
         ],
-        plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane.world_xy(),
         closed=True,
     )
 
@@ -96,7 +99,7 @@ def main():
     large_rect_window = PendingWindow(
         path=large_rect_path,
         component_graph="path_pui",
-        plane=Plane(Vec(2, 0, -0.2), Vec(1, 0, 0), Vec(0, 0, 1)),
+        plane=Plane(Vec(2, 0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
         parameters={
             "lining_thickness": 0.06,
             "lining_depth": 0.08,
@@ -114,12 +117,12 @@ def main():
 
     wall2 = PendingWall(
         footprint=[
-            Vec(0, 1.0, 0),
-            Vec(4, 1.0, 0),
-            Vec(4, 1.3, 0),
-            Vec(0, 1.3, 0),
+            Vec(0, 0.0, 0),
+            Vec(4, 0.0, 0),
+            Vec(4, 0.3, 0),
+            Vec(0, 0.3, 0),
         ],
-        plane=Plane(Vec(0, 1.0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane(Vec(0, 2, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
         height=3.0,
         name="Wall with Square Window",
     )
@@ -130,7 +133,7 @@ def main():
     square_window = PendingWindow(
         path=square_path,
         component_graph="path_pui",
-        plane=Plane(Vec(2, 1.0, -0.15), Vec(1, 0, 0), Vec(0, 0, 1)),
+        plane=Plane(Vec(4, 0.0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
         parameters={
             "lining_thickness": 0.05,
             "lining_depth": 0.07,
@@ -153,7 +156,7 @@ def main():
             Vec(4, 2.3, 0),
             Vec(0, 2.3, 0),
         ],
-        plane=Plane(Vec(0, 2.0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane(Vec(4, 0.0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
         height=3.0,
         name="Wall with Tall Narrow Window",
     )
@@ -181,7 +184,7 @@ def main():
     # Save
     # =========================================================================
 
-    output_path = "examples/output/path_pui_advanced_shapes.ifc"
+    output_path = "./output/path_pui_advanced_shapes.ifc"
     model.save(output_path)
     print(f"\n✓ Model saved: {output_path}")
 

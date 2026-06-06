@@ -16,7 +16,6 @@ from ifckit.builders._geom import (
     local_placement,
     product_definition_shape,
     profile_from_points,
-    project_profile_to_plane,
     shape_representation,
 )
 from ifckit.builders.base import BaseBuilder
@@ -30,9 +29,8 @@ class SlabBuilder(BaseBuilder):
     """
     Builds an IfcSlab from a PendingSlab.
 
-    The footprint is projected to the slab's local XY plane,
-    then extruded along local Z by `thickness`.
-    Optional clip planes are applied as IfcBooleanClippingResult.
+    The footprint (in plane-local XY coordinates) is extruded along local Z
+    by `thickness`. Optional clip planes are applied as IfcBooleanClippingResult.
     """
 
     entity_type = "basic_slab"
@@ -49,7 +47,9 @@ class SlabBuilder(BaseBuilder):
         if not hasattr(pending, "element_type") or pending.element_type != "basic_slab":
             raise TypeError(f"SlabBuilder expects PendingSlab, got {type(pending).__name__}")
 
-        pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
+        # Footprint is already in plane-local coordinates (XY plane of the plane).
+        # Extract the (x, y) components directly without transformation.
+        pts_2d = [(p.x, p.y) for p in pending.footprint]
         profile = profile_from_points(ifc_file, pts_2d)
 
         # Solid: extrude along element-local Z using identity placement.

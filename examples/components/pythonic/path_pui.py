@@ -58,7 +58,13 @@ class PathPui(FillComponent):
         else:
             wx = float(w or 1000)
             wy = float(h or 1000)
-            pts = [Vec(0, 0, 0), Vec(wx, 0, 0), Vec(wx, wy, 0), Vec(0, wy, 0)]
+            pts = [
+                Vec(0, 0, 0),
+                Vec(wx, 0, 0),
+                Vec(wx, wy, 0),
+                Vec(0.5 * wx, 2 * wy, 0),
+                Vec(0, wy, 0),
+            ]
             outer = Path.from_pts(
                 pts,
                 plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
@@ -69,7 +75,9 @@ class PathPui(FillComponent):
 
         # Opening void
         opening_solid = self._path_to_opening_solid(ifc_file, outer, wt)
-        comps.append(EvaluatedComponent(solid=opening_solid, role="Opening", material=VOID))
+        comps.append(
+            EvaluatedComponent(solid=opening_solid, role="Opening", material=VOID)
+        )
 
         # Frame: boolean difference outer - inner
         if lt > 0 and ld > 0:
@@ -82,14 +90,18 @@ class PathPui(FillComponent):
                 FirstOperand=outer_solid,
                 SecondOperand=inner_solid,
             )
-            comps.append(EvaluatedComponent(solid=frame_solid, role="Lining", material=ALUMINUM))
+            comps.append(
+                EvaluatedComponent(solid=frame_solid, role="Lining", material=ALUMINUM)
+            )
 
         # Glazing
         if gd > 0:
             glass_inset = (ld - gd) / 2
             glass_path = outer.offset(lt)
             glass_solid = _path_to_solid(ifc_file, glass_path, gd, glass_inset)
-            comps.append(EvaluatedComponent(solid=glass_solid, role="Glazing", material=GLASS))
+            comps.append(
+                EvaluatedComponent(solid=glass_solid, role="Glazing", material=GLASS)
+            )
 
         return comps
 
