@@ -175,7 +175,7 @@ class IfcModel:
         self.author = author
         self.unit = unit
 
-        schema_str = schema.value
+        schema_str = schema.to_ifcopenshell()
         self._file = ifcopenshell.file(schema=schema_str)  # type: ignore[arg-type]
 
         # IFC2X3 requires OwnerHistory on every root entity.
@@ -1340,8 +1340,8 @@ class IfcModel:
     def _require_schema(self, required: IfcSchema, method: str) -> None:
         if self.schema != required:
             raise ValueError(
-                f"IfcModel.{method}() requires schema {required.value}, "
-                f"but model uses {self.schema.value}"
+                f"IfcModel.{method}() requires schema {required.to_ifcopenshell()}, "
+                f"but model uses {self.schema.to_ifcopenshell()}"
             )
 
     def _setup_owner_history(self, author: str) -> None:

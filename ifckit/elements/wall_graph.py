@@ -10,6 +10,8 @@ buffer geometry (single extrusion, no boolean tree).
 
 from __future__ import annotations
 
+from typing import Optional
+
 from ifckit.elements.base import PendingElement, UserProperties
 from ifckit.elements.style import RenderStyle
 from ifckit.geometry import Path, Plane, Vec
@@ -51,17 +53,17 @@ class PendingWallGraph(PendingElement):
 
     def __init__(
         self,
-        vertices: list[Vec] | None = None,
-        edges: list[tuple[int, int]] | None = None,
-        path: Path | None = None,
-        plane: Plane | None = None,
+        vertices: Optional[list[Vec]] = None,
+        edges: Optional[list[tuple[int, int]]] = None,
+        path: Optional[Path] = None,
+        plane: Optional[Plane] = None,
         thickness: float = 200,
         height: float = 3000,
-        offset_left: float | None = None,
-        offset_right: float | None = None,
+        offset_left: Optional[float] = None,
+        offset_right: Optional[float] = None,
         name: str = "",
-        style: RenderStyle | None = None,
-        properties: UserProperties | None = None,
+        style: Optional[RenderStyle] = None,
+        properties: Optional[UserProperties] = None,
         angle_step_deg: float = 5.0,
     ) -> None:
         super().__init__(name=name, style=style, properties=properties)
@@ -105,7 +107,7 @@ class PendingWallGraph(PendingElement):
             self.from_path = False
 
     @property
-    def path(self) -> Path | None:
+    def path(self) -> Optional[Path]:
         """The Path in path-mode, or None in edge-mode."""
         return self._path if self.from_path else None
 

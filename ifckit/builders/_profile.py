@@ -319,8 +319,11 @@ def _profile_def_to_pts(
                         c = basis.Position
                         cx = c.Location.Coordinates[0] if c and c.Location else 0.0
                         cy = c.Location.Coordinates[1] if c and c.Location else 0.0
-                        t1 = curve.Trim1[0] if curve.Trim1 else 0.0
-                        t2 = curve.Trim2[0] if curve.Trim2 else _math.pi * 2
+                        # IfcParameterValue for IfcCircle is in degrees; convert to radians.
+                        t1_deg = curve.Trim1[0] if curve.Trim1 else 0.0
+                        t2_deg = curve.Trim2[0] if curve.Trim2 else 360.0
+                        t1 = _math.radians(t1_deg)
+                        t2 = _math.radians(t2_deg)
                         n = max(4, segments)
                         for k in range(n + 1):
                             angle = t1 + (t2 - t1) * k / n

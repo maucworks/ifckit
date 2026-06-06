@@ -55,7 +55,10 @@ class TaperedExtrusionBuilder(BaseBuilder):
         start_profile = profile_from_points(ifc_file, start_2d)
         end_profile = profile_from_points(ifc_file, end_2d)
 
-        placement = axis2placement3d(ifc_file, Vec(0, 0, 0), plane.z_axis, plane.x_axis)
+        # Solid: extrude along element-local Z using identity placement.
+        # The plane orientation is encoded solely in ObjectPlacement below
+        # to avoid a double rotation for non-XY planes.
+        placement = axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
         direction = dir3(ifc_file, 0, 0, 1)
 
         solid = ifc_file.create_entity(
@@ -71,7 +74,7 @@ class TaperedExtrusionBuilder(BaseBuilder):
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         element = ifcopenshell.api.run(
-            "root.create_entity", ifc_file, ifc_class="IfcElement", name=pending.name
+            "root.create_entity", ifc_file, ifc_class="IfcBuildingElementProxy", name=pending.name
         )
         element.Representation = prod_rep
         element.ObjectPlacement = local_placement(

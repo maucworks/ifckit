@@ -17,10 +17,9 @@ class IfcSchema(enum.Enum):
     IFC4 = "IFC4"
     IFC4X3 = "IFC4X3"
 
-
-def get_schema_name(schema: IfcSchema) -> str:
-    """Return the ifcopenshell schema string for a given IfcSchema enum value."""
-    return schema.value
+    def to_ifcopenshell(self) -> str:
+        """Return the ifcopenshell schema string for this enum value."""
+        return self.value
 
 
 class TessellationDetail(enum.IntEnum):

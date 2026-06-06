@@ -30,7 +30,7 @@ def apply_material_to_solid(
         solid: IfcExtrudedAreaSolid or similar representation item
         material_def: Dict with keys:
             - color: {"r": 0.0-1.0, "g": 0.0-1.0, "b": 0.0-1.0}
-            - transparency: 0.0-1.0 (0=transparent, 1=opaque)
+            - transparency: 0.0-1.0 (0=opaque, 1=fully transparent)
             - name: optional material name
 
     Returns:
@@ -40,7 +40,7 @@ def apply_material_to_solid(
         return solid
 
     color_def = material_def.get("color", {})
-    transparency = material_def.get("transparency", 1.0)
+    transparency = material_def.get("transparency", 0.0)
     name = material_def.get("name", "")
 
     color = ifc_file.create_entity(
@@ -65,12 +65,25 @@ def apply_material_to_solid(
         Styles=[shading],
     )
 
-    # Create IfcStyledItem referencing the solid and style
-    ifc_file.create_entity(
-        "IfcStyledItem",
-        Item=solid,
-        Styles=[surface_style],
-    )
+    # Create IfcStyledItem referencing the solid and style.
+    # IFC2X3 requires IfcPresentationStyleAssignment as the wrapper;
+    # IFC4+ accepts IfcSurfaceStyle directly (same pattern as _geom.py).
+    if ifc_file.schema.upper() == "IFC2X3":
+        style_assignment = ifc_file.create_entity(
+            "IfcPresentationStyleAssignment",
+            Styles=[surface_style],
+        )
+        ifc_file.create_entity(
+            "IfcStyledItem",
+            Item=solid,
+            Styles=[style_assignment],
+        )
+    else:
+        ifc_file.create_entity(
+            "IfcStyledItem",
+            Item=solid,
+            Styles=[surface_style],
+        )
 
     return solid
 

@@ -813,6 +813,8 @@ def build_standalone_fill(
     container: ifcopenshell.entity_instance,
     placement: ifcopenshell.entity_instance | None = None,
     type_entity=None,
+    overall_width: float = 0.0,
+    overall_height: float = 0.0,
 ) -> ifcopenshell.entity_instance:
     """Create a fill product (window/door/plate) without a host opening.
 
@@ -833,6 +835,8 @@ def build_standalone_fill(
         placement:  Optional ``IfcLocalPlacement``.  When ``None`` a
                     direct (world-origin) placement is created.
         type_entity: Optional type entity to assign (e.g. ``IfcWindowType``).
+        overall_width:  Overall width for IfcWindow/IfcDoor (default 0.0).
+        overall_height: Overall height for IfcWindow/IfcDoor (default 0.0).
 
     Returns:
         The created IFC product entity.
@@ -889,9 +893,9 @@ def build_standalone_fill(
         Representation=prod_def_shape,
     )
 
-    if ifc_class in ("IfcWindow",):
-        fill.OverallWidth = 0.0
-        fill.OverallHeight = 0.0
+    if ifc_class in ("IfcWindow", "IfcDoor"):
+        fill.OverallWidth = overall_width
+        fill.OverallHeight = overall_height
 
     if type_entity is not None:
         _assign_type(ifc_file, fill, type_entity)

@@ -116,31 +116,25 @@ class DerivedProfile(Profile):
             "IfcCartesianPoint", Coordinates=[self.offset_x, self.offset_y]
         )
 
-        # Scale (use for uniform scaling, None for non-uniform)
-        if self.scale_x is None and self.scale_y is None:
-            scale = self.scale
-        else:
-            scale = None  # non-uniform handled via subtype
-
-        operator = ifc_file.create_entity(
-            "IfcCartesianTransformationOperator2D",
-            Axis1=axis1,
-            Axis2=axis2,
-            LocalOrigin=location,
-            Scale=scale,
-        )
-
-        # For non-uniform scale: IfcCartesianTransformationOperator2DnonUniform
+        # Build the operator directly — no intermediate entity.
         if self.scale_x is not None or self.scale_y is not None:
             sx = self.scale_x if self.scale_x is not None else self.scale
             sy = self.scale_y if self.scale_y is not None else self.scale
             operator = ifc_file.create_entity(
                 "IfcCartesianTransformationOperator2DnonUniform",
-                Axis1=operator.Axis1,
-                Axis2=operator.Axis2,
-                LocalOrigin=operator.LocalOrigin,
+                Axis1=axis1,
+                Axis2=axis2,
+                LocalOrigin=location,
                 Scale=sx,
                 Scale2=sy,
+            )
+        else:
+            operator = ifc_file.create_entity(
+                "IfcCartesianTransformationOperator2D",
+                Axis1=axis1,
+                Axis2=axis2,
+                LocalOrigin=location,
+                Scale=self.scale,
             )
 
         return ifc_file.create_entity(

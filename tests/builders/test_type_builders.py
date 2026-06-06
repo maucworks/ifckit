@@ -133,10 +133,9 @@ class TestBuildDoorTypeIfc4:
         }
         lining_pset = psets.get("IfcDoorLiningProperties")
         assert lining_pset is not None
-        prop_names = {p.Name for p in lining_pset.HasProperties}
-        assert "LiningDepth" in prop_names
-        assert "CasingDepth" in prop_names
-        assert "LiningToPanelOffsetX" in prop_names
+        assert lining_pset.LiningDepth is not None
+        assert lining_pset.CasingDepth is not None
+        assert lining_pset.LiningToPanelOffsetX is not None
 
 
 # ===========================================================================
@@ -215,9 +214,8 @@ class TestBuildWindowTypeIfc4:
         }
         lining = psets.get("IfcWindowLiningProperties")
         assert lining is not None
-        prop_names = {p.Name for p in lining.HasProperties}
-        assert "MullionThickness" in prop_names
-        assert "FirstMullionOffset" in prop_names
+        assert lining.MullionThickness is not None
+        assert lining.FirstMullionOffset is not None
 
 
 # ===========================================================================

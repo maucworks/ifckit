@@ -125,6 +125,8 @@ def mapped_item(
 ) -> ifcopenshell.entity_instance:
     """Create IfcMappedItem referencing a RepresentationMap."""
     if mapping_target is None:
+        from ifckit.geometry import Vec
+
         mapping_target = axis2placement3d(
             f,
             Vec(0, 0, 0),
@@ -152,6 +154,8 @@ def representation_map(
     rebuilding in viewers (e.g., TAB cycling in Bonsai).
     """
     if placement is None:
+        from ifckit.geometry import Vec
+
         placement = axis2placement3d(
             f,
             Vec(0, 0, 0),

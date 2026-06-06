@@ -27,31 +27,64 @@ import ifcopenshell
 import ifcopenshell.api
 import ifcopenshell.guid
 
-from ifckit.builders.psets import _label_prop, _length_prop, _prop, _write_pset
+from ifckit.builders.psets import _prop, _write_pset
 
 # ---------------------------------------------------------------------------
 # Shared pset writers
 # ---------------------------------------------------------------------------
 
 
-def _write_field_map_pset(
+def _write_predefined_pset(
     ifc_file: ifcopenshell.file,
     type_entity: ifcopenshell.entity_instance,
-    pset_name: str,
-    field_map: dict,
+    ifc_class: str,
+    attr_map: dict,
     pending,
+    extra_attrs: dict | None = None,
 ) -> None:
-    """Write a property set from a {IFC_name: pending_attr} mapping.
+    """Create a pre-defined property set (IfcPreDefinedPropertySet subtype) and relate it.
 
-    Only fields with non-None values on *pending* are included.
-    All values are written as IfcLengthMeasure via ``_length_prop``.
+    In IFC4, IfcDoorLiningProperties / IfcWindowLiningProperties etc. are subtypes of
+    IfcPreDefinedPropertySet with typed, schema-defined attributes — not IfcPropertySingleValue
+    items inside a generic IfcPropertySet.  Using the proper entities allows BIM tools and
+    validators to recognise them correctly.
+
+    Falls back to a generic IfcPropertySet for IFC2X3 where the pre-defined types may
+    not be available in older library versions.
     """
-    props = []
-    for ifc_name, attr in field_map.items():
-        val = getattr(pending, attr, None)
+    length_kwargs: dict = {}
+    for ifc_attr, pending_attr in attr_map.items():
+        val = getattr(pending, pending_attr, None)
         if val is not None:
-            props.append(_length_prop(ifc_file, ifc_name, val))
-    _write_pset(ifc_file, type_entity, pset_name, props)
+            length_kwargs[ifc_attr] = float(val)
+
+    all_kwargs = {**length_kwargs, **(extra_attrs or {})}
+    if not all_kwargs:
+        return
+
+    try:
+        pset = ifc_file.create_entity(
+            ifc_class,
+            GlobalId=ifcopenshell.guid.new(),
+            Name=ifc_class,
+            **all_kwargs,
+        )
+    except Exception:
+        # Schema version does not have this pre-defined type; fall back to IfcPropertySet.
+        from ifckit.builders.psets import _label_prop, _length_prop  # noqa: PLC0415
+
+        props = [_length_prop(ifc_file, k, v) for k, v in length_kwargs.items()]
+        for k, v in (extra_attrs or {}).items():
+            props.append(_label_prop(ifc_file, k, str(v)))
+        _write_pset(ifc_file, type_entity, ifc_class, props)
+        return
+
+    ifc_file.create_entity(
+        "IfcRelDefinesByProperties",
+        GlobalId=ifcopenshell.guid.new(),
+        RelatedObjects=[type_entity],
+        RelatingPropertyDefinition=pset,
+    )
 
 
 def _write_door_lining_pset(
@@ -59,8 +92,8 @@ def _write_door_lining_pset(
     type_entity: ifcopenshell.entity_instance,
     pending,
 ) -> None:
-    """Write IfcDoorLiningProperties as a plain property set."""
-    _write_field_map_pset(
+    """Write IfcDoorLiningProperties (pre-defined property set)."""
+    _write_predefined_pset(
         ifc_file,
         type_entity,
         "IfcDoorLiningProperties",
@@ -87,15 +120,18 @@ def _write_door_panel_pset(
     type_entity: ifcopenshell.entity_instance,
     pending,
 ) -> None:
-    """Write IfcDoorPanelProperties as a plain property set."""
-    props = []
-    if getattr(pending, "panel_depth", None) is not None:
-        props.append(_length_prop(ifc_file, "PanelDepth", pending.panel_depth))
-    if getattr(pending, "panel_width", None) is not None:
-        props.append(_prop(ifc_file, "PanelWidth", float(pending.panel_width)))
+    """Write IfcDoorPanelProperties (pre-defined property set)."""
+    extra: dict = {}
     if getattr(pending, "panel_operation", None) is not None:
-        props.append(_label_prop(ifc_file, "PanelOperation", pending.panel_operation))
-    _write_pset(ifc_file, type_entity, "IfcDoorPanelProperties", props)
+        extra["PanelOperation"] = pending.panel_operation
+    _write_predefined_pset(
+        ifc_file,
+        type_entity,
+        "IfcDoorPanelProperties",
+        {"PanelDepth": "panel_depth", "PanelWidth": "panel_width"},
+        pending,
+        extra_attrs=extra if extra else None,
+    )
 
 
 def _write_window_lining_pset(
@@ -103,8 +139,8 @@ def _write_window_lining_pset(
     type_entity: ifcopenshell.entity_instance,
     pending,
 ) -> None:
-    """Write IfcWindowLiningProperties as a plain property set."""
-    _write_field_map_pset(
+    """Write IfcWindowLiningProperties (pre-defined property set)."""
+    _write_predefined_pset(
         ifc_file,
         type_entity,
         "IfcWindowLiningProperties",
@@ -130,17 +166,18 @@ def _write_window_panel_pset(
     type_entity: ifcopenshell.entity_instance,
     pending,
 ) -> None:
-    """Write IfcWindowPanelProperties as a plain property set."""
-    props = []
-    if getattr(pending, "panel_depth", None) is not None:
-        props.append(_length_prop(ifc_file, "PanelDepth", pending.panel_depth))
-    if getattr(pending, "panel_width", None) is not None:
-        props.append(_prop(ifc_file, "PanelWidth", float(pending.panel_width)))
-    if getattr(pending, "panel_height", None) is not None:
-        props.append(_prop(ifc_file, "PanelHeight", float(pending.panel_height)))
+    """Write IfcWindowPanelProperties (pre-defined property set)."""
+    extra: dict = {}
     if getattr(pending, "panel_operation", None) is not None:
-        props.append(_label_prop(ifc_file, "PanelOperation", pending.panel_operation))
-    _write_pset(ifc_file, type_entity, "IfcWindowPanelProperties", props)
+        extra["OperationType"] = pending.panel_operation
+    _write_predefined_pset(
+        ifc_file,
+        type_entity,
+        "IfcWindowPanelProperties",
+        {"PanelDepth": "panel_depth", "PanelWidth": "panel_width", "PanelHeight": "panel_height"},
+        pending,
+        extra_attrs=extra if extra else None,
+    )
 
 
 def _write_user_pset(

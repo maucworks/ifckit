@@ -325,13 +325,15 @@ class Profile(Path, metaclass=RegisterProfileType):
     @staticmethod
     def _transform_from_dict(
         d: Dict[str, Any], default_anchor: str = "c"
-    ) -> Tuple[float, float, float, str]:
+    ) -> Tuple[float, float, float, Optional[str]]:
         """Extract (rotation, offset_x, offset_y, anchor) from a dict, with defaults."""
+        raw = d.get("anchor", default_anchor)
+        anchor = None if raw is None else str(raw)
         return (
             float(d.get("rotation", 0.0)),
             float(d.get("offset_x", 0.0)),
             float(d.get("offset_y", 0.0)),
-            str(d.get("anchor", default_anchor)),
+            anchor,
         )
 
     # ------------------------------------------------------------------

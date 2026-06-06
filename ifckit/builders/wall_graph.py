@@ -171,9 +171,11 @@ class WallGraphBuilder(BaseBuilder):
 
         outer = outer.with_hole(inner)
         profile = profile_from_points(ifc_file, outer)
-        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), pending.plane.z_axis, pending.plane.x_axis)
+        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
         solid = extrude_profile(ifc_file, profile, pending.height, position=pos)
         return solid, "SweptSolid"
+
+    # ── Path mode (open) ────────────────────────────────────────────
 
     # ── Path mode (open) ────────────────────────────────────────────
 
@@ -213,8 +215,12 @@ class WallGraphBuilder(BaseBuilder):
         # Closed footprint: left polyline + right polyline reversed
         footprint = left_pts + right_pts[::-1]
 
-        profile = profile_from_points(ifc_file, footprint)
-        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), pending.plane.z_axis, pending.plane.x_axis)
+        # footprint is world-space Vec; must project to plane-local 2D (same pattern as
+        # _build_from_graph_offset) — raw Vec[0]/Vec[1] indexing would drop Vec.z.
+        plane = pending.plane
+        local_footprint = [(plane.to_local(v).x, plane.to_local(v).y) for v in footprint]
+        profile = profile_from_points(ifc_file, local_footprint)
+        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
         solid = extrude_profile(ifc_file, profile, pending.height, position=pos)
         return solid, "SweptSolid"
 
@@ -391,6 +397,6 @@ class WallGraphBuilder(BaseBuilder):
             raise ValueError("WallGraph: Shapely buffer produced empty/invalid polygon.")
 
         profile = shapely_polygon_to_ifc_profile(ifc_file, polygon)
-        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), plane.z_axis, plane.x_axis)
+        pos = axis2placement3d(ifc_file, Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0))
         solid = extrude_profile(ifc_file, profile, pending.height, position=pos)
         return solid, "SweptSolid"

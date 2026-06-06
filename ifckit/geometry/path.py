@@ -463,8 +463,6 @@ class Path:
     @property
     def is_closed(self) -> bool:
         """True if the path's last endpoint equals its first startpoint."""
-        if len(self._segments) < 2:
-            return False
         sp = self.start_point()
         ep = self.end_point()
         if sp is None or ep is None:
@@ -575,7 +573,12 @@ class Path:
         origin = self.start_point()
         if origin is None:
             raise ValueError("Path has no segments")
-        return Plane(origin, Vec(1, 0, 0), normal)
+        # Choose x_axis perpendicular to normal; avoid parallel case.
+        if abs(normal @ Vec(1, 0, 0)) > 0.99:
+            x_axis = Vec(0, 0, 1)
+        else:
+            x_axis = Vec(1, 0, 0)
+        return Plane(origin, x_axis, normal)
 
     @classmethod
     def assemble(
@@ -1504,6 +1507,10 @@ class Path:
         entities.  Holes become an ``IfcArbitraryProfileDefWithVoids``
         with the inner curve wound CW per IFC convention.
 
+        Coordinates are projected into the path's local *plane* frame
+        so the profile is correct for any plane orientation (XY, XZ,
+        YZ, or arbitrary).
+
         Args:
             ifc_file:  Open ifcopenshell file.
 
@@ -1517,7 +1524,15 @@ class Path:
         if not self.is_closed:
             raise ValueError("to_ifc_profile() requires a closed path")
 
-        outer_curve = self._build_composite_curve(ifc_file, self._segments, same_sense=True)
+        plane = self._plane
+
+        outer_curve = self._build_composite_curve(
+            ifc_file,
+            self._segments,
+            same_sense=True,
+            plane=plane,
+            is_closed=True,
+        )
 
         if not self._holes:
             return ifc_file.create_entity(
@@ -1529,7 +1544,11 @@ class Path:
         inner_curves = []
         for hole in self._holes:
             rev = [seg.reverse() for seg in reversed(hole._segments)]
-            inner_curves.append(self._build_composite_curve(ifc_file, rev, same_sense=True))
+            inner_curves.append(
+                self._build_composite_curve(
+                    ifc_file, rev, same_sense=True, plane=plane, is_closed=True
+                )
+            )
 
         return ifc_file.create_entity(
             "IfcArbitraryProfileDefWithVoids",
@@ -1546,11 +1565,16 @@ class Path:
     def _seg_to_ifc(
         ifc_file: "ifcopenshell.file",
         seg: "Line | Arc",
+        plane: "Plane | None" = None,
     ) -> "ifcopenshell.entity_instance":
         """Convert a single segment to an IFC curve entity.
 
         - ``Line`` → ``IfcPolyline``
         - ``Arc``  → ``IfcTrimmedCurve`` + ``IfcCircle``
+
+        When *plane* is given, Vec coordinates are projected from world
+        3D to the plane's local 2D frame (z=0) so the profile is
+        correct for any plane orientation.
         """
         from ifckit.geometry.primitives import Arc as _Arc, Line as _Line  # noqa: I001
 
@@ -1566,29 +1590,43 @@ class Path:
                 DirectionRatios=[round(x, 4), round(y, 4), round(z, 4)],
             )
 
+        def _to_plane(v: "Vec") -> "Vec":
+            if plane is None:
+                return Vec(v.x, v.y, 0.0)
+            delta = v - plane.origin
+            u = delta @ plane.x_axis
+            v_coord = delta @ plane.y_axis
+            return Vec(u, v_coord, 0.0)
+
         if isinstance(seg, _Line):
+            p0 = _to_plane(seg.start)
+            p1 = _to_plane(seg.end)
             return ifc_file.create_entity(
                 "IfcPolyline",
                 Points=[
-                    _pt3(ifc_file, seg.start.x, seg.start.y, seg.start.z),
-                    _pt3(ifc_file, seg.end.x, seg.end.y, seg.end.z),
+                    _pt3(ifc_file, p0.x, p0.y, p0.z),
+                    _pt3(ifc_file, p1.x, p1.y, p1.z),
                 ],
             )
 
         if isinstance(seg, _Arc):
-            center = seg.center
+            c = _to_plane(seg.center)
+            s = _to_plane(seg.start)
+
             if seg.angle >= 0:
-                normal = seg.normal
+                normal = Vec(0, 0, 1)
                 angle = seg.angle
             else:
-                normal = -seg.normal
+                normal = Vec(0, 0, -1)
                 angle = -seg.angle
 
-            ref_dir = (seg.start - center).normalized()
+            ref_dir = (s - c).normalized()
+            if ref_dir.length() < 1e-12:
+                ref_dir = Vec(1, 0, 0)
 
             pos = ifc_file.create_entity(
                 "IfcAxis2Placement3D",
-                Location=_pt3(ifc_file, center.x, center.y, center.z),
+                Location=_pt3(ifc_file, c.x, c.y, c.z),
                 Axis=_dir3(ifc_file, normal.x, normal.y, normal.z),
                 RefDirection=_dir3(ifc_file, ref_dir.x, ref_dir.y, ref_dir.z),
             )
@@ -1612,16 +1650,27 @@ class Path:
         ifc_file: "ifcopenshell.file",
         segments: "List[Line | Arc]",
         same_sense: bool = True,
+        plane: "Plane | None" = None,
+        is_closed: bool = False,
     ) -> "ifcopenshell.entity_instance":
-        """Wrap a list of segments into an ``IfcCompositeCurve``."""
+        """Wrap a list of segments into an ``IfcCompositeCurve``.
+
+        When *plane* is given, segment coordinates are projected from
+        world 3D to the plane's local 2D frame before creating the
+        IFC curve entities.
+        """
         seg_entities = []
         n = len(segments)
         for i, seg in enumerate(segments):
-            curve = cls._seg_to_ifc(ifc_file, seg)
+            curve = cls._seg_to_ifc(ifc_file, seg, plane=plane)
+            if i < n - 1:
+                transition = "CONTINUOUS"
+            else:
+                transition = "CONTINUOUS" if is_closed else "DISCONTINUOUS"
             seg_entities.append(
                 ifc_file.create_entity(
                     "IfcCompositeCurveSegment",
-                    Transition="CONTINUOUS" if i < n - 1 else "DISCONTINUOUS",
+                    Transition=transition,
                     SameSense=same_sense,
                     ParentCurve=curve,
                 )

@@ -10,6 +10,7 @@ dependency. It is converted to a real IFC entity by a Builder.
 from __future__ import annotations
 
 import json as _json
+import warnings as _warnings
 from typing import Any, Dict, List, Optional
 
 from ifckit.elements.registry import ElementRegistry, RegisterElementType
@@ -49,6 +50,12 @@ class PendingElement(metaclass=RegisterElementType):
         hatch_pattern: str = "",
         properties: Optional[UserProperties] = None,
     ) -> None:
+        if clip_data is not None:
+            _warnings.warn(
+                "clip_data is deprecated and ignored; use clips instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self.name = name
         self.clips: List[Any] = list(clips) if clips else []
         self.style = style

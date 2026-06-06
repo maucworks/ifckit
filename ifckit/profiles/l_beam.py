@@ -84,7 +84,7 @@ class LBeamProfile(Profile):
         self.name = name
         self._validate()
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y, anchor)
+        self._init_transform(rotation, offset_x, offset_y, self.anchor)
 
     def _validate(self) -> None:
         if self.height <= 0:

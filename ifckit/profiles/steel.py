@@ -363,10 +363,12 @@ class SteelProfile:
             "CHS": [],
         }
         for k in _I_SECTIONS:
-            for fam in ("HEA", "HEB", "HEM", "IPE", "UNP"):
+            for fam in ("HEA", "HEB", "HEM", "IPE"):
                 if k.startswith(fam):
                     families[fam].append(k)
                     break
+        for k in _UNP_SECTIONS:
+            families["UNP"].append(k)
         for k in _CHS_SECTIONS:
             families["CHS"].append(k)
         return families

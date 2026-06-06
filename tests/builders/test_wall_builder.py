@@ -81,6 +81,27 @@ class TestWallBuilder:
         assert len(reopened.by_type("IfcExtrudedAreaSolid")) == 1
 
 
+class TestWallBuilderNonXYPlane:
+    """Solid Position must be identity for any plane; orientation lives in ObjectPlacement only."""
+
+    def test_xz_plane_solid_position_is_identity(self, ifc4_model, ifc4_storey, body_context):
+        """Solid extrusion axis must be (0,0,1) — not world plane.z_axis — to avoid double rotation."""
+        footprint = [Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0, 0.3), Vec(0, 0, 0.3)]
+        pending = PendingWall(footprint, Plane.world_xz(), 3.0)
+        WallBuilder().build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        solid = ifc4_model.ifc_file.by_type("IfcExtrudedAreaSolid")[0]
+        axis = solid.Position.Axis.DirectionRatios
+        assert list(axis) == pytest.approx([0.0, 0.0, 1.0])
+
+    def test_xz_plane_produces_wall(self, ifc4_model, ifc4_storey, body_context):
+        footprint = [Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0, 0.3), Vec(0, 0, 0.3)]
+        pending = PendingWall(footprint, Plane.world_xz(), 3.0)
+        entity = WallBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        assert entity.is_a("IfcWall")
+
+
 class TestSlabBuilder:
     def test_produces_ifc_slab(self, ifc4_model, ifc4_storey, body_context):
         pending = PendingSlab(FOOTPRINT, PLANE, 0.2, name="S1")
@@ -117,3 +138,16 @@ class TestSlabBuilder:
         ifc4_model.save(path)
         reopened = ifcopenshell.open(path)
         assert len(reopened.by_type("IfcSlab")) == 1
+
+
+class TestSlabBuilderNonXYPlane:
+    """Solid Position must be identity for any plane; orientation lives in ObjectPlacement only."""
+
+    def test_xz_plane_solid_position_is_identity(self, ifc4_model, ifc4_storey, body_context):
+        """Solid extrusion axis must be (0,0,1) — not world plane.z_axis — to avoid double rotation."""
+        footprint = [Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0, 0.3), Vec(0, 0, 0.3)]
+        pending = PendingSlab(footprint, Plane.world_xz(), 0.2)
+        SlabBuilder().build(ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context)
+        solid = ifc4_model.ifc_file.by_type("IfcExtrudedAreaSolid")[0]
+        axis = solid.Position.Axis.DirectionRatios
+        assert list(axis) == pytest.approx([0.0, 0.0, 1.0])

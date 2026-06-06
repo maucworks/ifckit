@@ -466,6 +466,8 @@ class PendingRevolvedBeam(PendingElement):
             "angle_deg": math.degrees(self.arc.angle),
         }
         d["profile"] = [p.to_tuple() for p in self.profile]
+        if self.ref_line is not None:
+            d["ref_line"] = self.ref_line.to_dict()
         if self.cp_normal is not None:
             d["cp_normal"] = self.cp_normal.to_tuple()
         if self.plane is not None:
@@ -486,6 +488,11 @@ class PendingRevolvedBeam(PendingElement):
             angle=math.radians(arc_d["angle_deg"]),
         )
         profile = [Vec(*pt) for pt in cls._require(d, "profile")]
+        ref_line = None
+        if "ref_line" in d:
+            from ifckit.geometry.primitives import Line as _Line
+
+            ref_line = _Line.from_dict(d["ref_line"])
         cp_normal = Vec(*d["cp_normal"]) if "cp_normal" in d else None
         plane_d = d.get("plane")
         if plane_d:
@@ -499,6 +506,7 @@ class PendingRevolvedBeam(PendingElement):
         return cls(
             arc=arc,
             profile=profile,
+            ref_line=ref_line,
             name=d.get("name", ""),
             cp_normal=cp_normal,
             plane=plane,

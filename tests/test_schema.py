@@ -1,6 +1,6 @@
 """Tests for ifckit.schema"""
 import pytest
-from ifckit.schema import IfcSchema, LengthUnit, get_schema_name, unit_scale_to_metres
+from ifckit.schema import IfcSchema, LengthUnit, unit_scale_to_metres
 
 
 class TestIfcSchema:
@@ -8,11 +8,11 @@ class TestIfcSchema:
         assert IfcSchema.IFC4.value == "IFC4"
         assert IfcSchema.IFC4X3.value == "IFC4X3"
 
-    def test_get_schema_name_ifc4(self):
-        assert get_schema_name(IfcSchema.IFC4) == "IFC4"
+    def test_to_ifcopenshell_ifc4(self):
+        assert IfcSchema.IFC4.to_ifcopenshell() == "IFC4"
 
-    def test_get_schema_name_ifc4x3(self):
-        assert get_schema_name(IfcSchema.IFC4X3) == "IFC4X3"
+    def test_to_ifcopenshell_ifc4x3(self):
+        assert IfcSchema.IFC4X3.to_ifcopenshell() == "IFC4X3"
 
 
 class TestLengthUnit:

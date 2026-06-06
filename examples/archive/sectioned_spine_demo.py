@@ -60,12 +60,16 @@ def _print_table(pts, frames, scales):
     for i, (p, pl, (s, a)) in enumerate(zip(pts, frames, scales)):
         z = pl.z_axis
         if i == 0 or i == len(pts) - 1:
-            print(f"  P{i}     | ({z.x:.3f},{z.y:.3f},{z.z:.3f})              |  —    | 1.000 |")
+            print(
+                f"  P{i}     | ({z.x:.3f},{z.y:.3f},{z.z:.3f})              |  —    | 1.000 |"
+            )
         else:
             ba = pts[i - 1] - pts[i]
             bc = pts[i + 1] - pts[i]
             ang = math.degrees(ba.angle_to(bc))
-            print(f"  P{i}     | ({z.x:.3f},{z.y:.3f},{z.z:.3f})              | {ang:3.0f}°  | {s:.3f} | {a}")
+            print(
+                f"  P{i}     | ({z.x:.3f},{z.y:.3f},{z.z:.3f})              | {ang:3.0f}°  | {s:.3f} | {a}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -106,15 +110,20 @@ def main():
     ifc_file = model.ifc_file
     storey = _make_storey(ifc_file, model._project)
     pending = PendingSectionedSpine(
-        spine=spine, profiles=profiles, positions=field.frames, name="miter_demo",
+        spine=spine,
+        profiles=profiles,
+        positions=field.frames,
+        name="miter_demo",
     )
     context = get_body_context(ifc_file)
     builder = SectionedSpineBuilder()
     element = builder.build(ifc_file, pending, storey, context)
 
     geom = element.Representation.Representations[0].Items[0]
-    print(f"\n  IfcTriangulatedFaceSet: {len(geom.Coordinates.CoordList)} vertices, "
-          f"{len(geom.CoordIndex)} triangles")
+    print(
+        f"\n  IfcTriangulatedFaceSet: {len(geom.Coordinates.CoordList)} vertices, "
+        f"{len(geom.CoordIndex)} triangles"
+    )
     out = "output/sectioned_spine_demo.ifc"
     model.save(out)
     print(f"  Saved: {out}\n")
@@ -143,25 +152,44 @@ def main_ibeam():
     profiles = []
     for i, (s, a) in enumerate(field.scales):
         if s == 1.0:
-            profiles.append(IBeamProfile(height=base_h, width=base_w,
-                                         flange_thickness=10, web_thickness=6))
+            profiles.append(
+                IBeamProfile(
+                    height=base_h, width=base_w, flange_thickness=10, web_thickness=6
+                )
+            )
         elif a == "y":
             # rotation around Y → miter along X → scale X (width/flange)
-            profiles.append(IBeamProfile(height=base_h, width=base_w * s,
-                                         flange_thickness=10, web_thickness=6))
+            profiles.append(
+                IBeamProfile(
+                    height=base_h,
+                    width=base_w * s,
+                    flange_thickness=10,
+                    web_thickness=6,
+                )
+            )
         else:
             # rotation around X → miter along Y → scale Y (height/web)
-            profiles.append(IBeamProfile(height=base_h * s, width=base_w,
-                                         flange_thickness=10, web_thickness=6))
-        print(f"  P{i}: scale {a} by {s:.3f}  →  "
-              f"IBeamProfile(height={base_h * s if a == 'y' else base_h:.1f}, "
-              f"width={base_w * s if a == 'x' else base_w:.1f})")
+            profiles.append(
+                IBeamProfile(
+                    height=base_h * s,
+                    width=base_w,
+                    flange_thickness=10,
+                    web_thickness=6,
+                )
+            )
+        print(
+            f"  P{i}: scale {a} by {s:.3f}  →  "
+            f"IBeamProfile(height={base_h * s if a == 'y' else base_h:.1f}, "
+            f"width={base_w * s if a == 'x' else base_w:.1f})"
+        )
 
     model = IfcModel(unit=LengthUnit.MILLIMETRE)
     ifc_file = model.ifc_file
     storey = _make_storey(ifc_file, model._project)
     pending = PendingSectionedSpine(
-        spine=spine, profiles=profiles, positions=field.frames,
+        spine=spine,
+        profiles=profiles,
+        positions=field.frames,
         name="miter_demo_ibeam",
     )
     context = get_body_context(ifc_file)
@@ -169,8 +197,10 @@ def main_ibeam():
     element = builder.build(ifc_file, pending, storey, context)
 
     geom = element.Representation.Representations[0].Items[0]
-    print(f"\n  IfcTriangulatedFaceSet: {len(geom.Coordinates.CoordList)} vertices, "
-          f"{len(geom.CoordIndex)} triangles")
+    print(
+        f"\n  IfcTriangulatedFaceSet: {len(geom.Coordinates.CoordList)} vertices, "
+        f"{len(geom.CoordIndex)} triangles"
+    )
     out = "output/sectioned_spine_demo_ibeam.ifc"
     model.save(out)
     print(f"  Saved: {out}\n")

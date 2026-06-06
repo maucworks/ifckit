@@ -84,3 +84,46 @@ class PendingSectionedSpine(PendingElement):
             )
         if len(profiles) < 2:
             raise ValueError("At least 2 profiles are required")
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["spine"] = self.spine.to_dict()
+        d["profiles"] = [p.to_dict() for p in self.profiles]
+        d["positions"] = [p.to_dict() for p in self.positions]
+        d["profile_segments"] = self.profile_segments
+        d["closed"] = self.closed
+        if self.profile_overrides:
+            d["profile_overrides"] = {
+                str(k): v.to_dict() for k, v in self.profile_overrides.items()
+            }
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "PendingSectionedSpine":
+        from ifckit.geometry import Path, Plane
+        from ifckit.profiles.base import Profile as _Profile
+
+        spine = Path.from_dict(cls._require(d, "spine"))
+        profile_dicts = cls._require(d, "profiles")
+        profiles = [_Profile.dispatch_from_dict(pd) for pd in profile_dicts]
+        position_dicts = cls._require(d, "positions")
+        positions = [Plane.from_dict(p) for p in position_dicts]
+        profile_segments = d.get("profile_segments", 32)
+        closed = d.get("closed", False)
+        profile_overrides_raw = d.get("profile_overrides")
+        profile_overrides: Optional[Dict[int, "Profile"]] = None
+        if profile_overrides_raw:
+            profile_overrides = {
+                int(k): _Profile.dispatch_from_dict(v) for k, v in profile_overrides_raw.items()
+            }
+        return cls(
+            spine=spine,
+            profiles=profiles,
+            positions=positions,
+            name=d.get("name", ""),
+            style=cls._style_from_dict(d),
+            properties=d.get("properties"),
+            profile_segments=profile_segments,
+            closed=closed,
+            profile_overrides=profile_overrides,
+        )

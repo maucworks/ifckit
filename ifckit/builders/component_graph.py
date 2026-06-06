@@ -295,18 +295,24 @@ def _eval_node_list(
             for hole_node in node.get("holes", []):
                 hole_id = hole_node.get("id")
                 if hole_id and hole_id not in cache:
-                    hole_result = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
-                    cache[hole_id] = hole_result
+                    hole_op = hole_node.get("op", "rect")
+                    if hole_op == "polygon":
+                        cache[hole_id] = _eval_node_polygon(hole_node, resolved, scale_x, scale_y)
+                    else:
+                        cache[hole_id] = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
 
         elif op == "polygon":
             result = _eval_node_polygon(node, resolved, scale_x, scale_y)
             cache[node_id] = result
-            # Also cache any named holes.
+            # Also cache any named holes so extrude nodes can reference them directly.
             for hole_node in node.get("holes", []):
                 hole_id = hole_node.get("id")
                 if hole_id and hole_id not in cache:
-                    hole_result = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
-                    cache[hole_id] = hole_result
+                    hole_op = hole_node.get("op", "rect")
+                    if hole_op == "polygon":
+                        cache[hole_id] = _eval_node_polygon(hole_node, resolved, scale_x, scale_y)
+                    else:
+                        cache[hole_id] = _eval_node_rect(hole_node, resolved, scale_x, scale_y)
 
         elif op == "difference":
             result = _eval_node_difference(node, cache, resolved)
@@ -484,6 +490,11 @@ def evaluate_component_graph(
     resolved = _resolve_parameters(preset, params)
     ref_w = float(preset["parameters"]["w"])
     ref_h = float(preset["parameters"]["h"])
+    if ref_w == 0.0 or ref_h == 0.0:
+        raise ValueError(
+            f"Preset {preset_name!r} has zero reference dimension "
+            f"(w={ref_w}, h={ref_h}); cannot compute scale factors."
+        )
     actual_w = float(params.get("w", ref_w))
     actual_h = float(params.get("h", ref_h))
     scale_x = actual_w / ref_w

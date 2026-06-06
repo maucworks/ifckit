@@ -43,13 +43,20 @@ def _make_storey(ifc_file: ifcopenshell.file, project) -> ifcopenshell.entity_in
     o = ifc_file.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0))
     z = ifc_file.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))
     x = ifc_file.create_entity("IfcDirection", DirectionRatios=(1.0, 0.0, 0.0))
-    axis = ifc_file.create_entity("IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x)
-    place = ifc_file.create_entity("IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis)
+    axis = ifc_file.create_entity(
+        "IfcAxis2Placement3D", Location=o, Axis=z, RefDirection=x
+    )
+    place = ifc_file.create_entity(
+        "IfcLocalPlacement", PlacementRelTo=None, RelativePlacement=axis
+    )
     storey = ifc_file.create_entity(
         "IfcBuildingStorey", GlobalId=_guid(), Name="Storey", ObjectPlacement=place
     )
     ifc_file.create_entity(
-        "IfcRelAggregates", GlobalId=_guid(), RelatingObject=project, RelatedObjects=[storey]
+        "IfcRelAggregates",
+        GlobalId=_guid(),
+        RelatingObject=project,
+        RelatedObjects=[storey],
     )
     return storey
 
@@ -91,7 +98,9 @@ def build_rect_ibeam() -> None:
     spine = Path.from_pts(pts, closed=True)
     starter = Plane(Vec(0, 1500, 0), Vec(1, 0, 0), Vec(0, 0, 1))
     profile = IBeamProfile(height=200, width=100, flange_thickness=12, web_thickness=7)
-    _build_and_save(spine, profile, starter, "closed_rect_ibeam", "closed_rect_ibeam.ifc")
+    _build_and_save(
+        spine, profile, starter, "closed_rect_ibeam", "closed_rect_ibeam.ifc"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +114,9 @@ def build_rect_channel() -> None:
     spine = Path.from_pts(pts, closed=True)
     starter = Plane(Vec(0, 1000, 0), Vec(1, 0, 0), Vec(0, 0, 1))
     profile = CShapeProfile(depth=150, width=60, wall_thickness=6, girth=20)
-    _build_and_save(spine, profile, starter, "closed_rect_channel", "closed_rect_channel.ifc")
+    _build_and_save(
+        spine, profile, starter, "closed_rect_channel", "closed_rect_channel.ifc"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -123,10 +134,10 @@ def build_3d_ibeam() -> None:
         Vec(4000, 3000, 3000),
         Vec(0, 3000, 3000),
         Vec(0, 3000, 0),
-        Vec(0, 0, 0),
+        Vec(0, 1500, 0),
     ]
     pts = pts[:-1]
-    spine = Path.from_pts(pts, closed=True)
+    spine = Path.from_pts(pts, closed=False)
     spine.fillet(6, 400)  # P6: corner between P5→P6 (-Z) and P6→P0 (-Y)
     mid = (pts[0] + pts[1]) * 0.5
     starter = Plane(mid, Vec(1, 0, 0), Vec(0, 0, 1))
@@ -153,17 +164,21 @@ def build_3d_all_filleted() -> None:
         Vec(4000, 3000, 3000),
         Vec(0, 3000, 3000),
         Vec(0, 3000, 0),
-        Vec(0, 0, 0),
+        Vec(0, 500, 0),
     ]
-    pts = pts[:-1]
-    spine = Path.from_pts(pts, closed=True)
+
+    spine = Path.from_pts(pts, closed=False)
     # Fillet from highest index down — earlier indices stay valid
-    for idx in range(6, 0, -1):
-        spine.fillet(idx, 400)
-    mid = (pts[0] + pts[1]) * 0.5
-    starter = Plane(mid, Vec(1, 0, 0), Vec(0, 0, 1))
+    spine.fillet([1, 2, 3, 4, 5, 6], 400)
+    # for idx in range(6, 0, -1):
+    #     spine.fillet(idx, 400)
+    # mid = (pts[0] + pts[1]) * 0.5
+    # starter = Plane(mid, Vec(1, 0, 0), Vec(0, 0, 1))
+    starter = Plane(pts[0], Vec(1, 0, 0), Vec(0, 0, 1))
     profile = IBeamProfile(height=200, width=100, flange_thickness=12, web_thickness=7)
-    _build_and_save(spine, profile, starter, "closed_3d_filleted", "closed_3d_filleted.ifc")
+    _build_and_save(
+        spine, profile, starter, "closed_3d_filleted", "closed_3d_filleted.ifc"
+    )
 
 
 # ---------------------------------------------------------------------------

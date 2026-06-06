@@ -13,6 +13,7 @@ import ifcopenshell.api
 from ifckit.builders._geom import (
     axis2placement3d,
     extrude_profile,
+    get_or_create_footprint_context,
     local_placement,
     profile_from_points,
     pt2,
@@ -67,13 +68,10 @@ class SpaceBuilder(BaseBuilder):
             fp_pts.append(fp_pts[0])  # close
         fp_polyline = ifc_file.create_entity("IfcPolyline", Points=fp_pts)
 
-        # The FootPrint context must use the same parent context but with
-        # identifier "FootPrint".  We re-use the Body context's parent and
-        # create a temporary representation — most viewers accept Body context
-        # for FootPrint too, so we share the context object here.
+        fp_context = get_or_create_footprint_context(ifc_file)
         fp_rep = ifc_file.create_entity(
             "IfcShapeRepresentation",
-            ContextOfItems=context,
+            ContextOfItems=fp_context,
             RepresentationIdentifier="FootPrint",
             RepresentationType="Curve2D",
             Items=[fp_polyline],

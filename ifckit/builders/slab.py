@@ -52,11 +52,14 @@ class SlabBuilder(BaseBuilder):
         pts_2d = project_profile_to_plane(pending.footprint, pending.plane)
         profile = profile_from_points(ifc_file, pts_2d)
 
+        # Solid: extrude along element-local Z using identity placement.
+        # The plane orientation is encoded solely in ObjectPlacement below,
+        # matching the WallGraphBuilder pattern to avoid a double rotation.
         placement = axis2placement3d(
             ifc_file,
             Vec(0.0, 0.0, 0.0),
-            pending.plane.z_axis,
-            pending.plane.x_axis,
+            Vec(0.0, 0.0, 1.0),
+            Vec(1.0, 0.0, 0.0),
         )
         solid = extrude_profile(ifc_file, profile, pending.thickness, position=placement)
 

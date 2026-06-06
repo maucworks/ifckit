@@ -122,6 +122,7 @@ class PolygonProfile(Profile):
         rotation: float = 0.0,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
+        anchor: Optional[str] = None,
     ) -> None:
         self.name = name
         self.points: List[Tuple[float, float]] = []
@@ -135,7 +136,7 @@ class PolygonProfile(Profile):
         if len(self.points) < 3:
             raise ValueError("PolygonProfile requires at least 3 points")
         super().__init__()
-        self._init_transform(rotation, offset_x, offset_y)
+        self._init_transform(rotation, offset_x, offset_y, anchor)
 
     def _bbox(self) -> Tuple[float, float]:
         """Bounding box width × height of the raw polygon points."""
@@ -168,7 +169,14 @@ class PolygonProfile(Profile):
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PolygonProfile":
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
-        return cls(points=d["points"], name=d.get("name"), rotation=r, offset_x=ox, offset_y=oy)
+        return cls(
+            points=d["points"],
+            name=d.get("name"),
+            rotation=r,
+            offset_x=ox,
+            offset_y=oy,
+            anchor=anch,
+        )
 
 
 # ---------------------------------------------------------------------------

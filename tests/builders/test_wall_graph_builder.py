@@ -5,6 +5,7 @@ import ifcopenshell
 from ifckit.elements.wall_graph import PendingWallGraph
 from ifckit.builders.wall_graph import WallGraphBuilder
 from ifckit.geometry import Vec, Plane
+from ifckit.geometry.path import Path
 
 XY = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
 
@@ -203,3 +204,40 @@ class TestFileRoundTrip:
         assert len(reopened.by_type("IfcWall")) == 1
         assert len(reopened.by_type("IfcExtrudedAreaSolid")) == 1
         assert len(reopened.by_type("IfcBooleanResult")) == 0
+
+
+# ---------------------------------------------------------------------------
+# Non-XY plane (open-path mode)
+# ---------------------------------------------------------------------------
+
+class TestNonXYPlane:
+    def _profile_y_coords(self, ifc_file):
+        profile = ifc_file.by_type("IfcArbitraryClosedProfileDef")[0]
+        return [pt.Coordinates[1] for pt in profile.OuterCurve.Points]
+
+    def test_xz_plane_open_path_non_degenerate(self, ifc4_model, ifc4_storey, body_context):
+        """Profile must span ±thickness/2 in local Y; Vec.z must not be silently dropped."""
+        path = Path(plane=Plane.world_xz()).add_line(Vec(0, 0, 0), Vec(5000, 0, 0))
+        pending = PendingWallGraph(
+            path=path,
+            plane=Plane.world_xz(),
+            thickness=200,
+            height=3000,
+            name="XZ-wall",
+        )
+        _build(ifc4_model, ifc4_storey, body_context, pending)
+
+        y_coords = self._profile_y_coords(ifc4_model.ifc_file)
+        assert min(y_coords) < -1, "profile collapsed: all Y coords near zero"
+        assert max(y_coords) > 1, "profile collapsed: all Y coords near zero"
+
+    def test_xz_plane_produces_one_solid(self, ifc4_model, ifc4_storey, body_context):
+        path = Path(plane=Plane.world_xz()).add_line(Vec(0, 0, 0), Vec(5000, 0, 0))
+        pending = PendingWallGraph(
+            path=path,
+            plane=Plane.world_xz(),
+            thickness=200,
+            height=3000,
+        )
+        _build(ifc4_model, ifc4_storey, body_context, pending)
+        assert len(ifc4_model.ifc_file.by_type("IfcExtrudedAreaSolid")) == 1
