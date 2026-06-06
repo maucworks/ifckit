@@ -8,7 +8,7 @@ version = "0.2.1"
 description = "Framework-agnostic IFC builder library for architecture and infrastructure"
 authors = [{ name = "Sander Boer", email = "sanderboer@mauc.nl" }]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "LGPL-3.0-or-later" }
 keywords = ["ifc", "bim", "architecture", "ifcopenshell", "grasshopper", "rhino"]
 classifiers = [
@@ -18,7 +18,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: GIS",
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
     "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
