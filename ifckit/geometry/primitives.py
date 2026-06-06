@@ -10,6 +10,7 @@ No external dependencies beyond the standard library.
 from __future__ import annotations
 
 import math
+import warnings
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
@@ -152,7 +153,8 @@ class Vec:
         self and other should be direction vectors (non-zero).
         Returns a normalized Vec pointing in the averaged direction.
         For collinear vectors pointing opposite directions (sum ≈ 0),
-        returns a zero Vec — caller must handle this case.
+        raises ValueError because the sum cannot be normalized.
+        Caller must guard against anti-parallel input vectors.
         """
         return (self.normalized() + other.normalized()).normalized()
 
@@ -340,7 +342,6 @@ class Plane:
             # tangent nearly parallel to up — use +Y as fallback
             up = Vec(0, 1, 0)
         y = (up - t * (t @ up)).normalized()
-        x = (t**y).normalized()  # noqa: F841
         return cls(origin, t, y)
 
     def transform_point(self, local: "Vec") -> "Vec":
@@ -552,7 +553,12 @@ class Arc:
         return self.center + radial.rotate_around(self.normal, self.angle / 2)
 
     def reverse(self) -> "Arc":
-        return Arc(self.center, -self.normal, self.end, self.angle)
+        """Return a new arc traversing the same path in opposite direction.
+
+        The reversed arc starts at self.end and ends at self.start,
+        with angle negated to indicate opposite traversal direction.
+        """
+        return Arc(self.center, self.normal, self.end, -self.angle)
 
     def transformed(self, t: "Transform") -> "Arc":
         """Apply a 4×4 affine transform.
@@ -682,6 +688,7 @@ class Polyline:
     """
 
     def __init__(self, points: List["Vec"], closed: bool = False) -> None:
+        warnings.warn("Polyline is deprecated; use Path instead.", DeprecationWarning, stacklevel=2)
         self.points = list(points)
         self.closed = closed
 

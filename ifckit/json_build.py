@@ -315,9 +315,24 @@ def _pass2b_fills(
             for ei, elem_data in enumerate(storey_data.get("elements", [])):
                 elem_dict = elem_data.get("data") if "data" in elem_data else elem_data
                 elem_id = elem_data.get("id") or elem_dict.get("id")
-                scoped = f"{elem_id}__s{si}" if elem_id else None
-                lookup_id = scoped if scoped in id_map else elem_id
-                if lookup_id not in id_map:
+                # Use the same registration logic as pass1: check plain id first, then scoped
+                lookup_id = elem_id
+                scoped_id = f"{elem_id}__s{si}" if elem_id else None
+                if lookup_id and lookup_id not in id_map and scoped_id in id_map:
+                    lookup_id = scoped_id
+
+                # Check if element is missing but has nested fills
+                if not lookup_id or lookup_id not in id_map:
+                    if elem_data.get("windows") or elem_data.get("doors"):
+                        eprefix = f"buildings[{bi}].storeys[{si}].elements[{ei}]"
+                        import warnings
+
+                        warnings.warn(
+                            f"{eprefix}: element has no 'id' or id not found — "
+                            f"{len(elem_data.get('windows', []))} window(s) and "
+                            f"{len(elem_data.get('doors', []))} door(s) will be skipped.",
+                            stacklevel=2,
+                        )
                     continue
 
                 host_handle = id_map[lookup_id]

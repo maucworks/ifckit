@@ -287,6 +287,8 @@ class PendingDoorType(PendingTypeObject):
                 d[field] = val
         if self.component_graph is not None:
             d["component_graph"] = self.component_graph
+        if self.material_overrides:
+            d["material_overrides"] = self.material_overrides
         if self.properties:
             d["properties"] = self.properties
         return d
@@ -315,6 +317,7 @@ class PendingDoorType(PendingTypeObject):
             panel_width=d.get("panel_width"),
             panel_operation=d.get("panel_operation"),
             component_graph=d.get("component_graph"),
+            material_overrides=d.get("material_overrides"),
             properties=d.get("properties") or {},
         )
 
@@ -491,6 +494,8 @@ class PendingWindowType(PendingTypeObject):
                 d[field] = val
         if self.component_graph is not None:
             d["component_graph"] = self.component_graph
+        if self.material_overrides:
+            d["material_overrides"] = self.material_overrides
         if self.properties:
             d["properties"] = self.properties
         return d
@@ -519,5 +524,6 @@ class PendingWindowType(PendingTypeObject):
             panel_height=d.get("panel_height"),
             panel_operation=d.get("panel_operation"),
             component_graph=d.get("component_graph"),
+            material_overrides=d.get("material_overrides"),
             properties=d.get("properties") or {},
         )

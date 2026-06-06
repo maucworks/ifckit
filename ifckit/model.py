@@ -151,7 +151,6 @@ class IfcModel:
                 ParentContext=model_ctx,
                 TargetView="MODEL_VIEW",
             )
-        obj._body_context = body_ctx
         # _context = the parent Model context of the body sub-context
         obj._context = body_ctx.ParentContext
 
@@ -232,7 +231,9 @@ class IfcModel:
             context_type="Model",
         )
 
-        self._body_context = self._file.create_entity(
+        # Create Body sub-context for geometry representation. The reference
+        # is not cached since get_body_context() retrieves it dynamically as needed.
+        self._file.create_entity(
             "IfcGeometricRepresentationSubContext",
             ContextIdentifier="Body",
             ContextType="Model",
@@ -1034,7 +1035,7 @@ class IfcModel:
             container:      ``StoreyHandle`` for spatial containment.
             door_type:      Optional ``EntityHandle`` wrapping an ``IfcDoorType``
                             entity to assign via ``IfcRelDefinesByType``.
-            opening_anchor: Anchor of the parent ``PendingOpening`` (default ``"s"``).
+            opening_anchor: Anchor of the parent ``PendingOpening`` (default ``"sw"``).
 
         Returns:
             ``EntityHandle`` wrapping the created ``IfcDoor``.
@@ -1086,7 +1087,7 @@ class IfcModel:
             opening:        ``EntityHandle`` wrapping the ``IfcOpeningElement``.
             container:      ``StoreyHandle`` for spatial containment.
             window_type:    Optional ``EntityHandle`` wrapping an ``IfcWindowType``.
-            opening_anchor: Anchor of the parent ``PendingOpening`` (default ``"s"``).
+            opening_anchor: Anchor of the parent ``PendingOpening`` (default ``"sw"``).
 
         Returns:
             ``EntityHandle`` wrapping the created ``IfcWindow``.
@@ -1430,7 +1431,7 @@ class IfcModel:
             The number of elements removed.
         """
         removed = 0
-        for rel in container.ContainsElements or []:
+        for rel in getattr(container, "ContainsElements", None) or []:
             for product in list(rel.RelatedElements):
                 self._file.remove(product)
                 removed += 1

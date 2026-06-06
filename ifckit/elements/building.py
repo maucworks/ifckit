@@ -39,9 +39,12 @@ class PendingWall(PendingElement):
         name: str = "",
         clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
+        hatch_pattern: str = "",
         properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, clips=clips, style=style, properties=properties)
+        super().__init__(
+            name=name, clips=clips, style=style, hatch_pattern=hatch_pattern, properties=properties
+        )
         self.footprint = list(footprint)
         self.plane = plane
         self.height = float(height)
@@ -65,6 +68,7 @@ class PendingWall(PendingElement):
             name=d.get("name", ""),
             clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),
+            hatch_pattern=cls._hatch_pattern_from_dict(d),
             properties=d.get("properties") or {},
         )
 
@@ -92,9 +96,12 @@ class PendingSlab(PendingElement):
         name: str = "",
         clips: Optional[List[Plane]] = None,
         style: Optional[RenderStyle] = None,
+        hatch_pattern: str = "",
         properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, clips=clips, style=style, properties=properties)
+        super().__init__(
+            name=name, clips=clips, style=style, hatch_pattern=hatch_pattern, properties=properties
+        )
         self.footprint = list(footprint)
         self.plane = plane
         self.thickness = float(thickness)
@@ -118,5 +125,6 @@ class PendingSlab(PendingElement):
             name=d.get("name", ""),
             clips=cls._clips_from_dict(d),
             style=cls._style_from_dict(d),
+            hatch_pattern=cls._hatch_pattern_from_dict(d),
             properties=d.get("properties") or {},
         )

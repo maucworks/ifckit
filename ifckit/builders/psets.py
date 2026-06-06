@@ -176,18 +176,41 @@ def _write_pset(
     pset_name: str,
     props: Sequence,
 ) -> None:
-    """Create an IfcPropertySet and relate it to element."""
+    """Create an IfcPropertySet and relate it to element.
+
+    For IFC2X3 compatibility, adds OwnerHistory to both IfcPropertySet
+    and IfcRelDefinesByProperties, which are IfcRoot subtypes.
+    """
     if not props:
         return
+
+    # Get or create OwnerHistory for IFC2X3
+    owner_hist = None
+    if ifc_file.schema == "IFC2X3":
+        # Find existing OwnerHistory from the file, or create one
+        owner_histories = ifc_file.by_type("IfcOwnerHistory")
+        owner_hist = owner_histories[0] if owner_histories else None
+        if not owner_hist:
+            # Fallback: create minimal OwnerHistory if not already present
+            ifcopenshell.api.run(
+                "owner.add_owner_history",
+                ifc_file,
+            )
+            # Retrieve the newly created OwnerHistory
+            owner_histories = ifc_file.by_type("IfcOwnerHistory")
+            owner_hist = owner_histories[0] if owner_histories else None
+
     pset = ifc_file.create_entity(
         "IfcPropertySet",
         GlobalId=ifcopenshell.guid.new(),
+        OwnerHistory=owner_hist,
         Name=pset_name,
         HasProperties=list(props),
     )
     ifc_file.create_entity(
         "IfcRelDefinesByProperties",
         GlobalId=ifcopenshell.guid.new(),
+        OwnerHistory=owner_hist,
         RelatedObjects=[element],
         RelatingPropertyDefinition=pset,
     )
