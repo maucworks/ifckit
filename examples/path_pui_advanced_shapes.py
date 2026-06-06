@@ -122,7 +122,7 @@ def main():
             Vec(4, 0.3, 0),
             Vec(0, 0.3, 0),
         ],
-        plane=Plane(Vec(0, 2, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane(Vec(4, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
         height=3.0,
         name="Wall with Square Window",
     )
@@ -133,7 +133,7 @@ def main():
     square_window = PendingWindow(
         path=square_path,
         component_graph="path_pui",
-        plane=Plane(Vec(4, 0.0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
+        plane=Plane(Vec(2, 0.0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
         parameters={
             "lining_thickness": 0.05,
             "lining_depth": 0.07,
@@ -151,12 +151,12 @@ def main():
 
     wall3 = PendingWall(
         footprint=[
-            Vec(0, 2.0, 0),
-            Vec(4, 2.0, 0),
-            Vec(4, 2.3, 0),
-            Vec(0, 2.3, 0),
+            Vec(0, 0.0, 0),
+            Vec(4, 0.0, 0),
+            Vec(4, 0.3, 0),
+            Vec(0, 0.3, 0),
         ],
-        plane=Plane(Vec(4, 0.0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+        plane=Plane(Vec(8, 0.0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
         height=3.0,
         name="Wall with Tall Narrow Window",
     )
@@ -164,11 +164,11 @@ def main():
 
     # Create tall narrow window (panel style)
     tall_path = create_tall_narrow_path(0, 0)
-
+    tall_path.fillet(3, 0.2)
     tall_window = PendingWindow(
         path=tall_path,
         component_graph="path_pui",
-        plane=Plane(Vec(2, 2.0, -0.15), Vec(1, 0, 0), Vec(0, 0, 1)),
+        plane=Plane(Vec(2, 0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
         parameters={
             "lining_thickness": 0.055,
             "lining_depth": 0.07,

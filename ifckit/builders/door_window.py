@@ -664,10 +664,17 @@ def _build_model_b(
     from ifckit.builders.component_graph import evaluate_opening_nodes
     from ifckit.builders.opening import build_opening_from_solids
 
-    if pending.plane is None:
-        raise ValueError("_build_model_b: pending.plane must be set.")
     if not pending.component_graph:
         raise ValueError("_build_model_b: pending.component_graph must be set.")
+
+    # Derive plane from path if not explicitly set
+    fill_plane = pending.plane
+    if fill_plane is None:
+        path = getattr(pending, "path", None)
+        if path is not None:
+            fill_plane = path.plane
+    if fill_plane is None:
+        raise ValueError("_build_model_b: pending.plane must be set.")
 
     wall_thickness = _extract_wall_thickness(host_entity)
     params = {
@@ -681,14 +688,14 @@ def _build_model_b(
 
     path = getattr(pending, "path", None)
     opening_components = evaluate_opening_nodes(
-        pending.component_graph, ifc_file, context, params, pending.plane, path=path
+        pending.component_graph, ifc_file, context, params, fill_plane, path=path
     )
 
     opening_solids, projection_solids, fill_components = _split_by_role(opening_components)
 
     opening_entity = build_opening_from_solids(
         ifc_file,
-        pending.plane,
+        fill_plane,
         opening_solids,
         host_entity,
         context,
