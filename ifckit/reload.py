@@ -22,6 +22,48 @@ import os
 import sys
 from typing import Optional
 
+_RELOAD_ORDER = [
+    "ifckit.reload",
+    "ifckit.schema",
+    "ifckit.geometry.primitives",
+    "ifckit.geometry.transform",
+    "ifckit.geometry.biarc",
+    "ifckit.geometry.frames",
+    "ifckit.geometry.path",
+    "ifckit.geometry.curve",
+    "ifckit.geometry.surface",
+    "ifckit.geometry.subdivision",
+    "ifckit.geometry.intersection",
+    "ifckit.geometry",
+    "ifckit.rhinokit",
+    "ifckit.elements",
+    "ifckit.elements.opening",
+    "ifckit.profiles.base",
+    "ifckit.profiles.shapes",
+    "ifckit.profiles.i_beam",
+    "ifckit.profiles.l_beam",
+    "ifckit.profiles.steel",
+    "ifckit.profiles",
+    "ifckit.builders._geom",
+    "ifckit.builders.base",
+    "ifckit.builders.extruded",
+    "ifckit.builders.opening",
+    "ifckit.builders.wall",
+    "ifckit.builders.slab",
+    "ifckit.builders.space",
+    "ifckit.builders.beam_factory",
+    "ifckit.builders.revolved_beam",
+    "ifckit.builders.door_window",
+    "ifckit.builders.bridge",
+    "ifckit.builders.tapered",
+    "ifckit.builders",
+    "ifckit.bonsaikit",
+    "ifckit.model",
+    "ifckit.validator",
+    "ifckit.json_build",
+    "ifckit",
+]
+
 
 def reload_all(project_root: Optional[str] = None) -> None:
     """
@@ -40,38 +82,22 @@ def reload_all(project_root: Optional[str] = None) -> None:
     if root and root not in sys.path:
         sys.path.insert(0, root)
 
-    _RELOAD_ORDER = [
-        "ifckit.schema",
-        "ifckit.geometry",
-        "ifckit.elements",
-        "ifckit.elements.opening",
-        "ifckit.profiles.base",
-        "ifckit.profiles.shapes",
-        "ifckit.profiles.i_beam",
-        "ifckit.profiles.l_beam",
-        "ifckit.profiles.steel",
-        "ifckit.profiles",
-        "ifckit.builders._geom",
-        "ifckit.builders.base",
-        "ifckit.builders.extruded",
-        "ifckit.builders.opening",
-        "ifckit.builders.wall",
-        "ifckit.builders.slab",
-        "ifckit.builders.space",
-        "ifckit.builders.beam_factory",
-        "ifckit.builders.revolved_beam",
-        "ifckit.builders.door_window",
-        "ifckit.builders.bridge",
-        "ifckit.builders.tapered",
-        "ifckit.builders",
-        "ifckit.bonsaikit",
-        "ifckit.model",
-        "ifckit.validator",
-        "ifckit.json_build",
-        "ifckit",
-    ]
+    # Reload this module first so _RELOAD_ORDER is always fresh.
+    # The subsequent loop picks up any newly added modules.
+    try:
+        importlib.reload(sys.modules["ifckit.reload"])
+    except KeyError:
+        pass
 
-    for mod_name in _RELOAD_ORDER:
+    order = (
+        sys.modules["ifckit.reload"]._RELOAD_ORDER
+        if "ifckit.reload" in sys.modules
+        else _RELOAD_ORDER
+    )
+
+    for mod_name in order:
+        if mod_name == "ifckit.reload":
+            continue  # already reloaded above
         mod = sys.modules.get(mod_name)
         if mod is not None:
             try:

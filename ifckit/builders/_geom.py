@@ -93,6 +93,29 @@ def shift_plane_elevation(plane: "Plane", elev: float) -> "Plane":
     return plane.__class__(local_origin, plane.x_axis, plane.y_axis)
 
 
+def plane_from_local_placement(
+    placement: ifcopenshell.entity_instance,
+) -> "Plane":
+    """Reconstruct a Plane from an IfcLocalPlacement / IfcAxis2Placement3D.
+
+    Handles optional Axis (default +Z) and RefDirection (default +X) per IFC spec.
+    """
+    from ifckit.geometry import Plane, Vec
+
+    rp = placement.RelativePlacement
+    origin = Vec(*[float(c) for c in rp.Location.Coordinates])
+    if rp.Axis:
+        z_axis = Vec(*[float(d) for d in rp.Axis.DirectionRatios])
+    else:
+        z_axis = Vec(0, 0, 1)
+    if rp.RefDirection:
+        x_axis = Vec(*[float(d) for d in rp.RefDirection.DirectionRatios])
+    else:
+        x_axis = Vec(1, 0, 0)
+    y_axis = z_axis.cross(x_axis)
+    return Plane(origin, x_axis, y_axis)
+
+
 def extrude_profile(
     f: ifcopenshell.file,
     profile: ifcopenshell.entity_instance,

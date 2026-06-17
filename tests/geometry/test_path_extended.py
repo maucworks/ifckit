@@ -1,5 +1,7 @@
 """Tests for extended Path functionality (M8)."""
 
+import math
+
 import pytest
 
 from ifckit.geometry import Arc, Line, Path, Plane, Vec
@@ -291,3 +293,83 @@ class TestAssembleClassmethod:
         via_function = assemble_path(segs)
         assert len(via_classmethod) == len(via_function)
         assert len(via_classmethod[0].segments) == len(via_function[0].segments)
+
+
+class TestDivide:
+    def _rect_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(4, 0, 0))
+        p.add_line(Vec(4, 0, 0), Vec(4, 3, 0))
+        p.add_line(Vec(4, 3, 0), Vec(0, 3, 0))
+        p.add_line(Vec(0, 3, 0), Vec(0, 0, 0))
+        return p
+
+    def test_divide_num_basic(self):
+        p = self._rect_path()
+        result = p.divide(num=5)
+        assert len(result) == 5
+        t0, pt0, tan0 = result[0]
+        assert t0 == 0.0
+        assert (pt0 - Vec(0, 0, 0)).length() < 1e-9
+        t_end, pt_end, tan_end = result[-1]
+        assert t_end == 1.0
+        assert (pt_end - Vec(0, 0, 0)).length() < 1e-9
+
+    def test_divide_num_spacing(self):
+        p = self._rect_path()
+        result = p.divide(num=3)
+        assert len(result) == 3
+        t0, _, _ = result[0]
+        t1, _, _ = result[1]
+        t2, _, _ = result[2]
+        assert t0 == 0.0
+        assert t2 == 1.0
+        assert t1 == pytest.approx(0.5, abs=1e-9)
+
+    def test_divide_dist_basic(self):
+        p = self._rect_path()
+        result = p.divide(dist=2.0)
+        assert len(result) >= 4
+        assert result[0][0] == 0.0
+        assert result[-1][0] == 1.0
+
+    def test_divide_num_raises_lt_2(self):
+        p = self._rect_path()
+        with pytest.raises(ValueError):
+            p.divide(num=1)
+
+    def test_divide_neither_raises(self):
+        p = self._rect_path()
+        with pytest.raises(ValueError):
+            p.divide()
+
+    def test_divide_both_raises(self):
+        p = self._rect_path()
+        with pytest.raises(ValueError):
+            p.divide(num=5, dist=2.0)
+
+    def test_divide_zero_length_raises(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(0, 0, 0))
+        with pytest.raises(ValueError):
+            p.divide(num=5)
+
+    def test_divide_tangent_directions(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(10, 0, 0))
+        result = p.divide(num=3)
+        _, _, tan0 = result[0]
+        _, _, tan1 = result[1]
+        _, _, tan2 = result[2]
+        assert (tan0 - Vec(1, 0, 0)).length() < 1e-9
+        assert (tan1 - Vec(1, 0, 0)).length() < 1e-9
+        assert (tan2 - Vec(1, 0, 0)).length() < 1e-9
+
+    def test_divide_with_arc(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(1, 0, 0))
+        p.add_arc(Vec(1, 1, 0), Vec(0, 0, 1), Vec(1, 0, 0), math.pi)
+        result = p.divide(num=5)
+        assert len(result) == 5
+        assert result[0][0] == 0.0
+        assert result[-1][0] == 1.0

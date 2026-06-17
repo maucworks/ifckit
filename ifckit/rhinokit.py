@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from ifckit.geometry import Arc, Line, Path, Vec
+from ifckit.geometry import Arc, Curve, Line, Path, Surface, Vec
 from ifckit.paper import iso_a_size_mm
 
 try:
@@ -42,6 +42,36 @@ def _require_rhino(fn_name: str) -> None:
         raise ImportError(
             f"ifckit.rhinokit.{fn_name}() requires Rhino — run inside Rhino 8 / Grasshopper."
         )
+
+
+def _expand_knots(knots: Any, multiplicities: Any) -> list:
+    """Expand compact (knot, mult) pairs into a full knot vector."""
+    out: list = []
+    for k, m in zip(knots, multiplicities):
+        out.extend([float(k)] * m)
+    return out
+
+
+def _compact_knots(full_knots: list) -> tuple:
+    """Compress a full knot vector to (unique_knots, multiplicities)."""
+    if not full_knots:
+        return [], []
+    unique = [full_knots[0]]
+    mults = [1]
+    for k in full_knots[1:]:
+        if abs(k - unique[-1]) < 1e-12:
+            mults[-1] += 1
+        else:
+            unique.append(float(k))
+            mults.append(1)
+    return unique, mults
+
+
+def _is_rhino_nurbs(obj: Any) -> bool:
+    """True if *obj* is a Rhino NurbsCurve (not LineCurve, ArcCurve, etc.)."""
+    if not _RHINO_AVAILABLE:
+        return False
+    return isinstance(obj, Rhino.Geometry.NurbsCurve)
 
 
 def pt_to_vec(pt: Any) -> Vec:
@@ -153,9 +183,9 @@ def curves_to_path(curves: Any) -> Path:
     """Convert a Rhino curve or iterable of Rhino curves into an ifckit Path.
 
     Handles single curves, lists/tuples of curves, and polycurves (exploded).
-    Each segment is converted to an ifckit Line or Arc and appended to a Path.
+    Line and Arc segments are converted directly.  NurbsCurve segments are
+    auto‑converted via bi‑arc fitting (``Curve.to_biarcs()``).
     """
-    # Normalize to an iterable
     if curves is None:
         return Path()
     if not hasattr(curves, "__iter__") or isinstance(curves, (str, bytes)):
@@ -165,12 +195,22 @@ def curves_to_path(curves: Any) -> Path:
     for crv in curves:
         if crv is None:
             continue
+
+        if _is_rhino_nurbs(crv):
+            curve = rhino_nurbs_to_curve(crv)
+            biarc_path = curve.to_biarcs()
+            p._segments.extend(biarc_path._segments)
+            continue
+
         segs = curve_to_segments(crv)
         for s in segs:
-            # Rhino ArcCurve has Radius attribute; LineCurve does not
             if hasattr(s, "Radius") and getattr(s, "Radius", 0) > 0:
                 arc = arc_to_arc(s)
                 p.add_arc(arc.center, arc.normal, arc.start, arc.angle)
+            elif _is_rhino_nurbs(s):
+                curve = rhino_nurbs_to_curve(s)
+                biarc_path = curve.to_biarcs()
+                p._segments.extend(biarc_path._segments)
             else:
                 line = line_to_line(s)
                 p.add_line(line.start, line.end)
@@ -196,12 +236,226 @@ def rhino_plane_to_plane(rh_plane: Any) -> Any:
     return Plane(origin, x_axis, y_axis)
 
 
+def rhino_nurbs_to_curve(rh_nurbs: Any) -> Curve:
+    """Convert a Rhino NurbsCurve to an ifckit Curve.
+
+    Handles the Rhino knot‑vector convention (``n + d − 1`` knots)
+    by prepending / appending one superfluous knot at each clamped end
+    to produce the standard ``n + d + 1`` knot vector expected by IFC.
+
+    Args:
+        rh_nurbs: ``Rhino.Geometry.NurbsCurve``
+
+    Returns:
+        ``ifckit.geometry.Curve``
+    """
+    _require_rhino("rhino_nurbs_to_curve")
+
+    degree = rh_nurbs.Degree
+    n = rh_nurbs.Points.Count
+    rational = rh_nurbs.IsRational
+
+    control_points = []
+    weights: list = []
+    for i in range(n):
+        loc = rh_nurbs.Points[i].Location
+        control_points.append(Vec(loc.X, loc.Y, loc.Z))
+        if rational:
+            weights.append(rh_nurbs.Points[i].Weight)
+
+    rhino_knots = [rh_nurbs.Knots[i] for i in range(rh_nurbs.Knots.Count)]
+    full_knots = [rhino_knots[0]] + rhino_knots + [rhino_knots[-1]]
+    knots, mults = _compact_knots(full_knots)
+
+    return Curve(
+        control_points=control_points,
+        knots=knots,
+        multiplicities=mults,
+        degree=degree,
+        weights=weights if rational else None,
+        closed=rh_nurbs.IsClosed,
+    )
+
+
+def curve_to_rhino_nurbs(curve: Curve) -> Any:
+    """Convert an ifckit Curve to a Rhino NurbsCurve.
+
+    Strips one superfluous knot from each end of the full knot vector
+    to produce the Rhino ``n + d − 1`` convention.
+
+    Args:
+        curve: ``ifckit.geometry.Curve``
+
+    Returns:
+        ``Rhino.Geometry.NurbsCurve``
+    """
+    _require_rhino("curve_to_rhino_nurbs")
+
+    n = len(curve.points)
+    d = curve.degree
+    full_uknots = _expand_knots(curve.knots, curve.multiplicities)
+    rhino_knots = full_uknots[1:-1]
+
+    nc = Rhino.Geometry.NurbsCurve(3, curve.rational, d + 1, n)
+
+    if curve.rational:
+        w = curve._weights
+        for i in range(n):
+            p = curve.points[i]
+            nc.Points.SetPoint(i, p.x * w[i], p.y * w[i], p.z * w[i], w[i])
+    else:
+        for i in range(n):
+            p = curve.points[i]
+            nc.Points.SetPoint(i, p.x, p.y, p.z)
+
+    for i, k in enumerate(rhino_knots):
+        nc.Knots[i] = k
+
+    return nc
+
+
+def rhino_brep_to_surface(rh_brep: Any) -> Surface:
+    """Convert a Rhino Brep to an ifckit Surface.
+
+    Extracts the underlying untrimmed NurbsSurface from the first face.
+    Non‑NURBS surfaces are auto‑converted via ``ToNurbsSurface()``.
+
+    Args:
+        rh_brep: ``Rhino.Geometry.Brep``
+
+    Returns:
+        ``ifckit.geometry.Surface``
+
+    Raises:
+        ValueError: if the Brep has no faces or no extractable NURBS surface.
+    """
+    _require_rhino("rhino_brep_to_surface")
+
+    import Rhino.Geometry as rg
+
+    if rh_brep is None:
+        raise ValueError("rh_brep is None")
+    faces = rh_brep.Faces
+    if faces is None or faces.Count == 0:
+        raise ValueError("Brep has no faces")
+
+    for fi in range(faces.Count):
+        face = faces[fi]
+        underlying = face.UnderlyingSurface()
+        if underlying is None:
+            continue
+
+        ns = underlying
+        if not isinstance(ns, rg.NurbsSurface):
+            if hasattr(underlying, "ToNurbsSurface"):
+                converted = underlying.ToNurbsSurface()
+                if isinstance(converted, rg.NurbsSurface):
+                    ns = converted
+                else:
+                    continue
+            else:
+                continue
+
+        ud = ns.Degree(0)
+        vd = ns.Degree(1)
+        nu_pts = ns.Points.CountU
+        nv_pts = ns.Points.CountV
+        rational = ns.IsRational
+
+        control_points = []
+        weights = None
+        if rational:
+            weights = []
+        for ui in range(nu_pts):
+            row = []
+            if rational:
+                wrow = []
+            for vi in range(nv_pts):
+                cp = ns.Points.GetControlPoint(ui, vi)
+                loc = cp.Location
+                row.append(Vec(loc.X, loc.Y, loc.Z))
+                if rational:
+                    wrow.append(cp.Weight)
+            control_points.append(row)
+            if rational:
+                weights.append(wrow)
+
+        rhino_uk = [ns.KnotsU[i] for i in range(ns.KnotsU.Count)]
+        rhino_vk = [ns.KnotsV[i] for i in range(ns.KnotsV.Count)]
+        full_uk = [rhino_uk[0]] + rhino_uk + [rhino_uk[-1]]
+        full_vk = [rhino_vk[0]] + rhino_vk + [rhino_vk[-1]]
+        uknots, umults = _compact_knots(full_uk)
+        vknots, vmults = _compact_knots(full_vk)
+
+        return Surface(
+            control_points=control_points,
+            uknots=uknots,
+            vknots=vknots,
+            umults=umults,
+            vmults=vmults,
+            udegree=ud,
+            vdegree=vd,
+            weights=weights,
+            uclosed=ns.IsClosed(0),
+            vclosed=ns.IsClosed(1),
+        )
+
+    raise ValueError("Brep has no extractable NurbsSurface face")
+
+
+def surface_to_rhino(surface: Surface) -> Any:
+    """Convert an ifckit Surface to a Rhino NurbsSurface for preview.
+
+    Strips one superfluous knot from each end of each knot direction
+    to match the Rhino ``n + d − 1`` convention.
+
+    Args:
+        surface: ``ifckit.geometry.Surface``
+
+    Returns:
+        ``Rhino.Geometry.NurbsSurface``
+    """
+    _require_rhino("surface_to_rhino")
+
+    nu = surface.nu
+    nv = surface.nv
+    ud = surface.udegree
+    vd = surface.vdegree
+
+    full_uknots = _expand_knots(surface.uknots, surface.umults)
+    full_vknots = _expand_knots(surface.vknots, surface.vmults)
+    rhino_uk = full_uknots[1:-1]
+    rhino_vk = full_vknots[1:-1]
+
+    ns = Rhino.Geometry.NurbsSurface.Create(3, surface.rational, ud + 1, vd + 1, nu, nv)
+
+    if surface.rational:
+        w = surface._weights
+        for i in range(nu):
+            for j in range(nv):
+                p = surface.control_points[i][j]
+                ns.Points.SetPoint(i, j, p.x * w[i][j], p.y * w[i][j], p.z * w[i][j], w[i][j])
+    else:
+        for i in range(nu):
+            for j in range(nv):
+                p = surface.control_points[i][j]
+                ns.Points.SetPoint(i, j, p.x, p.y, p.z)
+
+    for i, k in enumerate(rhino_uk):
+        ns.KnotsU[i] = k
+    for j, k in enumerate(rhino_vk):
+        ns.KnotsV[j] = k
+
+    return ns
+
+
 def path_to_rhino_curve(geom: Any) -> Any:
-    """Convert a Line, Arc, Path, or Profile to a Rhino PolyCurve.
+    """Convert a Line, Arc, Curve, Path, or Profile to a Rhino PolyCurve.
 
     Accepts any of:
     - ``ifckit.geometry.Line``    — single straight segment
     - ``ifckit.geometry.Arc``     — single circular arc
+    - ``ifckit.geometry.Curve``   — single NURBS curve
     - ``ifckit.geometry.Path``    — ordered sequence of Line/Arc segments
     - ``ifckit.profiles.Profile`` — profile outline via ``to_path()``
 
@@ -217,14 +471,16 @@ def path_to_rhino_curve(geom: Any) -> Any:
         geom = geom.to_path()
 
     if isinstance(geom, Line):
-        segments = [geom]
+        segments: list = [geom]
     elif isinstance(geom, Arc):
+        segments = [geom]
+    elif isinstance(geom, Curve):
         segments = [geom]
     elif isinstance(geom, Path):
         segments = geom.segments
     else:
         raise TypeError(
-            f"path_to_rhino_curve() expects Line, Arc or Path, got {type(geom).__name__}"
+            f"path_to_rhino_curve() expects Line, Arc, Curve or Path, got {type(geom).__name__}"
         )
 
     rg = Rhino.Geometry
@@ -244,6 +500,9 @@ def path_to_rhino_curve(geom: Any) -> Any:
             plane = rg.Plane(center, x_axis, rg.Vector3d.CrossProduct(normal, x_axis))
             rhino_arc = rg.Arc(plane, seg.radius, seg.angle)
             polycurve.Append(rg.ArcCurve(rhino_arc))
+
+        elif isinstance(seg, Curve):
+            polycurve.Append(curve_to_rhino_nurbs(seg))
 
     return polycurve
 

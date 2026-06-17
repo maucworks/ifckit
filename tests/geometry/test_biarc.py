@@ -16,8 +16,10 @@ from ifckit.geometry.biarc import (
     build_arc_from_start_tangent,
     estimate_deviation,
     fit_biarcs,
+    simplify_biarcs,
     solve_biarc,
 )
+from ifckit.geometry.primitives import Arc
 
 TOL = 1e-6
 
@@ -190,3 +192,86 @@ class TestHelpers:
         line = Line(Vec(5, 0, 0), Vec(5, 0, 0))
         d = _dist_to_line(Vec(10, 0, 0), line)
         assert d == pytest.approx(5.0)
+
+
+# ---------------------------------------------------------------------------
+# simplify_biarcs
+# ---------------------------------------------------------------------------
+
+
+class TestSimplifyBiarcs:
+    def test_no_change_when_no_tiny_arcs(self):
+        segs = [
+            Arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), math.pi / 4),
+            Arc(Vec(2, 1, 0), Vec(0, 0, 1), Vec(3, 1, 0), math.pi / 3),
+        ]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        assert len(result) == len(segs)
+        for r, s in zip(result, segs):
+            assert isinstance(r, Arc)
+
+    def test_collapses_tiny_arc_to_line(self):
+        segs = [Arc(Vec(100, 0, 0), Vec(0, 0, 1), Vec(101, 0, 0), 0.0005)]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        assert len(result) == 1
+        assert isinstance(result[0], Line)
+
+    def test_large_arc_unchanged(self):
+        segs = [Arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), 1.0)]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        assert isinstance(result[0], Arc)
+
+    def test_merges_adjacent_lines(self):
+        segs = [
+            Line(Vec(0, 0, 0), Vec(1, 0, 0)),
+            Line(Vec(1, 0, 0), Vec(2, 0, 0)),
+            Line(Vec(2, 0, 0), Vec(3, 0, 0)),
+        ]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        assert len(result) == 1
+        assert isinstance(result[0], Line)
+        assert (result[0].end - Vec(3, 0, 0)).length() < TOL
+
+    def test_collapse_then_merge_creates_single_line(self):
+        segs = [
+            Arc(Vec(100, 0, 0), Vec(0, 0, 1), Vec(100.5, 0, 0), 0.0005),
+            Arc(Vec(100, 0, 0), Vec(0, 0, 1), Vec(101.0, 0, 0), 0.0005),
+        ]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        assert len(result) == 1
+        assert isinstance(result[0], Line)
+
+    def test_g1_on_boundary_after_collapse(self):
+        a = Arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), math.pi / 2)
+        tiny = Arc(Vec(100, 0, 0), Vec(0, 0, 1), Vec(101, 0, 0), 0.0001)
+        segs = [a, tiny]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        assert len(result) >= 1
+        tan_end = result[0].tangent_at_end() if isinstance(result[0], Arc) else (
+            (result[0].end - result[0].start).normalized()
+        )
+        if len(result) >= 2:
+            tan_start = result[1].tangent_at_start() if isinstance(result[1], Arc) else (
+                (result[1].end - result[1].start).normalized()
+            )
+            assert abs(tan_end.angle_to(tan_start)) < 0.01
+
+    def test_min_angle_zero_returns_unchanged(self):
+        tiny = Arc(Vec(100, 0, 0), Vec(0, 0, 1), Vec(101, 0, 0), 0.0001)
+        segs = [tiny]
+        result = simplify_biarcs(segs, min_angle=0.0)
+        assert isinstance(result[0], Arc)
+
+    def test_empty_list(self):
+        result = simplify_biarcs([], min_angle=0.001)
+        assert result == []
+
+    def test_two_adjacent_tiny_arcs_collapsed_iterative(self):
+        tiny1 = Arc(Vec(100, 0, 0), Vec(0, 0, 1), Vec(100.5, 0, 0), 0.0002)
+        tiny2 = Arc(Vec(100.5, 0, 0), Vec(0, 0, 1), Vec(101.0, 0, 0), 0.0003)
+        normal = Arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(1, 0, 0), math.pi / 3)
+        segs = [tiny1, tiny2, normal]
+        result = simplify_biarcs(segs, min_angle=0.001)
+        for seg in result:
+            if isinstance(seg, Arc):
+                assert abs(seg.angle) >= 0.001

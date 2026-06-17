@@ -175,6 +175,55 @@ class Path:
         """
         return self.tangent_at_length(t * self.length)
 
+    def divide(
+        self,
+        num: Optional[int] = None,
+        dist: Optional[float] = None,
+    ) -> List[Tuple[float, Vec, Vec]]:
+        """Distribute points along the path at equal arc-length intervals.
+
+        Returns a list of ``(t, point, tangent)`` tuples where *t* is the
+        normalised parameter in ``[0, 1]``.
+
+        Exactly one of *num* or *dist* must be given.
+
+        Args:
+            num: Number of points (inclusive of start and end).
+            dist: Step distance along the path in model units.
+
+        Returns:
+            List of ``(t, point, tangent)`` tuples.
+        """
+        if (num is None) == (dist is None):
+            raise ValueError("Exactly one of 'num' or 'dist' must be specified")
+        total = self.length
+        if total < 1e-12:
+            raise ValueError("Cannot divide a zero-length path")
+
+        if num is not None:
+            if num < 2:
+                raise ValueError("num must be at least 2")
+            step = total / (num - 1)
+        else:
+            step = dist
+
+        result: List[Tuple[float, Vec, Vec]] = []
+        d = 0.0
+        while d <= total + 1e-12:
+            d = min(d, total)
+            t = d / total
+            result.append(
+                (
+                    t,
+                    self.point_at_length(d),
+                    self.tangent_at_length(d),
+                )
+            )
+            if d >= total:
+                break
+            d += step
+        return result
+
     def subpath(self, t_start: float, t_end: float) -> "Path":
         """Return a new Path containing the portion from ``t_start`` to ``t_end``.
 

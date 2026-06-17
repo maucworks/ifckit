@@ -315,3 +315,108 @@ def fit_biarcs(
     segments: List = []
     _subdivide(curve_eval, 0.0, 1.0, tolerance, max_depth, max_depth, segments)
     return segments
+
+
+# ---------------------------------------------------------------------------
+# Post-process: collapse near-straight arcs + G1 restore
+# ---------------------------------------------------------------------------
+
+
+def _seg_tangent_at_start(seg):
+    if isinstance(seg, Arc):
+        return seg.tangent_at_start()
+    if isinstance(seg, Line):
+        d = seg.end - seg.start
+        try:
+            return d.normalized()
+        except ValueError:
+            return None
+    return None
+
+
+def _seg_tangent_at_end(seg):
+    if isinstance(seg, Arc):
+        return seg.tangent_at_end()
+    if isinstance(seg, Line):
+        d = seg.end - seg.start
+        try:
+            return d.normalized()
+        except ValueError:
+            return None
+    return None
+
+
+def simplify_biarcs(
+    segments: List,
+    min_angle: float = 0.001,
+    max_iterations: int = 10,
+) -> List:
+    """Collapse near-straight arcs to lines and iteratively restore G1 continuity.
+
+    *min_angle* is the threshold in radians below which an arc is considered
+    straight enough to replace with a ``Line``.  After collapsing, adjacent
+    ``Line`` segments are merged and G1 breaks are repaired by re-fitting the
+    boundary segments as a bi‑arc pair.
+
+    Args:
+        segments:       List of ``Arc`` and ``Line`` segments (from ``fit_biarcs``).
+        min_angle:      Threshold in radians (default ``0.001`` ≈ 0.057°).
+        max_iterations: Safety cap on repair loops.
+
+    Returns:
+        A new list of ``Arc`` and ``Line`` segments with G1 continuity restored.
+    """
+    segs = list(segments)
+
+    for _ in range(max_iterations):
+        changed = False
+
+        # Phase 1: collapse tiny arcs to lines
+        for i, seg in enumerate(segs):
+            if isinstance(seg, Arc) and abs(seg.angle) < min_angle:
+                segs[i] = Line(seg.start, seg.end)
+                changed = True
+
+        # Phase 2: merge runs of adjacent lines into single lines
+        merged: List = []
+        i = 0
+        while i < len(segs):
+            if isinstance(segs[i], Line):
+                start = segs[i].start
+                end = segs[i].end
+                j = i + 1
+                while j < len(segs) and isinstance(segs[j], Line):
+                    end = segs[j].end
+                    changed = True
+                    j += 1
+                merged.append(Line(start, end))
+                i = j
+            else:
+                merged.append(segs[i])
+                i += 1
+        segs = merged
+
+        # Phase 3: reconnect G1 at boundaries
+        i = 0
+        while i < len(segs) - 1:
+            seg_a = segs[i]
+            seg_b = segs[i + 1]
+            tan_a = _seg_tangent_at_end(seg_a)
+            tan_b = _seg_tangent_at_start(seg_b)
+            if tan_a is not None and tan_b is not None and abs(tan_a.angle_to(tan_b)) > 0.001:
+                p0 = seg_a.start
+                t0 = _seg_tangent_at_start(seg_a)
+                p1 = seg_b.end
+                t1 = _seg_tangent_at_end(seg_b)
+                if t0 is not None and t1 is not None:
+                    a0, a1, _ = solve_biarc(p0, t0, p1, t1)
+                    if a0 is not None and a1 is not None:
+                        segs[i] = a0
+                        segs[i + 1] = a1
+                        changed = True
+            i += 1
+
+        if not changed:
+            break
+
+    return segs

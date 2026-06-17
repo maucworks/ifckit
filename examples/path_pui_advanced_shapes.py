@@ -133,7 +133,7 @@ def main():
     square_window = PendingWindow(
         path=square_path,
         component_graph="path_pui",
-        plane=Plane(Vec(2, 0.0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
+        plane=Plane(Vec(6, 0.0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
         parameters={
             "lining_thickness": 0.05,
             "lining_depth": 0.07,
@@ -168,7 +168,7 @@ def main():
     tall_window = PendingWindow(
         path=tall_path,
         component_graph="path_pui",
-        plane=Plane(Vec(2, 0, 1), Vec(1, 0, 0), Vec(0, 0, 1)),
+        plane=Plane(Vec(10, 0, 1.5), Vec(1, 0, 0), Vec(0, 0, 1)),
         parameters={
             "lining_thickness": 0.055,
             "lining_depth": 0.07,

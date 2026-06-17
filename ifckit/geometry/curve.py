@@ -358,7 +358,12 @@ class Curve:
 
     # ── bi‑arc fitting ──────────────────────────────────────────────
 
-    def to_biarcs(self, tol: float = 0.01, max_iteration: int = 10) -> "Path":
+    def to_biarcs(
+        self,
+        tol: float = 0.01,
+        max_iteration: int = 10,
+        min_arc_angle: float = 0.001,
+    ) -> "Path":
         """Approximate this NURBS curve as bi‑arcs → ``Path`` of ``Line`` + ``Arc``.
 
         Uses recursive bi‑arc fitting (``ifckit.geometry.biarc.fit_biarcs``).
@@ -366,14 +371,18 @@ class Curve:
         Args:
             tol:           Maximum deviation from the original curve.
             max_iteration: Maximum recursion depth (default 10).
+            min_arc_angle: Arcs with ``|angle| < min_arc_angle`` (rad) are collapsed
+                           to lines and G1 is iteratively restored (default 0.001).
 
         Returns:
             A ``Path`` containing only ``Line`` and ``Arc`` segments.
         """
-        from ifckit.geometry.biarc import fit_biarcs
+        from ifckit.geometry.biarc import fit_biarcs, simplify_biarcs
         from ifckit.geometry.path import Path
 
         segments = fit_biarcs(self.point_at, tolerance=tol, max_depth=max_iteration)
+        if min_arc_angle > 0:
+            segments = simplify_biarcs(segments, min_angle=min_arc_angle)
         path = Path()
         for seg in segments:
             if isinstance(seg, Arc):
@@ -382,9 +391,14 @@ class Curve:
                 path._segments.append(seg)
         return path
 
-    def to_path(self, tolerance: float = 0.01, max_depth: int = 10) -> "Path":
+    def to_path(
+        self,
+        tolerance: float = 0.01,
+        max_depth: int = 10,
+        min_arc_angle: float = 0.001,
+    ) -> "Path":
         """Alias for :meth:`to_biarcs`."""
-        return self.to_biarcs(tol=tolerance, max_iteration=max_depth)
+        return self.to_biarcs(tol=tolerance, max_iteration=max_depth, min_arc_angle=min_arc_angle)
 
     # ── IFC serialisation ──────────────────────────────────────────
 
@@ -471,27 +485,37 @@ class Curve:
         """Create a cubic Bezier curve from two points and their tangents.
 
         The curve passes through *start* and *end* with the given
-        tangent directions at each endpoint.  The interior shape is
-        determined by the tangent magnitude(s).
+        tangent directions at each endpoint.  The tangent **magnitude**
+        determines the curve stiffness — a longer tangent pulls the
+        curve further before bending toward the other endpoint.
 
         Args:
             start:      Start point.
             tan_start:  Start tangent (direction + magnitude).
             end:        End point.
             tan_end:    End tangent (direction + magnitude).
-            scale:      Optional uniform multiplier for both tangents.
-                       When ``None`` (default) a chord‑length heuristic
-                       is used: ``|end - start| / 3``.
+            scale:      Optional uniform multiplier to override both
+                        tangent magnitudes.  When ``None`` (default)
+                        the magnitude of each tangent vector is used
+                        directly (falling back to ``|end - start| / 3``
+                        for zero‑length tangents).
 
         Returns:
             A new degree‑3 BSpline (cubic Bezier) Curve.
         """
         chord = end - start
-        if scale is None:
-            scale = chord.length() / 3.0
+        default = chord.length() / 3.0
 
-        ts = tan_start.normalized() * scale if tan_start.length() > 1e-12 else Vec(0, 0, 0)
-        te = tan_end.normalized() * scale if tan_end.length() > 1e-12 else Vec(0, 0, 0)
+        ts_len = tan_start.length()
+        te_len = tan_end.length()
+        use_start = ts_len if ts_len > 1e-12 else default
+        use_end = te_len if te_len > 1e-12 else default
+
+        if scale is not None:
+            use_start = use_end = scale
+
+        ts = tan_start.normalized() * use_start if ts_len > 1e-12 else Vec(0, 0, 0)
+        te = tan_end.normalized() * use_end if te_len > 1e-12 else Vec(0, 0, 0)
 
         control_points = [start, start + ts, end - te, end]
         knots = [0.0, 1.0]

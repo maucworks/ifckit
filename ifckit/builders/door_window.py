@@ -661,20 +661,19 @@ def _build_model_b(
     Returns:
         The created IfcDoor or IfcWindow entity.
     """
+    from ifckit.builders._geom import plane_from_local_placement
     from ifckit.builders.component_graph import evaluate_opening_nodes
     from ifckit.builders.opening import build_opening_from_solids
 
     if not pending.component_graph:
         raise ValueError("_build_model_b: pending.component_graph must be set.")
 
-    # Derive plane from path if not explicitly set
-    fill_plane = pending.plane
-    if fill_plane is None:
-        path = getattr(pending, "path", None)
-        if path is not None:
-            fill_plane = path.plane
-    if fill_plane is None:
+    if not pending.plane:
         raise ValueError("_build_model_b: pending.plane must be set.")
+
+    # Transform plane from storey coords to wall-local coords
+    wall_plane = plane_from_local_placement(host_entity.ObjectPlacement)
+    local_plane = pending.plane.in_frame(wall_plane)
 
     wall_thickness = _extract_wall_thickness(host_entity)
     params = {
@@ -688,14 +687,14 @@ def _build_model_b(
 
     path = getattr(pending, "path", None)
     opening_components = evaluate_opening_nodes(
-        pending.component_graph, ifc_file, context, params, fill_plane, path=path
+        pending.component_graph, ifc_file, context, params, local_plane, path=path
     )
 
     opening_solids, projection_solids, fill_components = _split_by_role(opening_components)
 
     opening_entity = build_opening_from_solids(
         ifc_file,
-        fill_plane,
+        local_plane,
         opening_solids,
         host_entity,
         context,

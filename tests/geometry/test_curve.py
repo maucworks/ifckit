@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from ifckit.geometry import Curve, Plane, Transform, Vec
+from ifckit.geometry import Arc, Curve, Plane, Transform, Vec
 
 TOL = 1e-6
 
@@ -314,4 +314,36 @@ class TestToBiarcs:
     def test_bezier_to_path(self):
         c = _bezier_curve()
         p = c.to_path(tolerance=0.1)
+        assert len(p.segments) > 0
+
+    def test_min_arc_angle_default(self):
+        c = _bezier_curve()
+        p = c.to_biarcs(tol=0.1)
+        assert len(p.segments) > 0
+
+    def test_min_arc_angle_zero_opt_out(self):
+        c = _bezier_curve()
+        p = c.to_biarcs(tol=0.1, min_arc_angle=0.0)
+        assert len(p.segments) > 0
+
+    def test_g1_continuity_after_simplify(self):
+        c = _bezier_curve()
+        p = c.to_biarcs(tol=0.1, min_arc_angle=0.001)
+        segs = p.segments
+        for i in range(len(segs) - 1):
+            seg_a = segs[i]
+            seg_b = segs[i + 1]
+            tan_a = seg_a.tangent_at_end() if isinstance(seg_a, Arc) else (
+                (seg_a.end - seg_a.start).normalized()
+            )
+            tan_b = seg_b.tangent_at_start() if isinstance(seg_b, Arc) else (
+                (seg_b.end - seg_b.start).normalized()
+            )
+            if tan_a is not None and tan_b is not None:
+                angle = abs(tan_a.angle_to(tan_b))
+                assert angle < 0.02, f"G1 break of {angle} rad at segment {i}"
+
+    def test_to_path_forwards_min_arc_angle(self):
+        c = _linear_curve()
+        p = c.to_path(tolerance=0.01, min_arc_angle=0.001)
         assert len(p.segments) > 0

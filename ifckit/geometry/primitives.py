@@ -362,6 +362,18 @@ class Plane:
         d = world_pt - self.origin
         return Vec(d @ self.x_axis, d @ self.y_axis, d @ self.z_axis)
 
+    def to_local_vector(self, world_vec: "Vec") -> "Vec":
+        """Express a world vector in local frame coordinates (no translation)."""
+        return Vec(world_vec @ self.x_axis, world_vec @ self.y_axis, world_vec @ self.z_axis)
+
+    def in_frame(self, target_frame: "Plane") -> "Plane":
+        """Express this plane in target_frame's local coordinates."""
+        return Plane(
+            target_frame.to_local(self.origin),
+            target_frame.to_local_vector(self.x_axis),
+            target_frame.to_local_vector(self.y_axis),
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "origin": self.origin.to_dict(),
