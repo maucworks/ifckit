@@ -195,6 +195,13 @@ class PendingBeam(PendingExtrudedElement):
                     Must not be parallel to the beam axis — raises
                     ValueError immediately if it is.
                     Defaults to world +Z (or +Y if axis is vertical).
+        plane:      Optional Plane that defines the full cross-section frame
+                    directly (x_axis = horiz, y_axis = vert, z_axis = extrusion
+                    direction).  When set, the builder uses this as the
+                    ObjectPlacement and ignores ``up``.  Use this when the
+                    caller has already computed a stable frame (e.g. from the
+                    path plane normal) to avoid orientation flips caused by
+                    segment direction reversals.
         clips:      Optional list of Planes for boolean clipping. Each
                     plane's z_axis points toward the material to keep.
         name:       Element name.
@@ -208,6 +215,7 @@ class PendingBeam(PendingExtrudedElement):
         axis: Line,
         profile: "Sequence[ProfilePoint]",
         up: Optional[Vec] = None,
+        plane: Optional[Plane] = None,
         clips: Optional[List[Plane]] = None,
         # backwards-compat
         start_clip: Optional[Plane] = None,
@@ -228,6 +236,7 @@ class PendingBeam(PendingExtrudedElement):
             style=style,
             properties=properties,
         )
+        self.plane = plane
         self.ref_line = ref_line
 
     @classmethod

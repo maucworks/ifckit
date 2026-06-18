@@ -73,7 +73,7 @@ from __future__ import annotations
 
 import math
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 from ifckit.geometry import Path, Plane, Vec
 from ifckit.profiles.anchor import VALID_ANCHORS, anchor_offset
@@ -102,6 +102,9 @@ class RegisterProfileType(type):
         return cls
 
 
+ProfileT = TypeVar("ProfileT", bound="Profile")
+
+
 class Profile(Path, metaclass=RegisterProfileType):
     """
     Abstract base class for all ifckit profile types.
@@ -128,6 +131,19 @@ class Profile(Path, metaclass=RegisterProfileType):
         super().__init__(plane=_XY_PLANE)
         # Segment list is populated lazily on first access via _ensure_segments()
         self._segments_built: bool = False
+
+    def __call__(self: ProfileT, **overrides: Any) -> ProfileT:
+        """Create a new profile with the same parameters, overriding given keys.
+
+        Usage::
+
+            ipe = IBeamProfile(height=0.2, anchor="nw", rotation=math.radians(90))
+            ipe_s = ipe(anchor="s", rotation=0.0)
+            narrow = ipe(width=0.080)
+        """
+        d = self.to_dict()
+        d.update(overrides)
+        return type(self).from_dict(d)
 
     # ------------------------------------------------------------------
     # Lazy segment population

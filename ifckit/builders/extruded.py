@@ -93,17 +93,24 @@ class ExtrudedElementBuilder(BaseBuilder):
         # Cross-section frame (right-handed, Plane.z_axis = t = extrusion dir):
         #   vert  = up guide projected perpendicular to t  (profile Y = up)
         #   horiz = vert × t  →  horiz × vert = t  so Plane.z_axis = t ✓
-        t = axis.direction.normalized()
-        if pending.up is not None:
-            world_z = pending.up.normalized()
+        #
+        # When pending.plane is set, the caller has already computed a stable
+        # frame — use it directly.  This avoids orientation flips when segment
+        # direction is reversed (horiz = vert × t would flip for −t).
+        pending_plane = getattr(pending, "plane", None)
+        if pending_plane is not None:
+            op_plane = Plane(local_start, pending_plane.x_axis, pending_plane.y_axis)
         else:
-            world_z = Vec(0.0, 0.0, 1.0)
-            if abs(t @ world_z) > 0.999:
-                world_z = Vec(0.0, 1.0, 0.0)
-        vert = (world_z - t * (t @ world_z)).normalized()
-        horiz = (vert**t).normalized()
-
-        op_plane = Plane(local_start, horiz, vert)
+            t = axis.direction.normalized()
+            if pending.up is not None:
+                world_z = pending.up.normalized()
+            else:
+                world_z = Vec(0.0, 0.0, 1.0)
+                if abs(t @ world_z) > 0.999:
+                    world_z = Vec(0.0, 1.0, 0.0)
+            vert = (world_z - t * (t @ world_z)).normalized()
+            horiz = (vert**t).normalized()
+            op_plane = Plane(local_start, horiz, vert)
 
         # Solid placement = identity (profile coords live in OP local space)
         solid_pos = axis2placement3d(
@@ -114,13 +121,23 @@ class ExtrudedElementBuilder(BaseBuilder):
         )
 
         pts_2d = [(p.x, p.y) for p in pending.profile]
-        # Use the original profile source (Profile object) when available so we
-        # emit the correct native IFC type (e.g. IfcIShapeProfileDef).
-        # Fall back to the already-projected 2D point list for plain Vec lists.
+        # Use the native IFC profile type (e.g. IfcIShapeProfileDef) only when
+        # the profile has no rotation and no offset.  Rotation in the native path
+        # happens around the centroid (IfcAxis2Placement2D.Location), whereas
+        # _apply_transform() rotates around the anchor point — producing a
+        # different result.  When rotation or offset are present we fall back to
+        # the already-projected 2D point list, which always matches the revolved
+        # beam builder and has the correct position.
         profile_source = getattr(pending, "_profile_source", None)
         from ifckit.profiles.base import Profile as _Profile
 
-        if isinstance(profile_source, _Profile):
+        _use_native = (
+            isinstance(profile_source, _Profile)
+            and abs(profile_source.rotation) < 1e-10
+            and abs(profile_source.offset_x) < 1e-10
+            and abs(profile_source.offset_y) < 1e-10
+        )
+        if _use_native:
             profile = profile_to_ifc(ifc_file, profile_source)
         else:
             profile = profile_from_points(ifc_file, pts_2d)

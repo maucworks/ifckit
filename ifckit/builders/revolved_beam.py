@@ -52,24 +52,25 @@ class RevolvedBeamBuilder(BaseBuilder):
         cp_normal = pending.cp_normal  # may be None
         plane = getattr(pending, "plane", None)
         arc_n = arc.normal.normalized()
-        arc_tan = arc.tangent_at_start().normalized()
         if cp_normal is None:
             if plane is not None:
                 cp_normal = plane.z_axis.normalized()
 
-        mult_x = -1
-        mult_y = -1
-        needs_flip = False
-        if plane is not None:
-            mult_x = -1 if arc_tan.dot(plane.x_axis) < 0 else 1
+        # 90° pre-rotation: IFC spec for IfcRevolvedAreaSolid orients the
+        # profile differently than IfcExtrudedAreaSolid — swap axes to
+        # compensate.
+        pts_2d = [(-p.y, p.x) for p in pending.profile]
 
+        # When the arc's implicit plane normal differs from the main reference
+        # plane normal, flip the profile over the x-axis (y → -y).  This
+        # prevents mirroring when individual arcs sweep in opposite directions
+        # relative to the global up.
+        needs_flip = False
         if cp_normal is not None:
             needs_flip = arc_n.dot(cp_normal.normalized()) < 0
-
         if needs_flip:
-            mult_x *= -1
-            mult_y *= -1
-        pts_2d = [(mult_x * p.x, mult_y * p.y) for p in pending.profile]
+            pts_2d = [(-x, -y) for (x, y) in pts_2d]
+
         profile = profile_from_points(ifc_file, pts_2d)
 
         # Position = CP at arc center
@@ -128,6 +129,7 @@ class RevolvedBeamBuilder(BaseBuilder):
         )
         beam.Representation = prod_rep
         beam.ObjectPlacement = beam_plac
+        beam.Name = pending.name
 
         ifcopenshell.api.run(
             "spatial.assign_container",

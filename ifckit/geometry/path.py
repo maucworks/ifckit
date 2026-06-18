@@ -627,6 +627,9 @@ class Path:
             x_axis = Vec(0, 0, 1)
         else:
             x_axis = Vec(1, 0, 0)
+        # Ensure x_axis is perfectly orthogonal to normal (floating point safety).
+        x_axis = x_axis - normal * (normal @ x_axis)
+        x_axis = x_axis.normalized()
         return Plane(origin, x_axis, normal)
 
     @classmethod
@@ -920,7 +923,11 @@ class Path:
             else:  # Arc
                 new_center = target.closest_point(seg.center)
                 new_start = target.closest_point(seg.start)
-                new_segs.append(Arc(new_center, target.z_axis, new_start, seg.angle))
+                # Preserve the original sweep direction: if the arc's normal
+                # opposes target.z_axis, negate the angle so the arc still
+                # sweeps in the same rotational direction.
+                sign = 1.0 if (seg.normal @ target.z_axis) >= 0 else -1.0
+                new_segs.append(Arc(new_center, target.z_axis, new_start, seg.angle * sign))
         self._segments = new_segs
         self._plane = target
         return self
