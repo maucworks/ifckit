@@ -10,6 +10,7 @@ from ifckit.builders.base import BuilderRegistry, IIfcBuilder
 from ifckit.builders.beam_factory import PathType, build_beam, classify_path
 from ifckit.builders.bridge import AlignmentBuilder
 from ifckit.builders.extruded import ExtrudedElementBuilder
+from ifckit.builders.fill_builder import FillBuilder
 from ifckit.builders.opening import OpeningBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
@@ -32,6 +33,7 @@ def default_registry() -> BuilderRegistry:
     registry.register(RevolvedBeamBuilder())
     registry.register(SectionedSpineBuilder())
     registry.register(TaperedExtrusionBuilder())
+    registry.register(FillBuilder())
     registry.register(OpeningBuilder())
 
     return registry

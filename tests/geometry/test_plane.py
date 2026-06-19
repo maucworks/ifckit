@@ -84,3 +84,39 @@ def test_to_local():
 def test_repr():
     p = Plane.world_xy()
     assert "Plane(" in repr(p)
+
+
+def test_flip_x_negates_x_and_z():
+    p = Plane.world_xy()
+    f = p.flip_x()
+    assert f.origin.equals(Vec(0, 0, 0))
+    assert f.x_axis.equals(Vec(-1, 0, 0))
+    assert f.y_axis.equals(Vec(0, 1, 0))
+    assert f.z_axis.equals(Vec(0, 0, -1))
+
+
+def test_flip_y_negates_y_and_z():
+    p = Plane.world_xy()
+    f = p.flip_y()
+    assert f.origin.equals(Vec(0, 0, 0))
+    assert f.x_axis.equals(Vec(1, 0, 0))
+    assert f.y_axis.equals(Vec(0, -1, 0))
+    assert f.z_axis.equals(Vec(0, 0, -1))
+
+
+def test_flip_z_negates_z_only():
+    p = Plane.world_xy()
+    f = p.flip_z()
+    assert f.origin.equals(Vec(0, 0, 0))
+    assert f.x_axis.equals(Vec(1, 0, 0))
+    assert f.y_axis.equals(Vec(0, -1, 0))
+    assert f.z_axis.equals(Vec(0, 0, -1))
+
+
+def test_flip_z_on_clip_plane_swaps_keep_side():
+    """Verify the normal is reversed via flip_z (same as flip_y)."""
+    clip = Plane.from_origin_and_normal(Vec(2, 0, 0), Vec(-1, 0, 0))
+    flipped = clip.flip_z()
+    # flipped normal = +X → keep side is now x < 2 (negative sd along z)
+    assert flipped.z_axis.equals(Vec(1, 0, 0))
+    assert flipped.origin.equals(Vec(2, 0, 0))

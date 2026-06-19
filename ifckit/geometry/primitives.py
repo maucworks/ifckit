@@ -414,6 +414,18 @@ class Plane:
         t = Transform.rotation(axis, angle)
         return Plane(t.apply(self.origin), t.apply_vector(self.x_axis), t.apply_vector(self.y_axis))
 
+    def flip_x(self) -> "Plane":
+        """Negate x_axis. z_axis is also negated (x→-x ⇒ z→-z)."""
+        return Plane(self.origin, -self.x_axis, self.y_axis)
+
+    def flip_y(self) -> "Plane":
+        """Negate y_axis. z_axis is also negated (y→-y ⇒ z→-z)."""
+        return Plane(self.origin, self.x_axis, -self.y_axis)
+
+    def flip_z(self) -> "Plane":
+        """Negate z_axis (normal). Keeps x_axis, negates y_axis for right-handedness."""
+        return Plane(self.origin, self.x_axis, -self.y_axis)
+
     def copy(self) -> "Plane":
         """Return an independent copy."""
         return Plane(self.origin.copy(), self.x_axis.copy(), self.y_axis.copy())

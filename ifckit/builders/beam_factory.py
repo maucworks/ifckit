@@ -73,12 +73,57 @@ def classify_path(path: Line | Arc | Path) -> str:
     raise TypeError(f"Unknown path type: {type(path).__name__}")
 
 
+def _segment_intersects_clip(
+    seg: Line | Arc,
+    clip: Plane,
+) -> bool:
+    """True if *clip* might remove material from *seg*.
+
+    Returns False only when both endpoints (and arc midpoint for arcs) are
+    strictly on the keep side (negative signed distance along clip.z_axis).
+    Checks the centerline only — does not account for profile extent.
+
+    A point with signed distance exactly zero (on the clip plane) is treated
+    as on the remove side — conservative: may create an unnecessary boolean
+    but never misses a required clip.
+    """
+
+    def _sd(pt: Vec) -> float:
+        return (pt - clip.origin) @ clip.z_axis
+
+    if _sd(seg.start) >= 0 or _sd(seg.end) >= 0:
+        return True
+    if isinstance(seg, Arc) and _sd(seg.midpoint) >= 0:
+        return True
+    return False
+
+
+def _segment_completely_removed(seg: Line | Arc, clip: Plane) -> bool:
+    """True when ALL tested points on *seg* are on the remove side (sd >= 0).
+
+    For arcs the midpoint is also checked — catches arcs that curve entirely
+    to the remove side even when both endpoints happen to be keep-side.
+    """
+
+    def _sd(pt: Vec) -> float:
+        return (pt - clip.origin) @ clip.z_axis
+
+    if _sd(seg.start) < 0 or _sd(seg.end) < 0:
+        return False
+    if isinstance(seg, Arc) and _sd(seg.midpoint) < 0:
+        return False
+    return True
+
+
 def beam_from_path(
     path: Path,
     profile: Profile,
     up: Optional[Vec] = None,
     plane: Optional[Plane] = None,
     name: str = "",
+    clips: Optional[List[Plane]] = None,
+    start_clip: Optional[Plane] = None,
+    end_clip: Optional[Plane] = None,
 ) -> List[Union[PendingBeam, PendingRevolvedBeam]]:
     """Split a planar Path into one PendingBeam / PendingRevolvedBeam per segment.
 
@@ -95,6 +140,18 @@ def beam_from_path(
     For Arc segments a construction plane is derived so that the revolved beam's
     profile Y aligns with ``up``.
 
+    Clip planes are forwarded only to segments they intersect (checked via
+    signed distance).  A clip whose keep side contains the entire segment is
+    skipped — no unnecessary IfcBooleanClippingResult is created.
+
+    Segments whose every point lies on the remove side of **any** clip are
+    omitted entirely — they would produce a zero-volume solid.
+
+    A point with signed distance exactly zero (on the clip plane) is treated
+    as on the remove side (conservative).  Multi-clip interaction (e.g. two
+    clips together carving out a middle section) is beyond the scope of this
+    function — each clip is evaluated independently.
+
     Args:
         path:    Planar Path whose segments are Line and/or Arc objects.
         profile: Cross-section profile applied to every segment.
@@ -106,6 +163,10 @@ def beam_from_path(
                  the path was produced by intersecting with a known plane — this
                  avoids modifying the path geometry.  Defaults to ``path.plane``.
         name:    Element name applied to every generated pending element.
+        clips:   Optional list of ``Plane`` objects for boolean clipping.
+                 Only forwarded to segments the plane actually intersects.
+        start_clip: Backward-compat — prepended to ``clips``.
+        end_clip:   Backward-compat — appended to ``clips``.
 
     Returns:
         List of PendingBeam (for Line segments) and PendingRevolvedBeam (for
@@ -114,6 +175,26 @@ def beam_from_path(
     Raises:
         ValueError: If the path has no segments or has no computable plane.
     """
+    # Merge clips
+    merged: List[Plane] = list(clips) if clips else []
+    if start_clip is not None:
+        merged.insert(0, start_clip)
+    if end_clip is not None:
+        merged.append(end_clip)
+
+    result: List[Union[PendingBeam, PendingRevolvedBeam]] = []
+    path = path.continued(tol=0.1, snap=True)
+    t = path.tangent_at(0).normalized()
+
+    dot_x = t @ path.plane.x_axis
+    dot_y = t @ path.plane.y_axis
+    if abs(dot_x) > abs(dot_y):
+        dominant_axis = dot_x
+    else:
+        dominant_axis = dot_y
+    if dominant_axis < 0:
+        path.reverse()
+
     segments = path.segments
     if not segments:
         raise ValueError("beam_from_path: path has no segments")
@@ -121,74 +202,31 @@ def beam_from_path(
     # Reference plane: explicit argument wins over path.plane.
     ref_plane = plane if plane is not None else path.plane
 
-    # The path plane normal is stable — it is the same regardless of which
-    # direction individual segments were assembled.
-    plane_normal = ref_plane.z_axis.normalized()
-    up_n = (up if up is not None else ref_plane.y_axis).normalized()
-
-    result: List[Union[PendingBeam, PendingRevolvedBeam]] = []
-
-    # Determine whether up has a meaningful component inside the path plane.
-    # When up ∥ plane_normal (e.g. up is the plane's own normal) the in-plane
-    # component of up is zero and we cannot use it to define vert/horiz.  In
-    # that case we fall back to the plane's own fixed axes.
-    up_in_plane = up_n - plane_normal * (up_n @ plane_normal)
-    up_in_plane_is_valid = up_in_plane.length() > 1e-10
-
-    if up_in_plane_is_valid:
-        # Normal case: up has a component in the path plane.
-        # vert_ref: the in-plane up direction (will become profile Y).
-        # horiz_ref: perpendicular to vert_ref in the path plane — stable
-        #            because it does not depend on any segment tangent.
-        vert_ref = up_in_plane.normalized()
-        horiz_ref = (vert_ref**plane_normal).normalized()
-    else:
-        # up ∥ plane_normal: use the plane's own fixed axes.
-        # plane.y_axis becomes the profile Y (vert), plane.x_axis the profile X.
-        vert_ref = path.plane.y_axis
-        horiz_ref = path.plane.x_axis
-
     for seg in segments:
+        # Skip segments whose every point is removed by any single clip.
+        if any(_segment_completely_removed(seg, c) for c in merged):
+            continue
+
+        # Filter clips — only forward those that intersect this segment.
+        seg_clips = [c for c in merged if _segment_intersects_clip(seg, c)]
+
         if isinstance(seg, Line):
-            t = seg.direction.normalized()
-            vert = vert_ref - t * (vert_ref @ t)
-            if vert.length() < 1e-10:
-                # vert_ref ∥ t: use horiz_ref instead (orthogonal in plane)
-                vert = horiz_ref - t * (horiz_ref @ t)
-            vert = vert.normalized()
-            # Profile X: orthogonalise horiz_ref against vert — t-independent.
-            horiz = horiz_ref - vert * (horiz_ref @ vert)
-            if horiz.length() < 1e-10:
-                horiz = vert**t
-            horiz = horiz.normalized()
-            # Ensure perfect orthogonality after normalization (floating point safety).
-            horiz = horiz - vert * (vert @ horiz)
-            horiz = horiz.normalized()
-            seg_plane = Plane(seg.start, horiz, vert)
             result.append(
-                PendingBeam(axis=seg, profile=profile, plane=seg_plane, name="Beam_" + name)
+                PendingBeam(
+                    axis=seg,
+                    profile=profile,
+                    plane=ref_plane,
+                    clips=seg_clips or None,
+                    name="Beam_" + name,
+                )
             )
 
         elif isinstance(seg, Arc):
-            # Construction plane for PendingRevolvedBeam:
-            #   x_axis = radial (from center toward start)
-            #   y_axis = up projected ⊥ radial
-            # This ensures plane.z_axis (= radial × up_perp) acts as cp_normal,
-            # driving flip detection consistent with the up direction.
-            radial = (seg.start - seg.center).normalized()
-            up_perp = up_n - radial * (up_n @ radial)
-            if up_perp.length() < 1e-10:
-                up_perp = plane_normal - radial * (plane_normal @ radial)
-            up_perp = up_perp.normalized()
-            # Ensure perfect orthogonality after normalization (floating point safety).
-            up_perp = up_perp - radial * (radial @ up_perp)
-            up_perp = up_perp.normalized()
-            cp_plane = Plane(seg.start, radial, up_perp)
             result.append(
                 PendingRevolvedBeam(
                     arc=seg,
                     profile=profile,
-                    plane=cp_plane,
+                    clips=seg_clips or None,
                     name="Revolved_beam_" + name,
                 )
             )

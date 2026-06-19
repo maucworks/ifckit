@@ -191,10 +191,15 @@ def _build_fill_from_components(
     # Build shape representation
     has_boolean = any(s.is_a("IfcBooleanResult") for s in solids)
     has_swept = any(s.is_a("IfcExtrudedAreaSolid") for s in solids)
+    has_tessellation = any(s.is_a("IfcTriangulatedFaceSet") for s in solids)
     if has_boolean and has_swept:
         rep_type = "SolidModel"
     elif has_boolean:
         rep_type = "CSG"
+    elif has_swept:
+        rep_type = "SweptSolid"
+    elif has_tessellation:
+        rep_type = "Tessellation"
     else:
         rep_type = "SweptSolid"
 
@@ -867,10 +872,15 @@ def build_standalone_fill(
 
     has_boolean = any(s.is_a("IfcBooleanResult") for s in solids)
     has_swept = any(s.is_a("IfcExtrudedAreaSolid") for s in solids)
+    has_tessellation = any(s.is_a("IfcTriangulatedFaceSet") for s in solids)
     if has_boolean and has_swept:
         rep_type = "SolidModel"
     elif has_boolean:
         rep_type = "CSG"
+    elif has_swept:
+        rep_type = "SweptSolid"
+    elif has_tessellation:
+        rep_type = "Tessellation"
     else:
         rep_type = "SweptSolid"
 

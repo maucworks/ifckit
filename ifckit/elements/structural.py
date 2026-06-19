@@ -442,7 +442,10 @@ class PendingRevolvedBeam(PendingElement):
         plane:      Optional Plane — when set, ``plane.z_axis`` is used as
                    the canonical normal (equivalent to *cp_normal*).
                    Serialised for round‑trip but not used by the builder.
-        clip_data:  Optional clip plane data.
+        clips:      Optional list of ``Plane`` objects for boolean clipping.
+                   Each plane's z_axis points toward material to keep.
+        start_clip: Backward-compat — prepended to ``clips``.
+        end_clip:   Backward-compat — appended to ``clips``.
     """
 
     element_type = "revolved_beam"
@@ -455,10 +458,18 @@ class PendingRevolvedBeam(PendingElement):
         ref_line: Optional[Line] = None,
         cp_normal: Optional[Vec] = None,
         plane: Optional["Plane"] = None,
+        clips: Optional[List[Plane]] = None,
+        start_clip: Optional[Plane] = None,
+        end_clip: Optional[Plane] = None,
         style: Optional[RenderStyle] = None,
         properties: Optional[UserProperties] = None,
     ) -> None:
-        super().__init__(name=name, style=style, properties=properties)
+        merged: List[Plane] = list(clips) if clips else []
+        if start_clip is not None:
+            merged.insert(0, start_clip)
+        if end_clip is not None:
+            merged.append(end_clip)
+        super().__init__(name=name, clips=merged, style=style, properties=properties)
         self.arc = arc
         self._profile_source = profile
         self.profile = _coerce_profile(profile)
@@ -512,6 +523,7 @@ class PendingRevolvedBeam(PendingElement):
             )
         else:
             plane = None
+        clips = cls._clips_from_dict(d)
         return cls(
             arc=arc,
             profile=profile,
@@ -519,6 +531,7 @@ class PendingRevolvedBeam(PendingElement):
             name=d.get("name", ""),
             cp_normal=cp_normal,
             plane=plane,
+            clips=clips,
             style=cls._style_from_dict(d),
             properties=d.get("properties") or {},
         )

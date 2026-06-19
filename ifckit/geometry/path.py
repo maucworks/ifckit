@@ -9,6 +9,7 @@ support and path assembly helpers.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
@@ -23,6 +24,39 @@ from ifckit.geometry.primitives import (
     _signed_area,
 )
 from ifckit.geometry.transform import Transform
+
+
+@dataclass
+class PathPoint:
+    """A point sampled along a path.
+
+    Supports tuple-style unpacking and indexing for backward compatibility.
+
+    Examples:
+        pp = path.divide(dist=2.0)[0]
+        pp.t        # → 0.0
+        pp.point    # → Vec(...)
+        t, pt, tan = pp   # tuple unpacking
+        pp[0]       # → t
+    """
+
+    t: float
+    point: Vec
+    tangent: Vec
+
+    def __iter__(self):
+        yield self.t
+        yield self.point
+        yield self.tangent
+
+    def __getitem__(self, index: int) -> float | Vec:
+        if index == 0:
+            return self.t
+        elif index == 1:
+            return self.point
+        elif index == 2:
+            return self.tangent
+        raise IndexError("PathPoint index out of range")
 
 
 class Path:
@@ -179,6 +213,8 @@ class Path:
         self,
         num: Optional[int] = None,
         dist: Optional[float] = None,
+        *,
+        even: bool = True,
     ) -> List[Tuple[float, Vec, Vec]]:
         """Distribute points along the path at equal arc-length intervals.
 
@@ -189,10 +225,18 @@ class Path:
 
         Args:
             num: Number of points (inclusive of start and end).
-            dist: Step distance along the path in model units.
+            dist: Approximate step distance.
+                ``even=True`` (default): evenly distributed, spacing ≤ dist,
+                endpoints always included.
+                ``even=False``: fixed step from start, last step may be shorter.
+            even: When ``True`` (default) and ``dist`` is given, points are
+                evenly distributed with spacing ≤ dist.  When ``False``, steps
+                are exact ``dist`` from the start.
 
         Returns:
-            List of ``(t, point, tangent)`` tuples.
+            List of ``PathPoint`` objects, each with ``.t`` (normalised
+            parameter), ``.point`` (world-space position), and ``.tangent``.
+            Backward-compatible with tuple unpacking and indexing.
         """
         if (num is None) == (dist is None):
             raise ValueError("Exactly one of 'num' or 'dist' must be specified")
@@ -205,18 +249,24 @@ class Path:
                 raise ValueError("num must be at least 2")
             step = total / (num - 1)
         else:
-            step = dist
+            if dist <= 0:
+                raise ValueError("dist must be positive")
+            if even:
+                segs = max(1, math.ceil(total / dist))
+                step = total / segs
+            else:
+                step = dist
 
-        result: List[Tuple[float, Vec, Vec]] = []
+        result: List[PathPoint] = []
         d = 0.0
         while d <= total + 1e-12:
             d = min(d, total)
             t = d / total
             result.append(
-                (
-                    t,
-                    self.point_at_length(d),
-                    self.tangent_at_length(d),
+                PathPoint(
+                    t=t,
+                    point=self.point_at_length(d),
+                    tangent=self.tangent_at_length(d),
                 )
             )
             if d >= total:
@@ -296,6 +346,62 @@ class Path:
             new_path._segments.append(Arc(seg1.center, seg1.normal, seg1.start, seg1.angle * lt1))
 
         return new_path
+
+    def shorten(self, start_dist: float = 0.0, end_dist: float = 0.0) -> "Path":
+        """Return a new Path trimmed by distances from the start and/or end.
+
+        Args:
+            start_dist: Distance to remove from the start.
+            end_dist:   Distance to remove from the end.
+
+        Returns:
+            A new Path spanning the remaining portion.
+
+        Raises:
+            ValueError: If the path has no segments or shortening overlaps.
+        """
+        total = self.length
+        if total < 1e-12:
+            raise ValueError("Cannot shorten a zero-length path")
+        t0 = start_dist / total
+        t1 = 1.0 - end_dist / total
+        if t0 >= t1:
+            raise ValueError("shortening overlaps past path centre")
+        return self.subpath(t0, t1)
+
+    def extend(self, start_dist: float = 0.0, end_dist: float = 0.0) -> "Path":
+        """Return a new Path with straight extensions added at start and/or end.
+
+        Start extension runs opposite to the start tangent.  End extension
+        runs along the end tangent.
+
+        Args:
+            start_dist: Straight extension length at the start.
+            end_dist:   Straight extension length at the end.
+
+        Returns:
+            A new Path with the added segments.
+
+        Raises:
+            ValueError: If the path has no segments.
+        """
+        if not self._segments:
+            raise ValueError("Path has no segments")
+        new = Path(plane=self._plane)
+        if start_dist > 0:
+            p = self.start_point()
+            t = self.start_tangent()
+            new.add_line(p - t * start_dist, p)
+        for seg in self._segments:
+            if isinstance(seg, Line):
+                new.add_line(seg.start, seg.end)
+            else:
+                new.add_arc(seg.center, seg.normal, seg.start, seg.angle)
+        if end_dist > 0:
+            p = self.end_point()
+            t = self.end_tangent()
+            new.add_line(p, p + t * end_dist)
+        return new
 
     def sample(self, angle_step_deg: float = 5.0) -> "Polyline":
         """
@@ -1111,7 +1217,7 @@ class Path:
 
         return new_path
 
-    def continued(self, tol: float = 1e-9) -> "Path":
+    def continued(self, tol: float = 1e-6, snap: bool = True) -> "Path":
         """Return a new Path with all segments chained end‑to‑start.
 
         Segments whose end matches the next segment's **end** (reversed)
@@ -1119,19 +1225,74 @@ class Path:
         used by :func:`assemble_path` but applied to a single already‑
         ordered path.
 
+        Arc normals are aligned to the path plane normal — arcs whose
+        normal opposes the plane normal are flipped (normal ← ‑normal,
+        angle ← ‑angle).  This may produce arcs with ``angle < 0`` (CW
+        sweep); downstream builders that require positive IFC angles
+        (e.g. ``IfcRevolvedAreaSolid``) handle this constraint.
+
         Args:
-            tol: Endpoint comparison tolerance.
+            tol:  Endpoint comparison tolerance for chaining.
+            snap: When True (default), consecutive endpoints within ``tol``
+                  are snapped together before chaining.  This handles small
+                  gaps from biarc fitting or floating-point operations.
 
         Returns:
-            A new ``Path`` with consistent segment direction.
+            A new ``Path`` with consistent segment direction and normals.
+
+        Raises:
+            ValueError: If consecutive segments cannot be connected or
+                the path plane cannot be determined.
         """
         result = Path(plane=self._plane)
         if not self._segments:
             return result
-        result._segments = [self._segments[0]]
-        for seg in self._segments[1:]:
-            _, rev = _segments_fit(result._segments[-1], seg, tol)
-            result._segments.append(seg.reverse() if rev else seg)
+
+        # Optionally snap consecutive endpoints before chaining.
+        src = self._segments
+        if snap:
+            snapped: list = [src[0]]
+            for seg in src[1:]:
+                prev_end = snapped[-1].end
+                seg_start = seg.start
+                if prev_end.distance_to(seg_start) <= tol:
+                    if isinstance(seg, Line):
+                        snapped.append(Line(prev_end, seg.end))
+                    else:  # Arc
+                        snapped.append(Arc(seg.center, seg.normal, prev_end, seg.angle))
+                else:
+                    snapped.append(seg)
+            src = snapped
+
+        # Determine reference normal for arc orientation.
+        # Use the explicitly stored plane when available, otherwise
+        # derive from the path geometry.
+        if self._plane is not None:
+            plane_normal = self._plane.z_axis
+        else:
+            plane_normal = self.normal
+            if plane_normal is not None:
+                plane_normal = plane_normal.normalized()
+
+        def _align_arc(seg: "Line | Arc") -> "Line | Arc":
+            """Flip an arc's normal to match the reference plane normal."""
+            if not isinstance(seg, Arc) or plane_normal is None:
+                return seg
+            if (seg.normal.normalized() @ plane_normal) < -tol:
+                return Arc(seg.center, seg.normal * -1, seg.start, -seg.angle)
+            return seg
+
+        result._segments = [_align_arc(src[0])]
+        for seg in src[1:]:
+            fwd, rev = _segments_fit(result._segments[-1], seg, tol)
+            if not fwd and not rev:
+                raise ValueError(
+                    f"cannot connect {type(seg).__name__}"
+                    f"(start={seg.start}, end={seg.end}) to previous "
+                    f"segment end={result._segments[-1].end}"
+                )
+            s = seg.reverse() if rev else seg
+            result._segments.append(_align_arc(s))
         return result
 
     def normalize(self, tol: float = 1e-9) -> "Path":
@@ -1240,11 +1401,14 @@ class Path:
                 return Line(seg.start + perp, seg.end + perp)
 
             # Arc: offset radius.
-            # The arc sweeps CCW around seg.normal.  The "inward" side of the
-            # arc (toward the center) has n × tangent pointing toward center.
-            # sign: if arc normal aligns with plane normal → positive sweep →
-            # center is to the left → inward offset *reduces* radius.
-            sign = 1.0 if (seg.normal @ n) > 0 else -1.0
+            # The "inward" side of the arc depends on both the arc normal
+            # direction AND the sweep direction (angle sign).  A CCW arc
+            # (angle > 0) has its center to the left; inward = toward center
+            # → radius reduces.  A CW arc (angle < 0) has its center to the
+            # right; inward = away from center → radius increases.
+            normal_sign = 1.0 if (seg.normal @ n) > 0 else -1.0
+            angle_sign = 1.0 if seg.angle >= 0 else -1.0
+            sign = normal_sign * angle_sign
             new_radius = seg.radius - sign * dist
             if new_radius <= 0:
                 raise ValueError(

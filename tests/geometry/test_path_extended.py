@@ -373,3 +373,181 @@ class TestDivide:
         assert len(result) == 5
         assert result[0][0] == 0.0
         assert result[-1][0] == 1.0
+
+    def test_divide_dist_even_spacing_leq_dist(self):
+        """even=True: spacing ≤ dist, endpoints included."""
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        result = p.divide(dist=2.0, even=True)
+        assert len(result) == 4  # ceil(5/2)+1 = 3+1 = 4
+        assert result[0][0] == 0.0
+        assert result[-1][0] == 1.0
+        # spacing = total / num_segments = 5/3 ≈ 1.667
+        t_vals = [t for t, _, _ in result]
+        diffs = [t_vals[i+1] - t_vals[i] for i in range(len(t_vals) - 1)]
+        assert abs(diffs[0] - diffs[1]) < 1e-12
+        assert abs(diffs[1] - diffs[2]) < 1e-12
+
+    def test_divide_dist_even_default(self):
+        """even defaults to True."""
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        result = p.divide(dist=2.0)
+        assert len(result) == 4
+        assert result[0][0] == 0.0
+        assert result[-1][0] == 1.0
+
+    def test_divide_dist_not_even_has_remainder(self):
+        """even=False: fixed step from start, may not hit endpoint exactly."""
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        result = p.divide(dist=2.0, even=False)
+        assert len(result) == 3  # 0, 2, 4 — endpoint 5 not reached
+        assert result[0][0] == 0.0
+        assert result[-1][0] == pytest.approx(4.0 / 5.0)
+
+    def test_divide_dist_zero_raises(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        with pytest.raises(ValueError):
+            p.divide(dist=0)
+        with pytest.raises(ValueError):
+            p.divide(dist=-1)
+
+    def test_divide_dist_even_circle_closure(self):
+        """Closed-ish L-shaped path: even dist across corners."""
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(4, 0, 0))
+        p.add_line(Vec(4, 0, 0), Vec(4, 3, 0))
+        result = p.divide(dist=2.0, even=True)
+        # total = 4 + 3 = 7, ceil(7/2) = 4 segments → 5 points
+        assert len(result) == 5
+
+    def test_divide_returns_pathpoint_with_attributes(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        pp = p.divide(dist=2.0, even=True)[0]
+        assert pp.t == 0.0
+        assert pp.point == Vec(0, 0, 0)
+        assert (pp.tangent - Vec(1, 0, 0)).length() < 1e-9
+
+    def test_divide_pathpoint_unpacks_as_tuple(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        pp = p.divide(dist=2.0, even=True)[1]
+        t, pt, tan = pp
+        assert t == pytest.approx(1 / 3)
+        assert (pt - Vec(5 / 3, 0, 0)).length() < 1e-9
+        assert (tan - Vec(1, 0, 0)).length() < 1e-9
+
+    def test_divide_pathpoint_indexable(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        pp = p.divide(dist=2.0, even=True)[0]
+        assert pp[0] == 0.0
+
+
+class TestShortenExtend:
+
+    def _line_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(5, 0, 0))
+        return p
+
+    def _l_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(4, 0, 0))
+        p.add_line(Vec(4, 0, 0), Vec(4, 3, 0))
+        return p
+
+    def _arc_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(1, 0, 0))
+        p.add_arc(Vec(1, 1, 0), Vec(0, 0, 1), Vec(1, 0, 0), math.pi)
+        return p
+
+    # ── shorten ────────────────────────────────────
+
+    def test_shorten_start(self):
+        new = self._line_path().shorten(start_dist=2.0)
+        assert new.length == pytest.approx(3.0)
+        assert new.start_point() == Vec(2, 0, 0)
+        assert new.end_point() == Vec(5, 0, 0)
+
+    def test_shorten_end(self):
+        new = self._line_path().shorten(end_dist=2.0)
+        assert new.length == pytest.approx(3.0)
+        assert new.start_point() == Vec(0, 0, 0)
+        assert new.end_point() == Vec(3, 0, 0)
+
+    def test_shorten_both_ends(self):
+        new = self._line_path().shorten(start_dist=1.0, end_dist=1.0)
+        assert new.length == pytest.approx(3.0)
+        assert abs(new.start_point() - Vec(1, 0, 0)) < 1e-9
+        assert abs(new.end_point() - Vec(4, 0, 0)) < 1e-9
+
+    def test_shorten_zero_does_nothing(self):
+        new = self._line_path().shorten()
+        assert new.length == pytest.approx(5.0)
+
+    def test_shorten_raises_when_overlap(self):
+        with pytest.raises(ValueError):
+            self._line_path().shorten(start_dist=3.0, end_dist=3.0)
+
+    def test_shorten_raises_on_empty_path(self):
+        with pytest.raises(ValueError):
+            Path().shorten(start_dist=1.0)
+
+    def test_shorten_multi_segment(self):
+        new = self._l_path().shorten(start_dist=2.0, end_dist=2.0)
+        # total=7, removed 2+2=4, remaining 3
+        assert new.length == pytest.approx(3.0)
+
+    def test_shorten_from_arc_end(self):
+        new = self._arc_path().shorten(end_dist=1.0)
+        # total = 1 + pi ≈ 4.1416, remaining ≈ 3.1416
+        assert new.length == pytest.approx(math.pi - 1.0 + 1.0, rel=1e-9)
+
+    # ── extend ─────────────────────────────────────
+
+    def test_extend_start(self):
+        new = self._line_path().extend(start_dist=2.0)
+        assert new.length == pytest.approx(7.0)
+        assert new.start_point() == Vec(-2, 0, 0)
+        assert new.end_point() == Vec(5, 0, 0)
+        assert len(new.segments) == 2
+
+    def test_extend_end(self):
+        new = self._line_path().extend(end_dist=3.0)
+        assert new.length == pytest.approx(8.0)
+        assert new.start_point() == Vec(0, 0, 0)
+        assert new.end_point() == Vec(8, 0, 0)
+        assert len(new.segments) == 2
+
+    def test_extend_both_ends(self):
+        new = self._line_path().extend(start_dist=1.0, end_dist=2.0)
+        assert new.length == pytest.approx(8.0)
+        assert new.start_point() == Vec(-1, 0, 0)
+        assert new.end_point() == Vec(7, 0, 0)
+        assert len(new.segments) == 3
+
+    def test_extend_zero_does_nothing(self):
+        new = self._line_path().extend()
+        assert new.length == pytest.approx(5.0)
+        assert len(new.segments) == 1
+
+    def test_extend_preserves_middle_segments(self):
+        new = self._l_path().extend(start_dist=1.0, end_dist=1.0)
+        # original 2 segments + 2 extension segments = 4
+        assert len(new.segments) == 4
+        assert new.length == pytest.approx(9.0)
+
+    def test_extend_start_tangent_arc_path(self):
+        new = self._arc_path().extend(start_dist=1.0)
+        # extension goes in -X from (0,0,0) to (-1,0,0)
+        assert new.start_point() == Vec(-1, 0, 0)
+        assert len(new.segments) == 3  # ext + line + arc
+
+    def test_extend_raises_on_empty_path(self):
+        with pytest.raises(ValueError):
+            Path().extend(start_dist=1.0)

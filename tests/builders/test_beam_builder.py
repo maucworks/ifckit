@@ -6,6 +6,7 @@ import ifcopenshell
 
 from ifckit.geometry import Vec, Line, Arc, Path, Plane
 from ifckit.elements.structural import PendingBeam, PendingColumn, PendingRevolvedBeam
+from ifckit.builders.beam_factory import beam_from_path
 from ifckit.builders.extruded import ExtrudedElementBuilder
 from ifckit.builders.revolved_beam import RevolvedBeamBuilder
 
@@ -231,3 +232,166 @@ class TestRevolvedBeamBuilder:
         assert entity.is_a("IfcBeam")
         solids = ifc4_model.ifc_file.by_type("IfcRevolvedAreaSolid")
         assert len(solids) == 1
+
+
+class TestRevolvedBeamClipping:
+    """Tests for start_clip / end_clip on PendingRevolvedBeam."""
+
+    def test_start_clip_produces_boolean_result(self, ifc4_model, ifc4_storey, body_context):
+        # Clip at x=0.3 keeping +X side — cuts off the start of the arc
+        clip = Plane.from_origin_and_normal(Vec(0.3, 0, 0), Vec(-1, 0, 0))
+        pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE, start_clip=clip)
+        RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        results = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")
+        assert len(results) == 1
+
+    def test_end_clip_produces_boolean_result(self, ifc4_model, ifc4_storey, body_context):
+        # Clip at x=0.7 keeping -X side — cuts off the end of the arc
+        clip = Plane.from_origin_and_normal(Vec(0.7, 0, 0), Vec(1, 0, 0))
+        pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE, end_clip=clip)
+        RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        results = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")
+        assert len(results) == 1
+
+    def test_no_clip_no_boolean_result(self, ifc4_model, ifc4_storey, body_context):
+        pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE)
+        RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        assert len(ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")) == 0
+
+    def test_clip_wraps_revolved_solid(self, ifc4_model, ifc4_storey, body_context):
+        clip = Plane.from_origin_and_normal(Vec(0.3, 0, 0), Vec(1, 0, 0))
+        pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE, start_clip=clip)
+        RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        result = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")[0]
+        assert result.FirstOperand.is_a("IfcRevolvedAreaSolid")
+
+    def test_clipped_beam_parses_after_save(self, ifc4_model, ifc4_storey, body_context, tmp_path):
+        clip = Plane.from_origin_and_normal(Vec(0.3, 0, 0), Vec(-1, 0, 0))
+        pending = PendingRevolvedBeam(QUARTER_ARC, SQUARE_PROFILE, start_clip=clip)
+        RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        path = str(tmp_path / "revbeam_clipped.ifc")
+        ifc4_model.save(path)
+        reopened = ifcopenshell.open(path)
+        assert len(reopened.by_type("IfcBeam")) == 1
+        assert len(reopened.by_type("IfcBooleanClippingResult")) == 1
+
+    def test_both_clips_produce_two_boolean_results(self, ifc4_model, ifc4_storey, body_context):
+        start_clip = Plane.from_origin_and_normal(Vec(0.3, 0, 0), Vec(-1, 0, 0))
+        end_clip = Plane.from_origin_and_normal(Vec(0.7, 0, 0), Vec(1, 0, 0))
+        pending = PendingRevolvedBeam(
+            QUARTER_ARC, SQUARE_PROFILE, start_clip=start_clip, end_clip=end_clip,
+        )
+        RevolvedBeamBuilder().build(
+            ifc4_model.ifc_file, pending, ifc4_storey.entity, body_context
+        )
+        results = ifc4_model.ifc_file.by_type("IfcBooleanClippingResult")
+        assert len(results) == 2
+
+
+class TestBeamFromPathClips:
+    """Tests for clip forwarding in beam_from_path."""
+
+    def _two_line_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
+        p.add_line(Vec(3, 0, 0), Vec(6, 0, 0))
+        return p
+
+    def _l_shaped_path(self):
+        p = Path()
+        p.add_line(Vec(0, 0, 0), Vec(3, 0, 0))
+        p.add_line(Vec(3, 0, 0), Vec(3, 3, 0))
+        return p
+
+    def test_clip_forwarded_only_to_intersecting_segment(self):
+        """Clip at x=2 (keep +X) affects only first of two collinear X-axis segments."""
+        clip = Plane.from_origin_and_normal(Vec(2, 0, 0), Vec(-1, 0, 0))
+        result = beam_from_path(self._two_line_path(), SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 2
+        assert len(result[0].clips) == 1  # 0→3 crosses x=2
+        assert len(result[1].clips) == 0  # 3→6 entirely on keep side
+
+    def test_clip_forwarded_to_all_segments_when_intersecting_all(self):
+        """Clip at y=1.5 (keep +Y) affects both segments of a zigzag path."""
+        def _zigzag():
+            p = Path()
+            p.add_line(Vec(0, 0, 0), Vec(3, 3, 0))
+            p.add_line(Vec(3, 3, 0), Vec(6, 0, 0))
+            return p
+
+        clip = Plane.from_origin_and_normal(Vec(0, 1.5, 0), Vec(0, -1, 0))
+        result = beam_from_path(_zigzag(), SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 2
+        assert len(result[0].clips) == 1  # y goes 0→3, crosses 1.5
+        assert len(result[1].clips) == 1  # y goes 3→0, crosses 1.5
+
+    def test_no_clips_no_clips_on_segments(self):
+        result = beam_from_path(self._two_line_path(), SQUARE_PROFILE)
+        assert len(result) == 2
+        assert len(result[0].clips) == 0
+        assert len(result[1].clips) == 0
+
+    def test_start_clip_forwarded_as_clip(self):
+        clip = Plane.from_origin_and_normal(Vec(2, 0, 0), Vec(-1, 0, 0))
+        result = beam_from_path(self._two_line_path(), SQUARE_PROFILE, start_clip=clip)
+        assert len(result[0].clips) == 1
+
+    def test_end_clip_forwarded_as_clip(self):
+        clip = Plane.from_origin_and_normal(Vec(5, 0, 0), Vec(1, 0, 0))
+        result = beam_from_path(self._two_line_path(), SQUARE_PROFILE, end_clip=clip)
+        # Only affects second segment (3→6 crosses x=5)
+        assert len(result[0].clips) == 0
+        assert len(result[1].clips) == 1
+
+    # --- Single-clip: segment fully removed / skipped ---
+
+    def test_single_clip_fully_removes_segment(self):
+        """Clip keeping x<2: seg 2 (3→6) fully removed and skipped."""
+        clip = Plane.from_origin_and_normal(Vec(2, 0, 0), Vec(1, 0, 0))
+        result = beam_from_path(self._two_line_path(), SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 1  # segment 2 skipped
+        assert len(result[0].clips) == 1  # segment 1 partially clipped
+
+    def test_segment_fully_on_remove_side_is_skipped(self):
+        """L-shaped: clip keeping x<1 fully removes vertical segment (x=3)."""
+        clip = Plane.from_origin_and_normal(Vec(1, 0, 0), Vec(1, 0, 0))
+        result = beam_from_path(self._l_shaped_path(), SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 1
+        assert len(result[0].clips) == 1
+
+    # --- Single-clip on arcs ---
+
+    def test_arc_fully_removed_by_single_clip(self):
+        arc_path = Path()
+        arc_path.add_arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+        clip = Plane.from_origin_and_normal(Vec(0, 1.5, 0), Vec(0, -1, 0))
+        result = beam_from_path(arc_path, SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 0
+
+    def test_arc_partially_removed_not_skipped(self):
+        arc_path = Path()
+        arc_path.add_arc(Vec(0, 1, 0), Vec(0, 0, 1), Vec(0, 0, 0), math.pi / 2)
+        clip = Plane.from_origin_and_normal(Vec(0.3, 0, 0), Vec(-1, 0, 0))
+        result = beam_from_path(arc_path, SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 1
+        assert len(result[0].clips) == 1
+
+    # --- Boundary (sd = 0) ---
+
+    def test_clip_at_segment_boundary_sd_zero(self):
+        """Clip at x=3 keeps -X.  Seg 1 ends at x=3 (sd=0) → clip forwarded.
+        Seg 2 starts at x=3 (sd=0), all x≥3 (sd≥0) → fully removed."""
+        clip = Plane.from_origin_and_normal(Vec(3, 0, 0), Vec(1, 0, 0))
+        result = beam_from_path(self._two_line_path(), SQUARE_PROFILE, clips=[clip])
+        assert len(result) == 1  # segment 2 skipped
+        assert len(result[0].clips) == 1  # segment 1 partially clipped

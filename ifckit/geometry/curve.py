@@ -363,6 +363,7 @@ class Curve:
         tol: float = 0.01,
         max_iteration: int = 10,
         min_arc_angle: float = 0.001,
+        plane: Optional[Plane] = None,
     ) -> "Path":
         """Approximate this NURBS curve as bi‑arcs → ``Path`` of ``Line`` + ``Arc``.
 
@@ -373,6 +374,11 @@ class Curve:
             max_iteration: Maximum recursion depth (default 10).
             min_arc_angle: Arcs with ``|angle| < min_arc_angle`` (rad) are collapsed
                            to lines and G1 is iteratively restored (default 0.001).
+            plane:         Optional reference plane.  When given, all points are
+                           projected onto this plane and arc normals are set to
+                           ``plane.z_axis``.  The resulting ``Path._plane`` is set,
+                           enabling downstream methods (``continued``) to use the
+                           plane for arc alignment.
 
         Returns:
             A ``Path`` containing only ``Line`` and ``Arc`` segments.
@@ -383,11 +389,18 @@ class Curve:
         segments = fit_biarcs(self.point_at, tolerance=tol, max_depth=max_iteration)
         if min_arc_angle > 0:
             segments = simplify_biarcs(segments, min_angle=min_arc_angle)
-        path = Path()
+        path = Path(plane=plane)
         for seg in segments:
             if isinstance(seg, Arc):
+                if plane is not None:
+                    center_p = plane.closest_point(seg.center)
+                    start_p = plane.closest_point(seg.start)
+                    sign = 1.0 if (seg.normal @ plane.z_axis) >= 0 else -1.0
+                    seg = Arc(center_p, plane.z_axis, start_p, seg.angle * sign)
                 path._segments.append(seg)
             elif isinstance(seg, Line):
+                if plane is not None:
+                    seg = Line(plane.closest_point(seg.start), plane.closest_point(seg.end))
                 path._segments.append(seg)
         return path
 

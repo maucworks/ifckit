@@ -23,11 +23,12 @@ from ifckit.builders._geom import (
     profile_from_points,
     pt3,
     shape_representation,
-    storey_elevation,
 )
 from ifckit.builders.base import BaseBuilder
+from ifckit.builders.extruded import _apply_clip, _iter_clips
 from ifckit.builders.psets import write_psets
 from ifckit.elements.base import PendingElement
+from ifckit.geometry import Plane
 
 
 class RevolvedBeamBuilder(BaseBuilder):
@@ -46,30 +47,16 @@ class RevolvedBeamBuilder(BaseBuilder):
             )
 
         arc = pending.arc
-        elev = storey_elevation(container)  # noqa: F841
-
-        # Canonical plane normal for profile continuity
-        cp_normal = pending.cp_normal  # may be None
-        plane = getattr(pending, "plane", None)
-        arc_n = arc.normal.normalized()
-        if cp_normal is None:
-            if plane is not None:
-                cp_normal = plane.z_axis.normalized()
+        # elev = storey_elevation(container)  # noqa: F841
 
         # 90° pre-rotation: IFC spec for IfcRevolvedAreaSolid orients the
         # profile differently than IfcExtrudedAreaSolid — swap axes to
         # compensate.
-        pts_2d = [(-p.y, p.x) for p in pending.profile]
+        pts_2d = [(-p.y, -p.x) for p in pending.profile]
 
-        # When the arc's implicit plane normal differs from the main reference
-        # plane normal, flip the profile over the x-axis (y → -y).  This
-        # prevents mirroring when individual arcs sweep in opposite directions
-        # relative to the global up.
-        needs_flip = False
-        if cp_normal is not None:
-            needs_flip = arc_n.dot(cp_normal.normalized()) < 0
-        if needs_flip:
-            pts_2d = [(-x, -y) for (x, y) in pts_2d]
+        if arc.angle < 0:
+            arc = arc.reverse()
+            pts_2d = [(-x, y) for (x, y) in pts_2d]
 
         profile = profile_from_points(ifc_file, pts_2d)
 
@@ -107,8 +94,14 @@ class RevolvedBeamBuilder(BaseBuilder):
             Angle=arc.angle,
         )
 
+        # Apply clips — op_plane is identity (beam_placement at origin).
+        geometry = solid
+        for clip_plane in _iter_clips(pending):
+            geometry = _apply_clip(ifc_file, geometry, clip_plane, Plane.world_xy(), 0.0)
+
+        rep_type = "SweptSolid" if geometry is solid else "Clipping"
         body_ctx = context
-        shape_rep = shape_representation(ifc_file, body_ctx, solid, rep_type="SweptSolid")
+        shape_rep = shape_representation(ifc_file, body_ctx, geometry, rep_type=rep_type)
         prod_rep = product_definition_shape(ifc_file, shape_rep)
 
         # Beam placement - at origin, solid already correctly positioned
@@ -129,7 +122,6 @@ class RevolvedBeamBuilder(BaseBuilder):
         )
         beam.Representation = prod_rep
         beam.ObjectPlacement = beam_plac
-        beam.Name = pending.name
 
         ifcopenshell.api.run(
             "spatial.assign_container",

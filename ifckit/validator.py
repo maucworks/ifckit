@@ -35,6 +35,7 @@ from ifckit.elements.bridge import (
     PendingBridgePart,
 )
 from ifckit.elements.building import PendingSlab, PendingWall
+from ifckit.elements.fill import PendingFill
 from ifckit.elements.opening import PendingDoor, PendingOpening, PendingWindow
 from ifckit.elements.registry import ElementRegistry
 from ifckit.elements.sectioned_spine import PendingSectionedSpine
@@ -506,6 +507,20 @@ def _validate_tapered(t: PendingTaperedExtrusion) -> ValidationResult:
         warnings.append(
             f"PendingTaperedExtrusion '{t.name}': height is very small ({t.height:.4f} m)"
         )
+
+    return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
+
+
+@register_validator(PendingFill)
+def _validate_fill(f: PendingFill) -> ValidationResult:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if not f.component_graph:
+        errors.append(f"fill '{f.name}': component_graph is required")
+
+    if f.plane is None and f.path is None:
+        errors.append(f"fill '{f.name}': either plane or path is required")
 
     return ValidationResult(ok=len(errors) == 0, errors=errors, warnings=warnings)
 

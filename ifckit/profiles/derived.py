@@ -58,12 +58,12 @@ class DerivedProfile(Profile):
         scale_y: Optional[float] = None,
     ):
         self.parent = parent
-        self.offset_x = offset_x
-        self.offset_y = offset_y
-        self.rotation = rotation  # degrees
-        self.scale = scale
-        self.scale_x = scale_x
-        self.scale_y = scale_y
+        self.offset_x = float(offset_x)
+        self.offset_y = float(offset_y)
+        self.rotation = float(rotation)
+        self.scale = float(scale)
+        self.scale_x = float(scale_x) if scale_x is not None else None
+        self.scale_y = float(scale_y) if scale_y is not None else None
         super().__init__()
 
     def get_profile_points(self):
@@ -113,7 +113,7 @@ class DerivedProfile(Profile):
 
         # Local origin (translation)
         location = ifc_file.create_entity(
-            "IfcCartesianPoint", Coordinates=[self.offset_x, self.offset_y]
+            "IfcCartesianPoint", Coordinates=[float(self.offset_x), float(self.offset_y)]
         )
 
         # Build the operator directly — no intermediate entity.
