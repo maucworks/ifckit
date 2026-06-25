@@ -50,6 +50,7 @@ class PendingWall(PendingElement):
         self.height = float(height)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["footprint"] = [p.to_tuple() for p in self.footprint]
         d["height"] = self.height
@@ -58,6 +59,7 @@ class PendingWall(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingWall":
+        """Deserialize from a dict."""
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         height = cls._require(d, "height")
         plane = Plane.from_dict(d["plane"]) if "plane" in d else Plane.world_xy()
@@ -107,6 +109,7 @@ class PendingSlab(PendingElement):
         self.thickness = float(thickness)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["footprint"] = [p.to_tuple() for p in self.footprint]
         d["thickness"] = self.thickness
@@ -115,6 +118,7 @@ class PendingSlab(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingSlab":
+        """Deserialize from a dict."""
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         thickness = cls._require(d, "thickness")
         plane = Plane.from_dict(d["plane"]) if "plane" in d else Plane.world_xy()

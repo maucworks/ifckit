@@ -1,3 +1,10 @@
+"""
+ifckit.components.pythonic.utils
+=================================
+
+Internal utility functions for pythonic component building.
+"""
+
 from ifckit.builders._geom import axis2placement3d
 from ifckit.builders.sectioned_spine import SectionedSpineBuilder
 from ifckit.geometry import Plane, Vec

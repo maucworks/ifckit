@@ -169,6 +169,7 @@ class Profile(Path, metaclass=RegisterProfileType):
 
     @property
     def segments(self):
+        """List of path segments (Line or Arc)."""
         self._ensure_segments()
         return list(self._segments)
 

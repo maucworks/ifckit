@@ -93,6 +93,7 @@ class RenderStyle:
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "r": self.r,
             "g": self.g,
@@ -102,6 +103,7 @@ class RenderStyle:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "RenderStyle":
+        """Deserialize from a dict."""
         obj = cls.__new__(cls)
         obj.r = float(d["r"])
         obj.g = float(d["g"])

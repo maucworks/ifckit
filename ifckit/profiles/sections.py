@@ -84,6 +84,7 @@ class TShapeProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         web_h = self.depth - self.flange_thickness
         return self.flange_width * self.flange_thickness + web_h * self.web_thickness
 
@@ -95,6 +96,7 @@ class TShapeProfile(Profile):
         return -self.flange_width / 2, 0.0
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return the profile points for IFC export."""
         hw = self.flange_width / 2
         htw = self.web_thickness / 2
         d = self.depth
@@ -117,6 +119,7 @@ class TShapeProfile(Profile):
         # Our natural origin is at bottom-centre, so IFC origin is depth/2 above ours.
         # The IFC bbox sw is at (-fw/2, -depth/2) in IFC coords.
         # We pass bbox_sw in IFC coords (shifted by +depth/2 from our natural coords).
+        """Convert to an IFC representation."""
         ifc_bbox_sw = (-self.flange_width / 2, -self.depth / 2)
         pos = self._ifc_placement_2d(
             ifc_file,
@@ -140,6 +143,7 @@ class TShapeProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "depth": self.depth,
@@ -154,6 +158,7 @@ class TShapeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "TShapeProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="s")
         return cls(
             depth=d["depth"],
@@ -222,6 +227,7 @@ class ZShapeProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         web_h = self.depth - 2 * self.flange_thickness
         return 2 * self.flange_width * self.flange_thickness + web_h * self.web_thickness
 
@@ -262,6 +268,7 @@ class ZShapeProfile(Profile):
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         # IfcZShapeProfileDef is centred at geometric centroid = (0,0) = natural origin.
         # IFC bbox sw = natural bbox_sw.
+        """Convert to an IFC representation."""
         pos = self._ifc_placement_2d(
             ifc_file,
             bbox=self._bbox(),
@@ -281,6 +288,7 @@ class ZShapeProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "depth": self.depth,
@@ -295,6 +303,7 @@ class ZShapeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "ZShapeProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             depth=d["depth"],
@@ -363,6 +372,7 @@ class CShapeProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         t = self.wall_thickness
         d = self.depth
         w = self.width
@@ -380,6 +390,7 @@ class CShapeProfile(Profile):
         return 0.0, -self.depth / 2
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return the profile points for IFC export."""
         d = self.depth
         w = self.width
         t = self.wall_thickness
@@ -418,6 +429,7 @@ class CShapeProfile(Profile):
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         # IfcCShapeProfileDef is centred. Our natural origin is left-edge, vert centred.
         # IFC bbox sw is (-width/2, -depth/2).
+        """Convert to an IFC representation."""
         ifc_bbox_sw = (-self.width / 2, -self.depth / 2)
         pos = self._ifc_placement_2d(ifc_file, bbox=self._bbox(), bbox_sw=ifc_bbox_sw)
         return ifc_file.create_entity(
@@ -433,6 +445,7 @@ class CShapeProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "depth": self.depth,
@@ -447,6 +460,7 @@ class CShapeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CShapeProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="w")
         return cls(
             depth=d["depth"],
@@ -514,6 +528,7 @@ class TrapeziumProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         return (self.bottom_x_dim + self.top_x_dim) / 2 * self.y_dim
 
     def _bbox(self) -> Tuple[float, float]:
@@ -524,6 +539,7 @@ class TrapeziumProfile(Profile):
         return -self.bottom_x_dim / 2, 0.0
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return the profile points for IFC export."""
         hb = self.bottom_x_dim / 2
         ht = self.top_x_dim / 2
         ox = self.top_x_offset
@@ -538,6 +554,7 @@ class TrapeziumProfile(Profile):
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         # IfcTrapeziumProfileDef: origin at bottom-centre, same as natural origin.
         # IFC bbox sw = (-bottom/2, 0) — same as _bbox_sw().
+        """Convert to an IFC representation."""
         pos = self._ifc_placement_2d(ifc_file, bbox=self._bbox(), bbox_sw=self._bbox_sw())
         return ifc_file.create_entity(
             "IfcTrapeziumProfileDef",
@@ -551,6 +568,7 @@ class TrapeziumProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "bottom_x_dim": self.bottom_x_dim,
@@ -565,6 +583,7 @@ class TrapeziumProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "TrapeziumProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="s")
         return cls(
             bottom_x_dim=d["bottom_x_dim"],
@@ -626,12 +645,14 @@ class CompositeProfile(Profile):
 
     @property
     def area(self) -> Optional[float]:
+        """Cross-sectional area of the profile."""
         areas = [p.area for p in self.profiles]
         if any(a is None for a in areas):
             return None
         return sum(areas)  # type: ignore[arg-type]
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert to an IFC representation."""
         child_entities = [p.to_ifc(ifc_file) for p in self.profiles]
         return ifc_file.create_entity(
             "IfcCompositeProfileDef",
@@ -642,6 +663,7 @@ class CompositeProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "profile_type": self.profile_type,
             "profiles": [p.to_dict() for p in self.profiles],
@@ -651,5 +673,6 @@ class CompositeProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CompositeProfile":
+        """Deserialize from a dict."""
         children = [Profile.dispatch_from_dict(pd) for pd in d["profiles"]]
         return cls(profiles=children, label=d.get("label"), name=d.get("name"))

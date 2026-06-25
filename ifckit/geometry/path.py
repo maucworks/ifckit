@@ -113,9 +113,11 @@ class Path:
 
     @property
     def segments(self) -> List[Line | Arc]:
+        """List of path segments (Line or Arc)."""
         return list(self._segments)
 
     def add_line(self, start: "Vec", end: "Vec") -> "Path":
+        """Append a line segment to the path close to the current end."""
         self._segments.append(Line(start, end))
         return self
 
@@ -126,11 +128,13 @@ class Path:
         start: "Vec",
         angle: float,
     ) -> "Path":
+        """Append an arc segment to the path."""
         self._segments.append(Arc(center, normal, start, angle))
         return self
 
     @property
     def length(self) -> float:
+        """Length of the vector."""
         return sum(seg.length for seg in self._segments)
 
     def _segment_and_local_t_at_length(self, d: float) -> "Tuple[int, float]":
@@ -520,16 +524,19 @@ class Path:
         }
 
     def start_point(self) -> Optional["Vec"]:
+        """Starting point of the path."""
         if not self._segments:
             return None
         return self._segments[0].start
 
     def end_point(self) -> Optional["Vec"]:
+        """End point of the path."""
         if not self._segments:
             return None
         return self._segments[-1].end
 
     def start_tangent(self) -> Optional["Vec"]:
+        """Tangent direction at the start of the path."""
         if not self._segments:
             return None
         seg = self._segments[0]
@@ -542,6 +549,7 @@ class Path:
         return self.start_tangent()
 
     def end_tangent(self) -> Optional["Vec"]:
+        """Tangent direction at the end of the path."""
         if not self._segments:
             return None
         seg = self._segments[-1]
@@ -1962,6 +1970,7 @@ class Path:
         return PolygonProfile(pts, name=name)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "plane": self._plane.to_dict() if self._plane else None,
             "segments": [s.to_dict() for s in self._segments],
@@ -1970,6 +1979,7 @@ class Path:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Path":
+        """Deserialize from a dict."""
         plane = Plane.from_dict(d["plane"]) if d.get("plane") else None
         path = cls(plane=plane)
 

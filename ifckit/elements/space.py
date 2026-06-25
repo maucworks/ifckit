@@ -57,6 +57,7 @@ class PendingSpace(PendingElement):
         self.predefined_type = predefined_type
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["footprint"] = [p.to_tuple() for p in self.footprint]
         d["height"] = self.height
@@ -68,6 +69,7 @@ class PendingSpace(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingSpace":
+        """Deserialize from a dict."""
         footprint = [Vec(*pt) for pt in cls._require(d, "footprint")]
         height = cls._require(d, "height")
         return cls(

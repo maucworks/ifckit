@@ -32,6 +32,8 @@ from ifckit.geometry import Plane
 
 
 class RevolvedBeamBuilder(BaseBuilder):
+    """Builder for creating revolved beam geometry in IFC models."""
+
     entity_type = "revolved_beam"
 
     def _create_geometry(

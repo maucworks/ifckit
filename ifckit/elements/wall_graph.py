@@ -119,6 +119,7 @@ class PendingWallGraph(PendingElement):
         return left, right
 
     def to_dict(self) -> dict:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         if self.from_path and self._path is not None:
             d["mode"] = "path"
@@ -143,6 +144,7 @@ class PendingWallGraph(PendingElement):
 
     @classmethod
     def from_dict(cls, d: dict) -> "PendingWallGraph":
+        """Deserialize from a dict."""
         kwargs = dict(
             thickness=float(d.get("thickness", 200)),
             height=float(d.get("height", 3000)),

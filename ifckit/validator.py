@@ -71,6 +71,7 @@ class ValidatorRegistry:
         """Decorator to register a validator for a PendingElement subclass."""
 
         def decorator(func: Callable[..., ValidationResult]) -> Callable[..., ValidationResult]:
+            """Return a decorator that registers the decorated class."""
             cls._validators[element_cls] = func
             # Also register by element_type string when available
             elem_type = getattr(element_cls, "element_type", None)

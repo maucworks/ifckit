@@ -23,11 +23,13 @@ ifeq ($(wildcard $(VENV)/bin/python),)
   UVICORN  := uvicorn
   PYTEST   := pytest
   RUFF     := ruff
+  PDOC     := pdoc
 else
   PIP      := $(BIN)/pip
   UVICORN  := $(BIN)/uvicorn
   PYTEST   := $(BIN)/pytest
   RUFF     := $(BIN)/ruff
+  PDOC     := $(BIN)/pdoc
 endif
 
 HOST       ?= 127.0.0.1
@@ -90,6 +92,19 @@ test-api:  ## Run only the API tests
 .PHONY: test-fast
 test-fast:  ## Run tests, stop on first failure
 	$(PYTEST) -x -q
+
+# ── documentation ──────────────────────────────────────────────────────────
+
+# Auto-discover all importable submodules for pdoc
+PDOC_MODULES = ifckit $(shell python3 -c "import pkgutil, ifckit; print(' '.join(m.name for m in pkgutil.walk_packages(ifckit.__path__, prefix='ifckit.')))" 2>/dev/null)
+
+.PHONY: docs
+docs:  ## Build static API docs → docs/_build/
+	$(PDOC) $(PDOC_MODULES) -o docs/_build
+
+.PHONY: docs-serve
+docs-serve:  ## Live API docs on http://localhost:8080
+	$(PDOC) $(PDOC_MODULES) --host 0.0.0.0
 
 # ── code quality ───────────────────────────────────────────────────────────────
 

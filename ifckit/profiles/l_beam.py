@@ -107,6 +107,7 @@ class LBeamProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         return self.width * self.thickness + (self.height - self.thickness) * self.thickness
 
     @property
@@ -177,6 +178,7 @@ class LBeamProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "profile_type": self.profile_type,
             "name": self.name,
@@ -192,6 +194,7 @@ class LBeamProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "LBeamProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="sw")
         return cls(
             height=d["height"],

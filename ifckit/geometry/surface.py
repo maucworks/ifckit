@@ -42,6 +42,7 @@ except ImportError:
 
 
 def require_occ():
+    """Import and return the OCC module, or raise ImportError."""
     if not _HAS_OCC:
         raise ImportError("pythonocc-core is required. Install with: pip install pythonocc-core")
 
@@ -90,14 +91,17 @@ class Surface:
 
     @property
     def rational(self) -> bool:
+        """Whether the curve or surface is rational (has weights)."""
         return self._weights is not None
 
     @property
     def nu(self) -> int:
+        """Number of control points in the U direction."""
         return len(self.control_points)
 
     @property
     def nv(self) -> int:
+        """Number of control points in the V direction."""
         return len(self.control_points[0]) if self.control_points else 0
 
     # ── evaluation (via OCC) ───────────────────────────────────────
@@ -207,6 +211,7 @@ class Surface:
         e.KnotSpec = "UNSPECIFIED"
 
     def to_ifc_bspline(self, ifc_file) -> "ifcopenshell.entity_instance":
+        """Convert to an IFC B-spline surface representation."""
         if self.rational:
             raise ValueError("Use to_ifc_rational() for rational surfaces")
         e = ifc_file.create_entity("IfcBSplineSurfaceWithKnots")
@@ -214,6 +219,7 @@ class Surface:
         return e
 
     def to_ifc_rational(self, ifc_file) -> "ifcopenshell.entity_instance":
+        """Convert to an IFC rational B-spline surface representation."""
         if not self.rational:
             raise ValueError("Use to_ifc_bspline() for non‑rational surfaces")
         e = ifc_file.create_entity("IfcRationalBSplineSurfaceWithKnots")
@@ -224,6 +230,7 @@ class Surface:
     # ── dict serialisation ─────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "udegree": self.udegree,
             "vdegree": self.vdegree,
@@ -241,6 +248,7 @@ class Surface:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Surface":
+        """Deserialize from a dict."""
         return cls(
             control_points=[[Vec.from_dict(v) for v in row] for row in d["control_points"]],
             uknots=d["uknots"],
@@ -325,6 +333,7 @@ class Surface:
 
     @classmethod
     def from_occ_surface(cls, occ_surface) -> "Surface":
+        """Create a Surface from an OCC surface object."""
         require_occ()
         udeg = occ_surface.UDegree()
         vdeg = occ_surface.VDegree()
@@ -951,6 +960,7 @@ def occ_eval_point(surf: Surface, u: float, v: float) -> Vec:
 
 
 def occ_eval_tangents(surf: Surface, u: float, v: float) -> "tuple[Vec, Vec]":
+    """Evaluate tangents at specified parameters using OCC."""
     require_occ()
     occ = _build_occ_surface(surf)
     _, d1u, d1v = occ.D1(u, v)

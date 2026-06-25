@@ -36,6 +36,7 @@ class SimpleWindowComponent(FillComponent):
         h: float,
         params: Dict[str, Any],
     ) -> List[EvaluatedComponent]:
+        """Build and insert components into the IFC model."""
         lt = float(params.get("lining_thickness", 55))
         ld = float(params.get("lining_depth", 70))
         sd = float(params.get("sash_depth", 40))

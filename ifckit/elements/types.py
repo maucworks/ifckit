@@ -93,6 +93,7 @@ class PendingTypeObject:
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "type": self.type_object_type,
             "type_key": self.type_key,
@@ -100,6 +101,7 @@ class PendingTypeObject:
         }
 
     def to_json(self, **kwargs) -> str:
+        """Serialise to a JSON string."""
         return _json.dumps(self.to_dict(), **kwargs)
 
     @classmethod
@@ -258,6 +260,7 @@ class PendingDoorType(PendingTypeObject):
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["overall_width"] = self.overall_width
         d["overall_height"] = self.overall_height
@@ -295,6 +298,7 @@ class PendingDoorType(PendingTypeObject):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingDoorType":
+        """Deserialize from a dict."""
         return cls(
             overall_width=cls._require(d, "overall_width"),
             overall_height=cls._require(d, "overall_height"),
@@ -468,6 +472,7 @@ class PendingWindowType(PendingTypeObject):
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["overall_width"] = self.overall_width
         d["overall_height"] = self.overall_height
@@ -502,6 +507,7 @@ class PendingWindowType(PendingTypeObject):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingWindowType":
+        """Deserialize from a dict."""
         return cls(
             overall_width=cls._require(d, "overall_width"),
             overall_height=cls._require(d, "overall_height"),

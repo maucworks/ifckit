@@ -48,6 +48,7 @@ class Vec:
 
     @classmethod
     def from_tuple(cls, t: Sequence[float]) -> "Vec":
+        """Create a Vec from a sequence of 3 floats."""
         return cls(t[0], t[1], t[2])
 
     # --- arithmetic ---------------------------------------------------------
@@ -113,30 +114,38 @@ class Vec:
     # --- vector math --------------------------------------------------------
 
     def equals(self, other: "Vec", tol: float = 1e-6) -> bool:
+        """Check equality within a tolerance."""
         return abs(self - other) <= tol
 
     def dot(self, other: "Vec") -> float:
+        """Dot product with another vector."""
         return self @ other
 
     def cross(self, other: "Vec") -> "Vec":
+        """Cross product with another vector."""
         return self**other
 
     def length(self) -> float:
+        """Length of the vector."""
         return abs(self)
 
     def length_squared(self) -> float:
+        """Squared length of the vector."""
         return self @ self
 
     def normalized(self) -> "Vec":
+        """Unit vector in the same direction."""
         mag = abs(self)
         if mag < 1e-12:
             raise ValueError("Cannot normalize a zero-length vector")
         return self / mag
 
     def lerp(self, other: "Vec", t: float) -> "Vec":
+        """Linearly interpolate towards another vector."""
         return self + (other - self) * t
 
     def distance_to(self, other: "Vec") -> float:
+        """Distance to another point or vector."""
         return abs(other - self)
 
     # --- angles -------------------------------------------------------------
@@ -225,13 +234,16 @@ class Vec:
     # --- conversion ---------------------------------------------------------
 
     def to_tuple(self) -> Tuple[float, float, float]:
+        """Return as a tuple of three floats."""
         return (self.x, self.y, self.z)
 
     def to_dict(self) -> Dict[str, float]:
+        """Serialise to a plain dict."""
         return {"x": self.x, "y": self.y, "z": self.z}
 
     @classmethod
     def from_dict(cls, d: Dict[str, float]) -> "Vec":
+        """Deserialize from a dict."""
         return cls(d["x"], d["y"], d["z"])
 
 
@@ -266,6 +278,7 @@ class Plane:
 
     @property
     def z_axis(self) -> "Vec":
+        """Normal vector of the plane."""
         return (self.x_axis**self.y_axis).normalized()
 
     @classmethod
@@ -375,6 +388,7 @@ class Plane:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "origin": self.origin.to_dict(),
             "x_axis": self.x_axis.to_dict(),
@@ -383,6 +397,7 @@ class Plane:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Plane":
+        """Deserialize from a dict."""
         return cls(
             origin=Vec.from_dict(d["origin"]),
             x_axis=Vec.from_dict(d["x_axis"]),
@@ -450,6 +465,7 @@ class Line:
 
     @property
     def direction(self) -> "Vec":
+        """Direction vector of the line."""
         return (self.end - self.start).normalized()
 
     def tangent_at_start(self) -> "Vec":
@@ -465,6 +481,7 @@ class Line:
         return self.direction
 
     def reverse(self) -> "Line":
+        """Return a reversed copy of this line."""
         return Line(self.end, self.start)
 
     def transformed(self, t: "Transform") -> "Line":
@@ -505,10 +522,12 @@ class Line:
 
     @property
     def length(self) -> float:
+        """Length of the vector."""
         return self.start.distance_to(self.end)
 
     @property
     def midpoint(self) -> "Vec":
+        """Midpoint of the line segment."""
         return self.start.lerp(self.end, 0.5)
 
     def point_at(self, t: float) -> "Vec":
@@ -516,13 +535,16 @@ class Line:
         return self.start.lerp(self.end, t)
 
     def to_polyline(self) -> "Polyline":
+        """Convert to a Polyline."""
         return Polyline([self.start, self.end])
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {"type": "line", "start": self.start.to_dict(), "end": self.end.to_dict()}
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Line":
+        """Deserialize from a dict."""
         return cls(Vec.from_dict(d["start"]), Vec.from_dict(d["end"]))
 
     def __repr__(self) -> str:
@@ -564,15 +586,18 @@ class Arc:
 
     @property
     def radius(self) -> float:
+        """Radius of the arc."""
         return self.start.distance_to(self.center)
 
     @property
     def end(self) -> "Vec":
+        """End point of the arc."""
         radial = self.start - self.center
         return self.center + radial.rotate_around(self.normal, self.angle)
 
     @property
     def midpoint(self) -> "Vec":
+        """Midpoint of the line segment."""
         radial = self.start - self.center
         return self.center + radial.rotate_around(self.normal, self.angle / 2)
 
@@ -655,14 +680,17 @@ class Arc:
 
     @property
     def length(self) -> float:
+        """Length of the vector."""
         return abs(self.angle) * self.radius
 
     def tangent_at_start(self) -> "Vec":
+        """Tangent direction at the start of the arc."""
         radial = (self.start - self.center).normalized()
         sign = 1.0 if self.angle >= 0 else -1.0
         return (self.normal**radial) * sign
 
     def tangent_at_end(self) -> "Vec":
+        """Tangent direction at the end of the arc."""
         radial = (self.end - self.center).normalized()
         sign = 1.0 if self.angle >= 0 else -1.0
         return (self.normal**radial) * sign
@@ -674,6 +702,7 @@ class Arc:
         return (self.normal**radial) * sign
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "type": "arc",
             "center": self.center.to_dict(),
@@ -684,6 +713,7 @@ class Arc:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Arc":
+        """Deserialize from a dict."""
         return cls(
             Vec.from_dict(d["center"]),
             Vec.from_dict(d["normal"]),
@@ -720,10 +750,12 @@ class Polyline:
     def from_tuples(
         cls, tuples: List[Tuple[float, float, float]], closed: bool = False
     ) -> "Polyline":
+        """Create a Polyline from a sequence of coordinate tuples."""
         return cls([Vec(*t) for t in tuples], closed=closed)
 
     @property
     def is_closed(self) -> bool:
+        """Whether the polyline forms a closed loop."""
         if self.closed:
             return True
         if len(self.points) >= 2:
@@ -732,6 +764,7 @@ class Polyline:
 
     @property
     def length(self) -> float:
+        """Length of the vector."""
         total = 0.0
         pts = self.points
         n = len(pts) - 1 if not self.closed else len(pts)

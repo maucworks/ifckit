@@ -144,6 +144,7 @@ class DerivedProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         return {
             "profile_type": "derived",
             "parent": self.parent.to_dict(),
@@ -157,6 +158,7 @@ class DerivedProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> DerivedProfile:
+        """Deserialize from a dict."""
         parent = Profile.dispatch_from_dict(d["parent"])
         return cls(
             parent,

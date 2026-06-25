@@ -34,11 +34,13 @@ def eval_expr(expr: Any, params: Dict[str, float]) -> float:
     pos = [0]  # mutable int so nested functions can advance it
 
     def peek() -> str:
+        """Peek at the next token without consuming."""
         while pos[0] < len(src) and src[pos[0]] == " ":
             pos[0] += 1
         return src[pos[0]] if pos[0] < len(src) else ""
 
     def consume(expected: str | None = None) -> str:
+        """Consume an expected token from the stream."""
         ch = peek()
         if expected is not None and ch != expected:
             raise ValueError(f"eval_expr: expected {expected!r} got {ch!r} in {expr!r}")
@@ -46,6 +48,7 @@ def eval_expr(expr: Any, params: Dict[str, float]) -> float:
         return ch
 
     def parse_number() -> float:
+        """Parse a numeric literal from an expression token stream."""
         start = pos[0]
         while pos[0] < len(src) and src[pos[0]] in "0123456789.":
             pos[0] += 1
@@ -54,6 +57,7 @@ def eval_expr(expr: Any, params: Dict[str, float]) -> float:
         return float(src[start : pos[0]])
 
     def parse_variable() -> float:
+        """Parse a variable reference from an expression token stream."""
         pos[0] += 1  # skip '$'
         start = pos[0]
         while pos[0] < len(src) and (src[pos[0]].isalnum() or src[pos[0]] == "_"):
@@ -64,6 +68,7 @@ def eval_expr(expr: Any, params: Dict[str, float]) -> float:
         return float(params[name])
 
     def parse_factor() -> float:
+        """Parse a factor from an expression token stream."""
         ch = peek()
         if ch == "(":
             consume("(")
@@ -78,6 +83,7 @@ def eval_expr(expr: Any, params: Dict[str, float]) -> float:
         return parse_number()
 
     def parse_term() -> float:
+        """Parse a term from an expression token stream."""
         val = parse_factor()
         while peek() in ("*", "/"):
             op = consume()
@@ -91,6 +97,7 @@ def eval_expr(expr: Any, params: Dict[str, float]) -> float:
         return val
 
     def parse_expr() -> float:
+        """Parse an arithmetic expression string into a value."""
         val = parse_term()
         while peek() in ("+", "-"):
             op = consume()

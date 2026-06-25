@@ -168,10 +168,12 @@ class Curve:
 
     @property
     def rational(self) -> bool:
+        """Whether the curve or surface is rational (has weights)."""
         return self._weights is not None
 
     @property
     def knot_domain(self) -> Tuple[float, float]:
+        """Knot domain of the curve."""
         return self._uknots[0], self._uknots[-1]
 
     # ── parameter mapping ──────────────────────────────────────────
@@ -350,10 +352,12 @@ class Curve:
 
     @property
     def start_point(self) -> Vec:
+        """Starting point of the path."""
         return self.point_at(0.0)
 
     @property
     def end_point(self) -> Vec:
+        """End point of the path."""
         return self.point_at(1.0)
 
     # ── bi‑arc fitting ──────────────────────────────────────────────
@@ -454,6 +458,7 @@ class Curve:
     # ── serialisation ──────────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "degree": self.degree,
             "control_points": [v.to_dict() for v in self.points],
@@ -467,6 +472,7 @@ class Curve:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Curve":
+        """Deserialize from a dict."""
         return cls(
             control_points=[Vec.from_dict(v) for v in d["control_points"]],
             knots=d["knots"],

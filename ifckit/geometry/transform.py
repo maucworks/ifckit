@@ -45,6 +45,7 @@ class Transform:
 
     @staticmethod
     def identity() -> Transform:
+        """Create an identity transform."""
         return Transform(
             (
                 (1, 0, 0, 0),
@@ -56,6 +57,7 @@ class Transform:
 
     @staticmethod
     def translation(v: Vec) -> Transform:
+        """Create a translation transform."""
         return Transform(
             (
                 (1, 0, 0, v.x),

@@ -89,6 +89,7 @@ class BaseBuilder(ABC, IIfcBuilder):
         context: ifcopenshell.entity_instance,
     ) -> ifcopenshell.entity_instance:
         # 1. Subclass creates geometry + entity
+        """Build and insert components into the IFC model."""
         entity = self._create_geometry(ifc_file, pending, container, context)
 
         # 2. Apply clipping (if element has clip planes)
@@ -193,4 +194,5 @@ class BuilderRegistry:
         return builder.build(ifc_file, pending, container, context)
 
     def registered_types(self) -> list[str]:
+        """Registered element type names."""
         return list(self._builders)

@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 
 def pt2(f: ifcopenshell.file, x: float, y: float) -> ifcopenshell.entity_instance:
+    """Create a 2D point."""
     return f.create_entity("IfcCartesianPoint", Coordinates=[round_coord(x), round_coord(y)])
 
 
@@ -62,6 +63,7 @@ def profile_from_points(
     profile_name: str | None = None,
     ensure_ccw: bool = True,
 ) -> ifcopenshell.entity_instance:
+    """Create a profile from a list of 2D points."""
     from ifckit.geometry import Path
 
     holes: list = []
@@ -108,6 +110,7 @@ def profile_to_ifc(
     profile_name: str | None = None,
     ensure_ccw: bool = True,
 ) -> ifcopenshell.entity_instance:
+    """Convert a profile to an IFC representation."""
     if hasattr(profile_source, "to_ifc"):
         return profile_source.to_ifc(f)
     if hasattr(profile_source, "get_profile_points"):
@@ -590,6 +593,7 @@ def shapely_polygon_to_ifc_profile(
     polygon: Any,
     profile_name: str | None = None,
 ) -> ifcopenshell.entity_instance:
+    """Convert a Shapely polygon to an IFC profile."""
     ext_coords = list(polygon.exterior.coords)
     if (
         len(ext_coords) > 1

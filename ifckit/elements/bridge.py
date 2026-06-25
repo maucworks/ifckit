@@ -51,9 +51,11 @@ class AlignmentSegment:
 
     @property
     def length(self) -> float:
+        """Length of the vector."""
         return self.geometry.length
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         geom_d: Dict[str, Any] = {}
         if isinstance(self.geometry, Line):
             geom_d.update(
@@ -77,6 +79,7 @@ class AlignmentSegment:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "AlignmentSegment":
+        """Deserialize from a dict."""
         geom_d = d["geometry"]
         if geom_d["segment_type"] == "line":
             geom: Union[Line, Arc] = Line(Vec(*geom_d["start"]), Vec(*geom_d["end"]))
@@ -113,12 +116,14 @@ class PendingAlignment(PendingElement):
         self.segments = list(segments)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["segments"] = [s.to_dict() for s in self.segments]
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingAlignment":
+        """Deserialize from a dict."""
         segments = [AlignmentSegment.from_dict(s) for s in cls._require(d, "segments")]
         return cls(segments=segments, name=d.get("name", ""))
 
@@ -166,6 +171,7 @@ class PendingBridgePart(PendingElement):
         self.alignment = alignment
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["part_type"] = self.part_type.value
         d["elements"] = [e.to_dict() for e in self.elements]
@@ -175,6 +181,7 @@ class PendingBridgePart(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBridgePart":
+        """Deserialize from a dict."""
         part_type = BridgePartType(cls._require(d, "part_type"))
         elements = [_element_from_dict(e) for e in d.get("elements", [])]
         alignment = PendingAlignment.from_dict(d["alignment"]) if "alignment" in d else None
@@ -214,6 +221,7 @@ class PendingBridge(PendingElement):
         self.alignment = alignment
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["parts"] = [p.to_dict() for p in self.parts]
         if self.alignment is not None:
@@ -222,6 +230,7 @@ class PendingBridge(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBridge":
+        """Deserialize from a dict."""
         parts = [PendingBridgePart.from_dict(p) for p in cls._require(d, "parts")]
         alignment = PendingAlignment.from_dict(d["alignment"]) if "alignment" in d else None
         return cls(parts=parts, alignment=alignment, name=d.get("name", ""))

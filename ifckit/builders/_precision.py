@@ -13,6 +13,7 @@ _MIN_COORD: float = 10 ** (-_PRECISION)
 
 
 def set_precision(decimals: int) -> None:
+    """Set decimal precision for IFC coordinate output."""
     global _PRECISION, _MIN_COORD
     if not isinstance(decimals, int):
         raise TypeError(f"decimals must be int, got {type(decimals).__name__}")

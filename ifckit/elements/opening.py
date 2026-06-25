@@ -144,6 +144,7 @@ class PendingOpening(PendingElement):
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["plane"] = self.plane.to_dict()
         d["width"] = self.width
@@ -156,6 +157,7 @@ class PendingOpening(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingOpening":
+        """Deserialize from a dict."""
         plane_raw = cls._require(d, "plane")
         width = cls._require(d, "width")
         height = cls._require(d, "height")
@@ -240,6 +242,7 @@ class PendingDoor(PendingElement):
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["overall_width"] = self.overall_width
         d["overall_height"] = self.overall_height
@@ -258,6 +261,7 @@ class PendingDoor(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingDoor":
+        """Deserialize from a dict."""
         return cls(
             overall_width=cls._require(d, "overall_width"),
             overall_height=cls._require(d, "overall_height"),
@@ -353,6 +357,7 @@ class PendingWindow(PendingElement):
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["overall_width"] = self.overall_width
         d["overall_height"] = self.overall_height
@@ -373,6 +378,7 @@ class PendingWindow(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingWindow":
+        """Deserialize from a dict."""
         from ifckit.geometry import Path as IFCPath
 
         path_data = d.get("path")

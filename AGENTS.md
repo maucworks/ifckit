@@ -96,12 +96,11 @@ AI-generated, identify them.
 
 ## Code Style
 
-### Python
+Follow the rules in [`STYLE.md`](STYLE.md). Key points:
 
-- **Line length**: 100 characters
-- **Formatter**: ruff
-- **Linter**: ruff (rules E, F, I)
-- Configuration is in `pyproject.toml`
+- **Line length**: 100 characters, **Formatter**: ruff, **Linter**: ruff (E, F, I, D)
+- **Docstrings**: Google-style. `__init__` params go in the class docstring.
+  `to_dict`/`from_dict` get single-line docstrings.
 
 Run linters and formatters **before submitting** your pull request. Do not rely
 on CI to catch formatting issues.

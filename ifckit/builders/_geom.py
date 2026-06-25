@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 
 
 def pt3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
+    """Create a 3D point."""
     return f.create_entity(
         "IfcCartesianPoint",
         Coordinates=[_round_coord(x), _round_coord(y), _round_coord(z)],
@@ -50,6 +51,7 @@ def pt3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.enti
 
 
 def dir3(f: ifcopenshell.file, x: float, y: float, z: float) -> ifcopenshell.entity_instance:
+    """Create a 3D direction vector for IFC."""
     return f.create_entity(
         "IfcDirection",
         DirectionRatios=[_round_coord(x), _round_coord(y), _round_coord(z)],
@@ -205,6 +207,7 @@ def shape_representation(
     solid: ifcopenshell.entity_instance,
     rep_type: str = "SweptSolid",
 ) -> ifcopenshell.entity_instance:
+    """Create an IFC shape representation."""
     valid_types = (
         "SweptSolid",
         "SectionedSpine",
@@ -228,6 +231,7 @@ def product_definition_shape(
     f: ifcopenshell.file,
     shape_rep: ifcopenshell.entity_instance,
 ) -> ifcopenshell.entity_instance:
+    """Create an IFC product definition shape."""
     return f.create_entity(
         "IfcProductDefinitionShape",
         Representations=[shape_rep],

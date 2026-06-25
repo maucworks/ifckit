@@ -129,6 +129,7 @@ class PendingExtrudedElement(PendingElement):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["axis"] = {
             "start": self.axis.start.to_tuple(),
@@ -261,6 +262,7 @@ class PendingBeam(PendingExtrudedElement):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         if self.ref_line is not None:
             d["ref_line"] = {
@@ -271,6 +273,7 @@ class PendingBeam(PendingExtrudedElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBeam":
+        """Deserialize from a dict."""
         obj: PendingExtrudedElement = cls._from_dict_fields(d)
         ref_line_d = d.get("ref_line")
         if ref_line_d is not None:
@@ -297,6 +300,7 @@ class PendingColumn(PendingExtrudedElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingColumn":
+        """Deserialize from a dict."""
         return cls._from_dict_fields(d)  # type: ignore[return-value]
 
 
@@ -381,6 +385,7 @@ class PendingTaperedExtrusion(PendingElement):
         return list(self._end_src)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["plane"] = self.plane.to_dict()
         d["height"] = self.height
@@ -406,6 +411,7 @@ class PendingTaperedExtrusion(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingTaperedExtrusion":
+        """Deserialize from a dict."""
         plane = Plane.from_dict(cls._require(d, "plane"))
         height = cls._require(d, "height")
         raw_start = cls._require(d, "start_profile")
@@ -478,6 +484,7 @@ class PendingRevolvedBeam(PendingElement):
         self.plane = plane
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["arc"] = {
             "center": self.arc.center.to_tuple(),
@@ -500,6 +507,7 @@ class PendingRevolvedBeam(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingRevolvedBeam":
+        """Deserialize from a dict."""
         arc_d = cls._require(d, "arc")
         arc = Arc(
             center=Vec(*arc_d["center"]),

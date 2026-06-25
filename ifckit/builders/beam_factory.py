@@ -43,6 +43,8 @@ from ifckit.profiles.base import Profile
 
 
 class PathType:
+    """Enumeration of path types for beam definitions."""
+
     SINGLE_LINE = "single_line"
     SINGLE_ARC = "single_arc"
     MULTI_SEGMENT = "multi_segment"

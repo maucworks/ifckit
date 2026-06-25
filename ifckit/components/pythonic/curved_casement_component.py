@@ -18,6 +18,7 @@ class CurvedCasementComponent(FillComponent):
     ifc_class = "IfcWindow"
 
     def build(self, ifc_file, plane, w, h, params):
+        """Build and insert components into the IFC model."""
         lt = float(params.get("lining_thickness", 55))
         ld = float(params.get("lining_depth", 70))
         gd = float(params.get("panel_depth", 24))

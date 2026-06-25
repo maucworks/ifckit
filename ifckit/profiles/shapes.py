@@ -151,12 +151,15 @@ class PolygonProfile(Profile):
         return (min(xs), min(ys))
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return the profile points for IFC export."""
         return self._apply_transform(list(self.points), bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert to an IFC representation."""
         return _build_polyline_profile(ifc_file, self.get_profile_points(), self.name)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "points": list(self.points),
@@ -168,6 +171,7 @@ class PolygonProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PolygonProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             points=d["points"],
@@ -333,12 +337,15 @@ class RoundedPolygonProfile(Profile):
         return outline
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return the profile points for IFC export."""
         return self._apply_transform(self._build_outline())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert to an IFC representation."""
         return _build_polyline_profile(ifc_file, self.get_profile_points(), self.name)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "points": list(self.points),
@@ -352,6 +359,7 @@ class RoundedPolygonProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "RoundedPolygonProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             points=d["points"],
@@ -409,9 +417,11 @@ class RectangleProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         return self.x_dim * self.y_dim
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
+        """Return the profile points for IFC export."""
         hx = self.x_dim / 2
         hy = self.y_dim / 2
         pts = [(-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)]
@@ -419,6 +429,7 @@ class RectangleProfile(Profile):
         return self._apply_transform(pts, bbox=(self.x_dim, self.y_dim), bbox_sw=bbox_sw)
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert to an IFC representation."""
         hx = self.x_dim / 2
         hy = self.y_dim / 2
         bbox_sw = (-hx, -hy)
@@ -433,6 +444,7 @@ class RectangleProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "x_dim": self.x_dim,
@@ -445,6 +457,7 @@ class RectangleProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "RectangleProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             x_dim=d["x_dim"],
@@ -499,6 +512,7 @@ class CircleProfile(Profile):
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         return math.pi * self.radius**2
 
     def _bbox(self) -> Tuple[float, float]:
@@ -521,6 +535,7 @@ class CircleProfile(Profile):
         return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert to an IFC representation."""
         pos = self._ifc_placement_2d(ifc_file, bbox=self._bbox(), bbox_sw=self._bbox_sw())
         return ifc_file.create_entity(
             "IfcCircleProfileDef",
@@ -531,6 +546,7 @@ class CircleProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "radius": self.radius,
@@ -542,6 +558,7 @@ class CircleProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CircleProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             radius=d["radius"],
@@ -600,10 +617,12 @@ class HollowCircleProfile(Profile):
 
     @property
     def inner_radius(self) -> float:
+        """Inner radius of the hollow profile."""
         return self.radius - self.wall_thickness
 
     @property
     def area(self) -> float:
+        """Cross-sectional area of the profile."""
         return math.pi * (self.radius**2 - self.inner_radius**2)
 
     def _bbox(self) -> Tuple[float, float]:
@@ -626,6 +645,7 @@ class HollowCircleProfile(Profile):
         return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
+        """Convert to an IFC representation."""
         pos = self._ifc_placement_2d(ifc_file, bbox=self._bbox(), bbox_sw=self._bbox_sw())
         return ifc_file.create_entity(
             "IfcCircleHollowProfileDef",
@@ -637,6 +657,7 @@ class HollowCircleProfile(Profile):
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
             "radius": self.radius,
@@ -649,6 +670,7 @@ class HollowCircleProfile(Profile):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "HollowCircleProfile":
+        """Deserialize from a dict."""
         r, ox, oy, anch = cls._transform_from_dict(d, default_anchor="c")
         return cls(
             radius=d["radius"],

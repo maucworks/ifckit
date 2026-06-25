@@ -86,6 +86,7 @@ class PendingSectionedSpine(PendingElement):
             raise ValueError("At least 2 profiles are required")
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["spine"] = self.spine.to_dict()
         d["profiles"] = [p.to_dict() for p in self.profiles]
@@ -100,6 +101,7 @@ class PendingSectionedSpine(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingSectionedSpine":
+        """Deserialize from a dict."""
         from ifckit.geometry import Path, Plane
         from ifckit.profiles.base import Profile as _Profile
 

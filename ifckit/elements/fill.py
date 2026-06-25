@@ -53,6 +53,7 @@ class PendingFill(PendingElement):
         self.material_overrides = material_overrides or {}
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict."""
         d = super().to_dict()
         d["component_graph"] = self.component_graph
         if self.plane is not None:
@@ -67,6 +68,7 @@ class PendingFill(PendingElement):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "PendingFill":
+        """Deserialize from a dict."""
         from ifckit.geometry import Path as IFCPath
         from ifckit.geometry import Plane
 

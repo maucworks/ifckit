@@ -4,6 +4,7 @@ Framework-agnostic IFC builder library for architecture and infrastructure.
 
 ![Tests](https://github.com/maucworks/ifckit/actions/workflows/tests.yml/badge.svg)
 ![PyPI](https://img.shields.io/pypi/v/ifckit)
+[![Docs](https://img.shields.io/badge/docs-pdoc-blue)](https://maucworks.github.io/ifckit/)
 
 Build valid IFC files in pure Python — no CAD host required.
 Works standalone, from Grasshopper, or via the JSON/CLI interface.

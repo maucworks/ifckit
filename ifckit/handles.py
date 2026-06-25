@@ -30,6 +30,7 @@ class Handle:
 
     @property
     def entity(self) -> ifcopenshell.entity_instance:
+        """The underlying ifcopenshell entity instance."""
         return object.__getattribute__(self, "_entity")
 
     @property

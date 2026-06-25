@@ -34,6 +34,7 @@ dev = [
     "httpx>=0.27",
     "ruff",
     "mypy",
+    "pdoc>=15.0.0",
 ]
 api = [
     "fastapi>=0.111",
@@ -113,3 +114,6 @@ module = [
     "ifckit.elements.bridge",
 ]
 ignore_errors = true
+
+[tool.pdoc]
+search = true

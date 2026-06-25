@@ -1,3 +1,10 @@
+"""
+ifckit.draw
+===========
+
+SVG-based IFC model visualisation and export utilities.
+"""
+
 import xml.etree.ElementTree as ET
 from typing import Optional
 
@@ -32,6 +39,7 @@ def generate_svg(
     scale: float = 1.0 / 100.0,
     drawing_object_type: str = "DRAWING",
 ) -> bytes:
+    """Generate an SVG visualisation of an IFC model."""
     ifc_file = getattr(ifc_model, "ifc_file", ifc_model)
 
     svg_geom = _geom.settings(ELEMENT_HIERARCHY=True, REORIENT_SHELLS=True)
@@ -78,6 +86,7 @@ def _ifc_unit_factor(ifc_file) -> float:
 
 
 def inject_symbols(svg_bytes: bytes, ifc_file) -> bytes:
+    """Inject SVG marker/arrowhead definitions."""
     ET.register_namespace("", "http://www.w3.org/2000/svg")
     ET.register_namespace("ifc", _IFC_NS)
 
@@ -156,5 +165,6 @@ def inject_symbols(svg_bytes: bytes, ifc_file) -> bytes:
 
 
 def save_svg(svg_bytes: bytes, path: str) -> None:
+    """Save an SVG string to a file."""
     with open(path, "wb") as f:
         f.write(svg_bytes)

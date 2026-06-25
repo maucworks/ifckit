@@ -16,6 +16,7 @@ from ifckit import build, validate_json
 
 
 def main() -> int:
+    """Main entry point for bootstrap component loading."""
     parser = argparse.ArgumentParser(
         prog="ifckit",
         description="IFC builder library - convert JSON to IFC",
@@ -51,6 +52,7 @@ def main() -> int:
 
 
 def handle_build(args) -> int:
+    """Handle the build command line argument."""
     input_path = args.input
 
     if input_path == "-":

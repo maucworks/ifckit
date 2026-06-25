@@ -1,3 +1,10 @@
+"""
+ifckit.draw._svg
+================
+
+SVG path and matrix parsing helpers for IFC visualisation.
+"""
+
 import re
 from typing import List, Optional, Tuple, Union
 
@@ -10,6 +17,7 @@ _SVG_NUM_RE = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
 
 
 def parse_matrix3(matrix3_attr: str) -> Optional[Tuple[float, float, float]]:
+    """Parse an SVG matrix3 attribute into a tuple of floats."""
     if not matrix3_attr:
         return None
     nums = [float(n) for n in _SVG_NUM_RE.findall(matrix3_attr)]
@@ -24,6 +32,7 @@ def parse_matrix3(matrix3_attr: str) -> Optional[Tuple[float, float, float]]:
 
 
 def parse_plane_attr(plane_attr: str) -> Optional[List[float]]:
+    """Parse an SVG plane attribute."""
     if not plane_attr:
         return None
     nums = [float(n) for n in _SVG_NUM_RE.findall(plane_attr)]
@@ -33,6 +42,7 @@ def parse_plane_attr(plane_attr: str) -> Optional[List[float]]:
 
 
 def plane_mat_to_numpy(plane: List[float]) -> np.ndarray:
+    """Convert a plane matrix to a numpy array."""
     m = np.array(plane).reshape(4, 4)
     m[3] = [0.0, 0.0, 0.0, 1.0]
     return m.T
@@ -45,6 +55,7 @@ def world_to_svg(
     tx: float,
     ty: float,
 ) -> Tuple[float, float]:
+    """Transform world coordinates to SVG coordinates."""
     w = np.array([*world_pt, 1.0])
     local = plane_mat_inv @ w
     lx = local[0]
@@ -59,6 +70,7 @@ def curves_to_svg_d(
     plane_mat: Optional[List[float]],
     svg_transform: Tuple[float, float, float],
 ) -> str:
+    """Convert IFC curves to an SVG path d-attribute."""
     sc, tx, ty = svg_transform
     if plane_mat:
         M = plane_mat_to_numpy(plane_mat)
@@ -90,6 +102,7 @@ def curves_to_svg_d(
 
 
 def parse_path_d(d: str) -> list[tuple]:
+    """Parse an SVG path d-attribute into IFC curves."""
     tokens = _SVG_CMD_RE.split(d.strip())
     cmd_blocks: list[tuple[str, list[float]]] = []
     i = 1

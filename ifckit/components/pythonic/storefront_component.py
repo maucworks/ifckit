@@ -25,6 +25,7 @@ class StorefrontComponent(FillComponent):
     ifc_class = "IfcWindow"
 
     def build(self, ifc_file, plane=None, w=None, h=None, params=None, path=None):
+        """Build and insert components into the IFC model."""
         params = params or {}
         lt = float(params.get("lining_thickness", 55))
         ld = float(params.get("lining_depth", 70))

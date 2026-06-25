@@ -287,6 +287,7 @@ def sectioned_spine(
     profile_segments: int = 32,
     closed: bool = False,
 ) -> ifcopenshell.entity_instance:
+    """Create a sectioned spine solid geometry."""
     if len(cross_sections) != len(positions):
         raise ValueError(
             f"CrossSections ({len(cross_sections)}) must have same length "

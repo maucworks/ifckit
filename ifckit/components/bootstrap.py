@@ -101,10 +101,12 @@ IFC_CLASSES = [
 
 
 def to_pascal(snake: str) -> str:
+    """Convert a string to PascalCase."""
     return "".join(word.capitalize() for word in snake.split("_"))
 
 
 def main():
+    """Main entry point for bootstrap component loading."""
     raw = sys.argv[1] if len(sys.argv) > 1 else ""
 
     if not raw:
