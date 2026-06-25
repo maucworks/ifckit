@@ -282,23 +282,37 @@ class Plane:
         return (self.x_axis**self.y_axis).normalized()
 
     @classmethod
-    def world_xy(cls) -> "Plane":
-        """Standard XY plane at origin (normal = +Z)."""
-        return cls(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+    def world_xy(cls, origin: Optional["Vec"] = None) -> "Plane":
+        """Standard XY plane at *origin* (normal = +Z).
+
+        Args:
+            origin: Origin point (default ``(0, 0, 0)``).
+        """
+        o = origin or Vec(0, 0, 0)
+        return cls(o, Vec(1, 0, 0), Vec(0, 1, 0))
 
     @classmethod
-    def world_xz(cls) -> "Plane":
-        """XZ plane at origin (normal = -Y).
+    def world_xz(cls, origin: Optional["Vec"] = None) -> "Plane":
+        """XZ plane at *origin* (normal = -Y).
 
         2D ``(X, Y)`` maps to 3D ``(X, 0, Y)`` — ``X`` becomes world-X,
         ``Y`` becomes world-Z.
+
+        Args:
+            origin: Origin point (default ``(0, 0, 0)``).
         """
-        return cls(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 0, 1))
+        o = origin or Vec(0, 0, 0)
+        return cls(o, Vec(1, 0, 0), Vec(0, 0, 1))
 
     @classmethod
-    def world_yz(cls) -> "Plane":
-        """YZ plane at origin (normal = +X)."""
-        return cls(Vec(0, 0, 0), Vec(0, 1, 0), Vec(0, 0, 1))
+    def world_yz(cls, origin: Optional["Vec"] = None) -> "Plane":
+        """YZ plane at *origin* (normal = +X).
+
+        Args:
+            origin: Origin point (default ``(0, 0, 0)``).
+        """
+        o = origin or Vec(0, 0, 0)
+        return cls(o, Vec(0, 1, 0), Vec(0, 0, 1))
 
     @classmethod
     def from_origin_and_normal(
