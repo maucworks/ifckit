@@ -7,6 +7,7 @@ Curve — a NURBS/BSpline curve with evaluation (De Boor) and IFC serialisation.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 from ifckit.geometry.primitives import Arc, Line, Plane, Vec
@@ -216,6 +217,124 @@ class Curve:
         v = (p1 - p0) / (t1 - t0)
         n = v.normalized()
         return n if n is not None else Vec(0, 0, 0)
+
+    def divide(
+        self,
+        num: Optional[int] = None,
+        dist: Optional[float] = None,
+        *,
+        even: bool = True,
+    ) -> List:
+        """Distribute points along the curve at equal arc-length intervals.
+
+        Returns a list of ``PathPoint`` objects with attributes ``.t``
+        (normalised parameter), ``.point``, and ``.tangent``.
+
+        Exactly one of *num* or *dist* must be given.
+
+        Args:
+            num: Number of points (inclusive of start and end).
+            dist: Approximate step distance.
+                ``even=True`` (default): evenly distributed, spacing ≤ dist,
+                endpoints always included.
+                ``even=False``: fixed step from start, last step may be shorter.
+            even: When ``True`` (default) and *dist* is given, points are
+                evenly distributed with spacing ≤ dist.
+
+        Returns:
+            List of ``PathPoint`` objects.
+
+        Raises:
+            ValueError: If exactly one of *num*/*dist* is not given,
+                *num* < 2, *dist* ≤ 0, or the curve has zero length.
+        """
+        if (num is None) == (dist is None):
+            raise ValueError("Exactly one of 'num' or 'dist' must be specified")
+        total = self.length
+        if total < 1e-12:
+            raise ValueError("Cannot divide a zero-length curve")
+        if num is not None:
+            if num < 2:
+                raise ValueError("num must be at least 2")
+            step = total / (num - 1)
+        else:
+            if dist <= 0:
+                raise ValueError("dist must be positive")
+            if even:
+                segs = max(1, math.ceil(total / dist))
+                step = total / segs
+            else:
+                step = dist
+
+        u0, u1 = self.knot_domain
+        inv_range = 1.0 / (u1 - u0) if u1 != u0 else 1.0
+
+        try:
+            from OCC.Core.GCPnts import GCPnts_AbscissaPoint, GCPnts_UniformAbscissa
+            from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
+            from OCC.Core.gp import gp_Pnt, gp_Vec
+
+            from ifckit.geometry.path import PathPoint
+            from ifckit.geometry.surface import _build_occ_curve
+
+            occ = _build_occ_curve(self)
+            adaptor = GeomAdaptor_Curve(occ)
+            ua = GCPnts_UniformAbscissa(adaptor, step)
+
+            result: list = []
+            for i in range(1, ua.NbPoints() + 1):
+                u = ua.Parameter(i)
+                pnt = gp_Pnt()
+                d1 = gp_Vec()
+                occ.D1(u, pnt, d1)
+                result.append(
+                    PathPoint(
+                        t=(u - u0) * inv_range,
+                        point=Vec(pnt.X(), pnt.Y(), pnt.Z()),
+                        tangent=Vec(d1.X(), d1.Y(), d1.Z()).normalized(),
+                    )
+                )
+
+            if num is not None:
+                occ_total = GCPnts_AbscissaPoint.Length(adaptor)
+                # OCC's internal arc-length may differ from self.length;
+                # ensure exact point count by resampling at correct abscissas
+                step_occ = occ_total / (num - 1)
+                result2: list = []
+                for i in range(num):
+                    d = i * step_occ
+                    if d > occ_total:
+                        d = occ_total
+                    ap = GCPnts_AbscissaPoint(1e-6, adaptor, d, u0)
+                    u = ap.Parameter() if ap.IsDone() else u0 + i * (u1 - u0) / (num - 1)
+                    pnt = gp_Pnt()
+                    d1 = gp_Vec()
+                    occ.D1(u, pnt, d1)
+                    result2.append(
+                        PathPoint(
+                            t=(u - u0) * inv_range,
+                            point=Vec(pnt.X(), pnt.Y(), pnt.Z()),
+                            tangent=Vec(d1.X(), d1.Y(), d1.Z()).normalized(),
+                        )
+                    )
+                return result2
+
+            # Remove trailing duplicate if OCC's internal length rounding
+            # added an extra point (same t within tolerance)
+            while len(result) > 1 and abs(result[-1].t - result[-2].t) < 1e-4:
+                result.pop()
+            return result
+
+        except ImportError:
+            pass
+
+        n = num if num is not None else int(total / step) + 1
+        from ifckit.geometry.path import PathPoint
+
+        return [
+            PathPoint(t=t, point=self.point_at(t), tangent=self.tangent_at(t))
+            for t in (i / (n - 1) for i in range(n))
+        ]
 
     @property
     def length(self) -> float:

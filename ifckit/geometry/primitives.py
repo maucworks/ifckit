@@ -338,6 +338,36 @@ class Plane:
         return cls(origin, x, y)
 
     @classmethod
+    def from_3_pts(cls, p0: "Vec", p1: "Vec", p2: "Vec") -> "Plane":
+        """Construct a plane from three points.
+
+        ``origin = p0``, ``x_axis`` = direction from **p0** to **p1**,
+        ``y_axis`` = component of ``(p2 - p0)`` perpendicular to
+        ``x_axis`` (Gram-Schmidt orthogonalisation).
+
+        Args:
+            p0: Origin of the plane.
+            p1: Defines the X-axis direction (from p0).
+            p2: Defines the Y-axis direction (projected perpendicular to X).
+
+        Returns:
+            A right-handed frame with orthogonal x_axis / y_axis.
+
+        Raises:
+            ValueError: If p1 ≈ p0 (zero X-axis).
+            ValueError: If p2 is collinear with the p0→p1 direction.
+        """
+        x_raw = p1 - p0
+        if x_raw.length() < 1e-12:
+            raise ValueError("p1 must differ from p0")
+        x = x_raw.normalized()
+        v = p2 - p0
+        y_raw = v - x * (v @ x)
+        if y_raw.length() < 1e-12:
+            raise ValueError("p2 must not be collinear with p0→p1")
+        return cls(p0, x, y_raw.normalized())
+
+    @classmethod
     def from_tangent(
         cls,
         origin: "Vec",

@@ -1,7 +1,8 @@
 """Tests for ifckit.geometry.Plane"""
-import math
+
 import pytest
-from ifckit.geometry import Vec, Plane
+
+from ifckit.geometry import Plane, Vec
 
 
 def test_world_xy():
@@ -35,6 +36,32 @@ def test_from_origin_and_normal_z():
 def test_from_origin_and_normal_x():
     p = Plane.from_origin_and_normal(Vec(0, 0, 0), Vec(1, 0, 0))
     assert p.z_axis.equals(Vec(1, 0, 0))
+
+
+def test_from_3_pts_basic():
+    p0, p1, p2 = Vec(0, 0, 0), Vec(1, 1, 0), Vec(-1, 1, 0)
+    p = Plane.from_3_pts(p0, p1, p2)
+    assert p.origin.equals(Vec(0, 0, 0))
+    assert p.x_axis.equals(Vec(0.707, 0.707, 0).normalized())
+    assert p.x_axis.dot(p.y_axis) == pytest.approx(0.0, abs=1e-10)
+    assert abs(p.y_axis) == pytest.approx(1.0)
+
+
+def test_from_3_pts_upright_plane():
+    p = Plane.from_3_pts(Vec(1, 0, 0), Vec(1, 1, 0), Vec(1, 0, 1))
+    assert p.x_axis.equals(Vec(0, 1, 0))
+    assert p.y_axis.equals(Vec(0, 0, 1))
+    assert p.z_axis.equals(Vec(1, 0, 0))
+
+
+def test_from_3_pts_raises_on_p1_equals_p0():
+    with pytest.raises(ValueError, match="p1 must differ"):
+        Plane.from_3_pts(Vec(1, 2, 3), Vec(1, 2, 3), Vec(4, 5, 6))
+
+
+def test_from_3_pts_raises_on_collinear():
+    with pytest.raises(ValueError, match="collinear"):
+        Plane.from_3_pts(Vec(0, 0, 0), Vec(1, 0, 0), Vec(3, 0, 0))
 
 
 def test_from_tangent_basic():
