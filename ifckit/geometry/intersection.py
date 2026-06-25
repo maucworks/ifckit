@@ -80,6 +80,13 @@ class Intersection:
         if isinstance(a, Plane) and isinstance(b, Plane):
             return cls.plane_plane(a, b)
 
+        from ifckit.geometry.curve import Curve
+        from ifckit.geometry.surface import Surface
+
+        allowed = (Plane, Surface, Curve)
+        if not isinstance(a, allowed) or not isinstance(b, allowed):
+            raise TypeError(f"Unsupported intersection: {type(a).__name__} × {type(b).__name__}")
+
         # All remaining cases require pythonocc-core
         return cls._occ_intersect(a, b)
 
