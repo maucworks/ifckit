@@ -385,8 +385,8 @@ class PendingWindow(PendingElement):
         path = IFCPath.from_dict(path_data) if path_data is not None else None
 
         return cls(
-            overall_width=d.get("overall_width", 1000),
-            overall_height=d.get("overall_height", 1000),
+            overall_width=cls._require(d, "overall_width"),
+            overall_height=cls._require(d, "overall_height"),
             window_type=d.get("window_type", "NOTDEFINED"),
             type_ref=d.get("type_ref"),
             plane=Plane.from_dict(d["plane"]) if "plane" in d else None,
