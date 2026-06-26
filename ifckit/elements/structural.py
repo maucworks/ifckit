@@ -364,7 +364,7 @@ class PendingTaperedExtrusion(PendingElement):
         """Resolve profile to a list of 2D (u, v) points in *plane* local coords."""
         if isinstance(profile, Path):
             return profile.to_profile_points(plane)
-        from ifckit.builders._geom import project_profile_to_plane as _proj
+        from ifckit.geometry.ifc_geom import project_profile_to_plane as _proj
 
         return _proj(profile, plane)
 

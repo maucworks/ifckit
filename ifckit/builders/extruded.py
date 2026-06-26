@@ -190,6 +190,81 @@ class ExtrudedElementBuilder(BaseBuilder):
         return entity  # Clipping handled in _create_geometry for now
 
 
+class WallSlabBuilder(BaseBuilder):
+    """
+    Builds an extruded IfcWall or IfcSlab from a PendingWall/PendingSlab.
+
+    The footprint (in plane-local XY coordinates) is extruded along the local
+    Z axis by the ``depth`` attribute.  Optional clip planes are applied as
+    IfcBooleanClippingResult.
+
+    Args:
+        entity_type:   Registry key, e.g. ``"basic_wall"`` or ``"basic_slab"``.
+        ifc_class:     IFC entity class name, e.g. ``"IfcWall"`` or ``"IfcSlab"``.
+        extrusion_attr:  Attribute name on PendingElement holding the depth,
+                        e.g. ``"height"`` or ``"thickness"``.
+    """
+
+    def __init__(self, entity_type: str, ifc_class: str, extrusion_attr: str) -> None:
+        self.entity_type = entity_type
+        self._ifc_class = ifc_class
+        self._extrusion_attr = extrusion_attr
+
+    def _create_geometry(
+        self,
+        ifc_file: ifcopenshell.file,
+        pending: PendingElement,
+        container: ifcopenshell.entity_instance,
+        context: ifcopenshell.entity_instance,
+    ) -> ifcopenshell.entity_instance:
+        if not hasattr(pending, "element_type") or pending.element_type != self.entity_type:
+            raise TypeError(
+                f"WallSlabBuilder({self.entity_type!r}) expects a matching element, "
+                f"got element_type={getattr(pending, 'element_type', None)!r}"
+            )
+
+        pts_2d = [(p.x, p.y) for p in pending.footprint]
+        profile = profile_from_points(ifc_file, pts_2d)
+
+        depth = getattr(pending, self._extrusion_attr)
+        placement = axis2placement3d(
+            ifc_file,
+            Vec(0.0, 0.0, 0.0),
+            Vec(0.0, 0.0, 1.0),
+            Vec(1.0, 0.0, 0.0),
+        )
+        solid = extrude_profile(ifc_file, profile, depth, position=placement)
+
+        geometry = solid
+        for clip_plane in _iter_clips(pending):
+            geometry = _apply_clip(ifc_file, geometry, clip_plane, pending.plane, 0.0)
+
+        rep_type = "SweptSolid" if geometry is solid else "Clipping"
+        shape_rep = shape_representation(ifc_file, context, geometry, rep_type=rep_type)
+        prod_rep = product_definition_shape(ifc_file, shape_rep)
+
+        element = ifcopenshell.api.run(
+            "root.create_entity",
+            ifc_file,
+            ifc_class=self._ifc_class,
+            name=pending.name,
+        )
+        element.Representation = prod_rep
+        element.ObjectPlacement = local_placement(
+            ifc_file, pending.plane, relative_to=container.ObjectPlacement
+        )
+
+        ifcopenshell.api.run(
+            "spatial.assign_container",
+            ifc_file,
+            products=[element],
+            relating_structure=container,
+        )
+
+        write_psets(ifc_file, element, pending)
+        return element
+
+
 # ---------------------------------------------------------------------------
 # Clipping helpers (shared)
 # ---------------------------------------------------------------------------

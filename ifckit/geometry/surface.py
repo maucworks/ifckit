@@ -757,7 +757,7 @@ class Surface:
         def _downcast(surf):
             try:
                 return Geom_BSplineSurface.DownCast(surf)
-            except BaseException:
+            except Exception:
                 return None
 
         bspline = _downcast(geom)

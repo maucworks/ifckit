@@ -539,7 +539,7 @@ class Curve:
     # ── IFC serialisation ──────────────────────────────────────────
 
     def _to_ifc_points(self, ifc_file: "ifcopenshell.file") -> list:
-        from ifckit.builders._geom import pt3
+        from ifckit.geometry.ifc_geom import pt3
 
         return [pt3(ifc_file, v.x, v.y, v.z) for v in self.points]
 
@@ -832,7 +832,7 @@ class Curve:
             try:
                 joined = joiner.BSplineCurve()
                 result.append(_curve_from_occ_bspline(joined))
-            except BaseException:
+            except Exception:
                 # Join failed — add curves individually
                 for c in grp:
                     result.append(c)
@@ -901,7 +901,7 @@ class Curve:
                 pts.append(Vec(p.X(), p.Y(), p.Z()))
             try:
                 return cls.from_points(pts, degree=min(3, len(pts) - 1))
-            except BaseException:
+            except Exception:
                 pass  # fall through to full-curve extraction below
 
         poles = []

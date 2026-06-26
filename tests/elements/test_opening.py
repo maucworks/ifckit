@@ -17,7 +17,6 @@ from ifckit.elements.opening import (
 )
 from ifckit.geometry import Plane, Vec
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -292,20 +291,12 @@ class TestPendingWindowRoundtrip:
 
 
 class TestElementRegistration:
-    def test_opening_registered(self):
+    @pytest.mark.parametrize("elem_type", ["basic_opening", "basic_door", "basic_window"])
+    def test_registered(self, elem_type):
         from ifckit.elements.registry import ElementRegistry
-        assert ElementRegistry.has("basic_opening")
-
-    def test_door_registered(self):
-        from ifckit.elements.registry import ElementRegistry
-        assert ElementRegistry.has("basic_door")
-
-    def test_window_registered(self):
-        from ifckit.elements.registry import ElementRegistry
-        assert ElementRegistry.has("basic_window")
+        assert ElementRegistry.has(elem_type)
 
     def test_from_json_dispatch_opening(self):
-        import json
         o = _opening(name="dispatch-test")
         s = o.to_json()
         from ifckit.elements.base import PendingElement

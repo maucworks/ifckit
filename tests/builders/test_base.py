@@ -1,14 +1,17 @@
 """Tests for BuilderRegistry, IIfcBuilder base, and _geom helpers."""
-import pytest
 import ifcopenshell
 import ifcopenshell.api
+import pytest
 
-from ifckit.builders.base import BuilderRegistry
-from ifckit.builders.wall import WallBuilder
-from ifckit.builders.slab import SlabBuilder
 from ifckit.builders import default_registry
-from ifckit.builders._geom import extrude_profile, get_body_context, profile_from_points, axis2placement3d
-from ifckit.geometry import Vec
+from ifckit.builders._geom import (
+    extrude_profile,
+    get_body_context,
+    profile_from_points,
+)
+from ifckit.builders.base import BuilderRegistry
+from ifckit.builders.slab import SlabBuilder
+from ifckit.builders.wall import WallBuilder
 
 
 class TestBuildRegistry:
@@ -37,10 +40,13 @@ class TestBuildRegistry:
         assert "basic_wall" in types
         assert "basic_slab" in types
 
-    def test_default_registry_has_all(self):
+    @pytest.mark.parametrize(
+        "builder_type",
+        ["basic_wall", "basic_slab", "basic_beam", "basic_column", "revolved_beam"],
+    )
+    def test_default_registry_has_all(self, builder_type):
         r = default_registry()
-        for t in ["basic_wall", "basic_slab", "basic_beam", "basic_column", "revolved_beam"]:
-            assert t in r.registered_types()
+        assert builder_type in r.registered_types()
 
     def test_default_registry_excludes_alignment(self):
         """AlignmentBuilder is intentionally excluded — it is called directly by

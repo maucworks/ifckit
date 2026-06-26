@@ -1349,7 +1349,7 @@ class Path:
         Returns:
             IfcCompositeCurve entity
         """
-        from ifckit.builders._geom import directrix_from_path as _directrix
+        from ifckit.geometry.ifc_geom import directrix_from_path as _directrix
 
         return _directrix(ifc_file, self)
 

@@ -16,8 +16,8 @@ from typing import List, Union
 
 import ifcopenshell
 
-from ifckit.builders._geom import pt3
 from ifckit.geometry import Arc, Line
+from ifckit.geometry.ifc_geom import pt3
 
 _CURVE = Union[Line, Arc]
 

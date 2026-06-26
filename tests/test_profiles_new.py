@@ -15,22 +15,22 @@ Tests for the ifckit.profiles system:
 from __future__ import annotations
 
 import math
+
 import ifcopenshell
 import pytest
 
 from ifckit.profiles import (
-    IBeamProfile,
-    LBeamProfile,
-    Profile,
-    PolygonProfile,
-    RoundedPolygonProfile,
-    RectangleProfile,
     CircleProfile,
     HollowCircleProfile,
+    IBeamProfile,
+    LBeamProfile,
+    PolygonProfile,
+    Profile,
+    RectangleProfile,
+    RoundedPolygonProfile,
     SteelProfile,
 )
 from ifckit.profiles.base import RegisterProfileType
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -49,26 +49,12 @@ def ifc4_file():
 
 
 class TestProfileRegistry:
-    def test_polygon_registered(self):
-        assert "polygon" in RegisterProfileType._registry
-
-    def test_rounded_polygon_registered(self):
-        assert "rounded_polygon" in RegisterProfileType._registry
-
-    def test_rectangle_registered(self):
-        assert "rectangle" in RegisterProfileType._registry
-
-    def test_circle_registered(self):
-        assert "circle" in RegisterProfileType._registry
-
-    def test_hollow_circle_registered(self):
-        assert "hollow_circle" in RegisterProfileType._registry
-
-    def test_i_beam_registered(self):
-        assert "i_beam" in RegisterProfileType._registry
-
-    def test_l_beam_registered(self):
-        assert "l_beam" in RegisterProfileType._registry
+    @pytest.mark.parametrize(
+        "profile_type",
+        ["polygon", "rounded_polygon", "rectangle", "circle", "hollow_circle", "i_beam", "l_beam"],
+    )
+    def test_registered(self, profile_type):
+        assert profile_type in RegisterProfileType._registry
 
     def test_dispatch_unknown_raises(self):
         with pytest.raises(ValueError, match="Unknown profile_type"):
@@ -620,8 +606,8 @@ class TestProfileToIfc:
 
 class TestPendingBeamProfileRoundTrip:
     def test_ibeam_preserved_in_to_dict(self):
-        from ifckit.geometry import Vec, Line
         from ifckit.elements import PendingBeam
+        from ifckit.geometry import Line, Vec
 
         beam = PendingBeam(
             axis=Line(Vec(0, 0, 0), Vec(5, 0, 0)),
@@ -634,8 +620,8 @@ class TestPendingBeamProfileRoundTrip:
         assert d["profile"]["profile_type"] == "i_beam"
 
     def test_ibeam_reconstructed_from_dict(self):
-        from ifckit.geometry import Vec, Line
         from ifckit.elements import PendingBeam
+        from ifckit.geometry import Line, Vec
 
         beam = PendingBeam(
             axis=Line(Vec(0, 0, 0), Vec(5, 0, 0)),
@@ -649,8 +635,8 @@ class TestPendingBeamProfileRoundTrip:
         assert beam2._profile_source.name == "IPE300"
 
     def test_point_list_profile_unchanged(self):
-        from ifckit.geometry import Vec, Line
         from ifckit.elements import PendingBeam
+        from ifckit.geometry import Line, Vec
 
         pts = [Vec(0, -0.05, 0), Vec(0.05, 0, 0), Vec(0, 0.05, 0), Vec(-0.05, 0, 0)]
         beam = PendingBeam(axis=Line(Vec(0, 0, 0), Vec(3, 0, 0)), profile=pts)

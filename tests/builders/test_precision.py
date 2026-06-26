@@ -1,12 +1,13 @@
 import pytest
+
 from ifckit.builders._precision import get_precision, round_coord, set_precision
 
 
 class TestSetPrecision:
-    def test_valid_range(self):
-        for d in (0, 4, 10):
-            set_precision(d)
-            assert get_precision() == d
+    @pytest.mark.parametrize("d", [0, 4, 10])
+    def test_valid_range(self, d):
+        set_precision(d)
+        assert get_precision() == d
 
     def test_negative_raises(self):
         with pytest.raises(ValueError, match="0-10"):
