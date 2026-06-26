@@ -1,0 +1,6 @@
+/* Layout overrides for Swiss minimal theme */
+nav.pdoc {
+  background-color: #fafafa;
+  border-right-color: var(--accent);
+  box-shadow: none;
+}

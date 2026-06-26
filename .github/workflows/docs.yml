@@ -37,7 +37,7 @@ jobs:
     - name: Build API docs
       run: |
         MODULES="ifckit $(python3 -c "import pkgutil, ifckit; print(' '.join(m.name for m in pkgutil.walk_packages(ifckit.__path__, prefix='ifckit.')))")"
-        pdoc $MODULES -o docs/_build
+        pdoc $MODULES -o docs/_build -t docs/pdoc_templates
 
     - name: Upload to Pages
       id: upload

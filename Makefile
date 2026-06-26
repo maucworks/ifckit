@@ -100,11 +100,11 @@ PDOC_MODULES = ifckit $(shell python3 -c "import pkgutil, ifckit; print(' '.join
 
 .PHONY: docs
 docs:  ## Build static API docs → docs/_build/
-	$(PDOC) $(PDOC_MODULES) -o docs/_build
+	$(PDOC) $(PDOC_MODULES) -o docs/_build -t docs/pdoc_templates
 
 .PHONY: docs-serve
 docs-serve:  ## Live API docs on http://localhost:8080
-	$(PDOC) $(PDOC_MODULES) --host 0.0.0.0
+	$(PDOC) $(PDOC_MODULES) -t docs/pdoc_templates --host 0.0.0.0
 
 # ── code quality ───────────────────────────────────────────────────────────────
 

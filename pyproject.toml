@@ -117,3 +117,4 @@ ignore_errors = true
 
 [tool.pdoc]
 search = true
+template_directory = "docs/pdoc_templates"
