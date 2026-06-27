@@ -141,6 +141,14 @@ def beam_from_path(
 
     For Arc segments a construction plane is derived so that the revolved beam's
     profile Y aligns with ``up``.
+        col_segments = beam_from_path(
+            crv,
+            profile=lbeam(anchor="sw", rotation=math.radians(180), offset_x=gap / 2),
+            name="LBEAM_column",
+            clips=clips,
+        )
+        res.extend(col_segments)
+
 
     Clip planes are forwarded only to segments they intersect (checked via
     signed distance).  A clip whose keep side contains the entire segment is
@@ -213,11 +221,15 @@ def beam_from_path(
         seg_clips = [c for c in merged if _segment_intersects_clip(seg, c)]
 
         if isinstance(seg, Line):
+            t0 = seg.tangent_at(0).normalized()
+            x_axis = ref_plane.z_axis
+            y_axis = x_axis**t0
+            myplane = Plane(seg.point_at(0), x_axis, y_axis)
             result.append(
                 PendingBeam(
                     axis=seg,
                     profile=profile,
-                    plane=ref_plane,
+                    plane=myplane,
                     clips=seg_clips or None,
                     name="Beam_" + name,
                 )
