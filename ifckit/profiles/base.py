@@ -173,6 +173,18 @@ class Profile(Path, metaclass=RegisterProfileType):
         self._ensure_segments()
         return list(self._segments)
 
+    @property
+    def points(self) -> List["Vec"]:
+        """Tessellated polyline points (arcs sampled at 5°). Cached."""
+        self._ensure_segments()
+        return super().points
+
+    @property
+    def endpoints(self) -> List["Vec"]:
+        """Segment endpoints without arc interpolation."""
+        self._ensure_segments()
+        return super().endpoints
+
     # ------------------------------------------------------------------
     # Path property overrides — enforce planar + closed invariants
     # ------------------------------------------------------------------
@@ -226,6 +238,7 @@ class Profile(Path, metaclass=RegisterProfileType):
         # Invalidate cached segments when transform changes
         self._segments_built = False
         self._segments = []
+        self._cached_points = None
 
     def _apply_transform(
         self,

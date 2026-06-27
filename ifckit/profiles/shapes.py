@@ -125,34 +125,35 @@ class PolygonProfile(Profile):
         anchor: Optional[str] = None,
     ) -> None:
         self.name = name
-        self.points: List[Tuple[float, float]] = []
+        self._raw_points: List[Tuple[float, float]] = []
         for p in points:
             if hasattr(p, "x") and hasattr(p, "y"):
-                self.points.append((float(p.x), float(p.y)))
+                self._raw_points.append((float(p.x), float(p.y)))
             elif len(p) >= 2:
-                self.points.append((float(p[0]), float(p[1])))
+                self._raw_points.append((float(p[0]), float(p[1])))
             else:
                 raise ValueError(f"Cannot interpret point {p!r} as (x, y)")
-        if len(self.points) < 3:
+        if len(self._raw_points) < 3:
             raise ValueError("PolygonProfile requires at least 3 points")
         super().__init__()
         self._init_transform(rotation, offset_x, offset_y, anchor)
 
     def _bbox(self) -> Tuple[float, float]:
         """Bounding box width × height of the raw polygon points."""
-        xs = [p[0] for p in self.points]
-        ys = [p[1] for p in self.points]
+        xs = [p[0] for p in self._raw_points]
+        ys = [p[1] for p in self._raw_points]
         return (max(xs) - min(xs), max(ys) - min(ys))
 
     def _bbox_sw(self) -> Tuple[float, float]:
         """SW corner (min x, min y) of the raw polygon points."""
-        xs = [p[0] for p in self.points]
-        ys = [p[1] for p in self.points]
+        xs = [p[0] for p in self._raw_points]
+        ys = [p[1] for p in self._raw_points]
         return (min(xs), min(ys))
 
     def get_profile_points(self) -> List[Tuple[float, float]]:
         """Return the profile points for IFC export."""
-        return self._apply_transform(list(self.points), bbox=self._bbox(), bbox_sw=self._bbox_sw())
+        pts = list(self._raw_points)
+        return self._apply_transform(pts, bbox=self._bbox(), bbox_sw=self._bbox_sw())
 
     def to_ifc(self, ifc_file: "ifcopenshell.file") -> "ifcopenshell.entity_instance":
         """Convert to an IFC representation."""
@@ -162,7 +163,7 @@ class PolygonProfile(Profile):
         """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
-            "points": list(self.points),
+            "points": list(self._raw_points),
             **self._transform_dict(),
         }
         if self.name is not None:
@@ -233,7 +234,7 @@ class RoundedPolygonProfile(Profile):
             if len(radii) != n:
                 raise ValueError(f"radius list length {len(radii)} != points length {n}")
 
-        self.points = raw
+        self._raw_points = raw
         self.radii = radii
         self.name = name
         self.arc_segments = int(arc_segments)
@@ -242,7 +243,7 @@ class RoundedPolygonProfile(Profile):
 
     def _build_outline(self) -> List[Tuple[float, float]]:
         """Build the tessellated outline including fillet arcs."""
-        pts = self.points
+        pts = self._raw_points
         n = len(pts)
         outline: List[Tuple[float, float]] = []
 
@@ -348,7 +349,7 @@ class RoundedPolygonProfile(Profile):
         """Serialise to a plain dict."""
         d: Dict[str, Any] = {
             "profile_type": self.profile_type,
-            "points": list(self.points),
+            "points": list(self._raw_points),
             "radius": self.radii,
             "arc_segments": self.arc_segments,
             **self._transform_dict(),

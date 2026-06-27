@@ -84,6 +84,10 @@ class Path:
         self._segments: List[Line | Arc] = []
         self._plane: Optional["Plane"] = plane
         self._holes: List["Path"] = []
+        self._cached_points: Optional[List["Vec"]] = None
+
+    def _invalidate_cache(self) -> None:
+        self._cached_points = None
 
     @property
     def holes(self) -> "List[Path]":
@@ -116,9 +120,31 @@ class Path:
         """List of path segments (Line or Arc)."""
         return list(self._segments)
 
+    @property
+    def points(self) -> List["Vec"]:
+        """Tessellated polyline points (arcs sampled at 5°). Cached."""
+        if self._cached_points is None:
+            self._cached_points = self.sample().points
+        return list(self._cached_points)
+
+    @property
+    def endpoints(self) -> List["Vec"]:
+        """Segment endpoints without arc interpolation.
+
+        Returns one point per vertex (deduplicated).  No tessellation
+        — arcs are represented by their start and end only.
+        """
+        pts: List["Vec"] = []
+        for seg in self._segments:
+            if not pts or not pts[-1].equals(seg.start, tol=1e-9):
+                pts.append(seg.start)
+            pts.append(seg.end)
+        return pts
+
     def add_line(self, start: "Vec", end: "Vec") -> "Path":
         """Append a line segment to the path close to the current end."""
         self._segments.append(Line(start, end))
+        self._invalidate_cache()
         return self
 
     def add_arc(
@@ -130,6 +156,7 @@ class Path:
     ) -> "Path":
         """Append an arc segment to the path."""
         self._segments.append(Arc(center, normal, start, angle))
+        self._invalidate_cache()
         return self
 
     @property
@@ -770,6 +797,7 @@ class Path:
         ep = self.end_point()
         if sp is not None and ep is not None and not ep.equals(sp, tol=1e-9):
             self._segments.append(Line(ep, sp))
+            self._invalidate_cache()
         return self
 
     def fillet(self, index: "int | List[int]", radius: float) -> "Path":
@@ -948,6 +976,7 @@ class Path:
             self._segments = (
                 segs[: index - 1] + [new_seg_in, arc_seg, new_seg_out] + segs[index + 1 :]
             )
+        self._invalidate_cache()
         return self
 
     def reverse(self) -> "Path":
@@ -959,6 +988,7 @@ class Path:
             else:  # Arc
                 reversed_segs.append(Arc(seg.center, seg.normal, seg.end, -seg.angle))
         self._segments = reversed_segs
+        self._invalidate_cache()
         return self
 
     def move(self, delta: "Vec") -> "Path":
@@ -970,6 +1000,7 @@ class Path:
             else:
                 new_segs.append(Arc(seg.center + delta, seg.normal, seg.start + delta, seg.angle))
         self._segments = new_segs
+        self._invalidate_cache()
         if self._plane is not None:
             self._plane = Plane(self._plane.origin + delta, self._plane.x_axis, self._plane.y_axis)
         return self
@@ -1008,6 +1039,7 @@ class Path:
                     )
                 )
         self._segments = new_segs
+        self._invalidate_cache()
         if self._plane is not None:
             self._plane = Plane(
                 (self._plane.origin - ctr).rotate_around(axis, angle) + ctr,
@@ -1044,6 +1076,7 @@ class Path:
                 new_segs.append(Arc(new_center, target.z_axis, new_start, seg.angle * sign))
         self._segments = new_segs
         self._plane = target
+        self._invalidate_cache()
         return self
 
     def assert_ccw(self, normal: Optional["Vec"] = None) -> "Path":
@@ -1502,7 +1535,7 @@ class Path:
             return result
 
         # Cap: offset curve → end cap → original reversed → start cap
-        orig_pts = self.sample().points
+        orig_pts = self.points
         result = Path(plane=self._plane)
         result._segments = list(offset_segs)
         result.add_line(offset_segs[-1].end, orig_pts[-1])
@@ -1573,13 +1606,13 @@ class Path:
         """
         from shapely import Polygon
 
-        pts = [p.to_tuple()[:2] for p in self.sample().points]
+        pts = [p.to_tuple()[:2] for p in self.points]
         if len(pts) < 3:
             raise ValueError("Path must have at least 3 points for shapely conversion")
 
         holes: "list[list[tuple[float, float]]]" = []
         for hole in self._holes:
-            hpts = [p.to_tuple()[:2] for p in hole.sample().points]
+            hpts = [p.to_tuple()[:2] for p in hole.points]
             if len(hpts) >= 3:
                 holes.append(hpts)
 

@@ -77,7 +77,7 @@ class TestPolygonProfile:
 
     def test_construction_from_tuples_3d(self):
         p = PolygonProfile([(0, 0, 5), (1, 0, 5), (1, 1, 5)])
-        assert p.points[0] == (0.0, 0.0)
+        assert p.points[0].x == 0.0 and p.points[0].y == 0.0
 
     def test_too_few_points_raises(self):
         with pytest.raises(ValueError):
@@ -127,7 +127,7 @@ class TestRoundedPolygonProfile:
     def test_construction(self):
         pts = [(0, 0), (4, 0), (4, 3), (0, 3)]
         p = RoundedPolygonProfile(pts, radius=0.1)
-        assert len(p.points) == 4
+        assert len(p._raw_points) == 4
         assert p.radii == [0.1, 0.1, 0.1, 0.1]
 
     def test_per_corner_radius(self):
