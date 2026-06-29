@@ -13,7 +13,7 @@ Files created can be viewed in its companion [IfcViewer](https://github.com/mauc
 
 **Live: [maucworks.github.io/web-ifc-viewer](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fweb-ifc-viewer%2Frefs%2Fheads%2Fmaster%2Fres%2Ftest.ifc)**
 
-![IFC Viewer](res/Screenshot%202026-05-02%20at%2016.20.20.png)
+![IFC Viewer](./res/Screenshot\ 2026-05-12\ at\ 20.11.17.png)
 
 
 
