@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ifckit"
-version = "0.2.1"
+version = "0.2.2"
 description = "Framework-agnostic IFC builder library for architecture and infrastructure"
 authors = [{ name = "Sander Boer", email = "sanderboer@mauc.nl" }]
 readme = "README.md"
