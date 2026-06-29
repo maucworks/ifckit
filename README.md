@@ -17,7 +17,7 @@ Files created can be viewed in its companion [IfcViewer](https://github.com/mauc
   <img src="./res/Screenshot_2026-05-12_at_20.11.17.png" alt="alt text">
   <figcaption>IfcKit integrated with Grasshopper via the JSON pipeline.</figcaption>
 </figure>
-
+<br>
 <figure>
   <img src="./res/Screenshot_2026-06-29_at_17.03.36.png" alt="alt text">
   <figcaption>IfcKit as the pythonic gernerator core of a configurator.</figcaption>
