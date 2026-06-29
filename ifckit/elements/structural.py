@@ -264,6 +264,8 @@ class PendingBeam(PendingExtrudedElement):
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict."""
         d = super().to_dict()
+        if self.plane is not None:
+            d["plane"] = _plane_to_dict(self.plane)
         if self.ref_line is not None:
             d["ref_line"] = {
                 "start": self.ref_line.start.to_tuple(),
@@ -275,6 +277,9 @@ class PendingBeam(PendingExtrudedElement):
     def from_dict(cls, d: Dict[str, Any]) -> "PendingBeam":
         """Deserialize from a dict."""
         obj: PendingExtrudedElement = cls._from_dict_fields(d)
+        plane_d = d.get("plane")
+        if plane_d is not None:
+            obj.plane = _plane_from_dict(plane_d)
         ref_line_d = d.get("ref_line")
         if ref_line_d is not None:
             obj.ref_line = Line(Vec(*ref_line_d["start"]), Vec(*ref_line_d["end"]))

@@ -193,7 +193,7 @@ def beam_from_path(
         merged.append(end_clip)
 
     result: List[Union[PendingBeam, PendingRevolvedBeam]] = []
-    path = path.continued(tol=0.1, snap=True)
+    path = path.continued(tol=0.001, snap=True)
     t = path.tangent_at(0).normalized()
 
     dot_x = t @ path.plane.x_axis
@@ -224,7 +224,7 @@ def beam_from_path(
             t0 = seg.tangent_at(0).normalized()
             x_axis = ref_plane.z_axis
             y_axis = x_axis**t0
-            myplane = Plane(seg.point_at(0), x_axis, y_axis)
+            myplane = Plane(seg.point_at(0), -x_axis, y_axis)
             result.append(
                 PendingBeam(
                     axis=seg,
