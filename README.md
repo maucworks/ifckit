@@ -13,8 +13,15 @@ Files created can be viewed in its companion [IfcViewer](https://github.com/mauc
 
 **Live: [maucworks.github.io/web-ifc-viewer](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fweb-ifc-viewer%2Frefs%2Fheads%2Fmaster%2Fres%2Ftest.ifc)**
 
-![IFC Viewer](./res/Screenshot\ 2026-05-12\ at\ 20.11.17.png)
+<figure>
+  <img src="./res/Screenshot_2026-05-12_at_20.11.17.png" alt="alt text">
+  <figcaption>IfcKit integrated with Grasshopper via the JSON pipeline.</figcaption>
+</figure>
 
+<figure>
+  <img src="./res/Screenshot_2026-06-29_at_17.03.36.png" alt="alt text">
+  <figcaption>IfcKit as the pythonic gernerator core of a configurator.</figcaption>
+</figure>
 
 
 ## Install
