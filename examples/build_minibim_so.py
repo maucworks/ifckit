@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# This file was generated with the assistance of an AI coding tool.
 """
 Build MiniBIM SO voorbeeld — end-to-end ILS-demo.
 
@@ -18,13 +19,14 @@ Usage:
 """
 
 import ifcopenshell.api
-from ifckit.model import IfcModel
+
 from ifckit.builders.classification import add_classification, assign_classification
 from ifckit.builders.georeference import set_georeference
-from ifckit.builders.zones import group_spaces_by_property
 from ifckit.builders.quantities import write_quantities
+from ifckit.builders.zones import group_spaces_by_property
 from ifckit.ils.minibim import apply_minibim_pset
 from ifckit.ils.minibim.naming import format_eenheid_nummer
+from ifckit.model import IfcModel
 
 
 def main():

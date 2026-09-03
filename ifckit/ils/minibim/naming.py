@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.minibim.naming — naamgevingsregels (EenheidNummer, bestandsnaam, bouwlaag)."""
 
 from __future__ import annotations

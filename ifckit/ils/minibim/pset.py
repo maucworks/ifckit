@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.minibim.pset — MiniBIM ILS pset-definitie en writer."""
 
 from __future__ import annotations

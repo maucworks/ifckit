@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.minibim — MiniBIM ILS v3.1 domeinlaag."""
 
 from __future__ import annotations
@@ -99,11 +100,19 @@ class MiniBimSpec:
         return _load(name)
 
 
+def group_zones(model_or_file: Any, by: str = "EenheidNummer") -> list:
+    """Groepeer IfcSpace op een MiniBIM ILS property (bv. EenheidNummer) via IfcZone."""
+    from .zones import group_zones as _gz
+
+    return _gz(model_or_file, by=by)
+
+
 __all__ = [
     "ILS_VERSION",
     "ILS_NAME",
     "MiniBimSpec",
     "apply_minibim_pset",
+    "group_zones",
     "is_valid_ruimte_type",
     "is_valid_gebied_type",
     "is_valid_bouwwerk_type",

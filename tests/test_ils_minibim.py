@@ -1,16 +1,18 @@
+# This file was generated with the assistance of an AI coding tool.
 """Tests voor ils/minibim vocabularies en helpers."""
 
 import ifcopenshell.api
-from ifckit.model import IfcModel
+
 from ifckit.ils.minibim import (
+    BOUWWERK_TYPES,
+    GEBIED_TYPES,
+    RUIMTE_TYPES,
     MiniBimSpec,
     apply_minibim_pset,
     is_valid_ruimte_type,
-    RUIMTE_TYPES,
-    GEBIED_TYPES,
-    BOUWWERK_TYPES,
 )
 from ifckit.ils.minibim.pset import PARAMS
+from ifckit.model import IfcModel
 
 
 def test_ruimte_types():

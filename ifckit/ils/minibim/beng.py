@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.minibim.beng — BENG gevelwandregels."""
 
 from __future__ import annotations

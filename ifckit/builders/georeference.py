@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.builders.georeference — RD/NAP en andere CRS."""
 
 from __future__ import annotations

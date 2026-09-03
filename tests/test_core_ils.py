@@ -1,12 +1,14 @@
+# This file was generated with the assistance of an AI coding tool.
 """Tests voor core ILS-mechanismen: psets, classificatie, zones, georef, quantities."""
 
 import ifcopenshell.api
-from ifckit.model import IfcModel
-from ifckit.builders.psets import write_named_pset
+
 from ifckit.builders.classification import add_classification, assign_classification
-from ifckit.builders.zones import add_zone, group_spaces_by_property
 from ifckit.builders.georeference import set_georeference
+from ifckit.builders.psets import write_named_pset
 from ifckit.builders.quantities import write_quantities
+from ifckit.builders.zones import add_zone, group_spaces_by_property
+from ifckit.model import IfcModel
 
 
 def test_write_named_pset():

@@ -1,7 +1,14 @@
+# This file was generated with the assistance of an AI coding tool.
 """Tests voor ils/common vocabularies."""
 
-from ifckit.ils.common import BEPALINGSMETHODEN, ORIENTATIES, GEBRUIKSBESTEMMINGEN, load_data
-from ifckit.ils.common import is_valid_bepalingsmethode, is_valid_orientatie
+from ifckit.ils.common import (
+    BEPALINGSMETHODEN,
+    GEBRUIKSBESTEMMINGEN,
+    ORIENTATIES,
+    is_valid_bepalingsmethode,
+    is_valid_orientatie,
+    load_data,
+)
 
 
 def test_bepalingsmethoden():

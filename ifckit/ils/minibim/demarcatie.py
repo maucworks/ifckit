@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.minibim.demarcatie — demarcatie Bouwwerk en Gebruiksbestemming.
 
 Regels uit MiniBIM ILS v3.1 deel A §9.3 en §9.4. Tekstueel van aard;

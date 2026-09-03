@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.common — gedeelde NL-vocabularies (ILS-neutraal)."""
 
 from __future__ import annotations
@@ -28,6 +29,8 @@ def _codes(name: str) -> list[str]:
 BEPALINGSMETHODEN: list[str] = _codes("bepalingsmethoden.json")
 ORIENTATIES: list[str] = _codes("orientaties.json")
 GEBRUIKSBESTEMMINGEN: list[str] = _codes("gebruiksbestemmingen.json")
+NLSFB: list[str] = _codes("nlsfb.json")
+NAAKT: list[str] = _codes("naakt.json")
 
 # Laag-niveau helper voor andere ILS'en
 def load_data(name: str) -> dict:
@@ -51,6 +54,8 @@ __all__ = [
     "BEPALINGSMETHODEN",
     "ORIENTATIES",
     "GEBRUIKSBESTEMMINGEN",
+    "NLSFB",
+    "NAAKT",
     "load_data",
     "is_valid_bepalingsmethode",
     "is_valid_orientatie",

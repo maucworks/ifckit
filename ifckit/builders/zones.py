@@ -1,8 +1,7 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.builders.zones — IfcZone groepering."""
 
 from __future__ import annotations
-
-from typing import Any
 
 import ifcopenshell
 import ifcopenshell.api.owner

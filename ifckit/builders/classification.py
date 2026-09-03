@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.builders.classification — NL-SfB en andere classificaties."""
 
 from __future__ import annotations

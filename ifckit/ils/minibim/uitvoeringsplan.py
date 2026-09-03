@@ -1,3 +1,4 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.ils.minibim.uitvoeringsplan — SO/VO/DO fase-matrix."""
 
 from __future__ import annotations

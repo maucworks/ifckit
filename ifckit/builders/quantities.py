@@ -1,8 +1,7 @@
+# This file was generated with the assistance of an AI coding tool.
 """ifckit.builders.quantities — base quantities (Qto_...)."""
 
 from __future__ import annotations
-
-from typing import Any
 
 import ifcopenshell
 import ifcopenshell.api.pset
@@ -42,7 +41,6 @@ def write_quantities(
         "IfcElementQuantity",
         GlobalId=ifcopenshell.guid.new(),
         Name=qto_name,
-        MethodOfMeasurement="",
         Quantities=q_items,
     )
     ifc_file.create_entity(
