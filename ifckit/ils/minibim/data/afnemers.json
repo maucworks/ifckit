@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "herkomst": "WOZ (via MiniBIM ILS v3.1 deel B, Gebied sheet)",
+    "versie": "3.1",
+    "licentie": "WOZ"
+  },
+  "items": [
+    {
+      "code": "Belegger",
+      "naam": "Belegger"
+    },
+    {
+      "code": "Corporatie",
+      "naam": "Corporatie"
+    },
+    {
+      "code": "Particulier",
+      "naam": "Particulier"
+    },
+    {
+      "code": "Gemeenschappelijk",
+      "naam": "Gemeenschappelijk"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Ruimte sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Verblijfsruimte",
+      "naam": "Verblijfsruimte"
+    },
+    {
+      "code": "Functieruimte",
+      "naam": "Functieruimte"
+    },
+    {
+      "code": "Restruimte",
+      "naam": "Restruimte"
+    },
+    {
+      "code": "Subruimte *",
+      "naam": "Subruimte *"
+    }
+  ]
+}

@@ -63,7 +63,7 @@ where   = ["."]
 include = ["ifckit*"]
 
 [tool.setuptools.package-data]
-ifckit = ["window_types/*.json"]
+ifckit = ["window_types/*.json", "ils/common/data/*.json", "ils/minibim/data/*.json"]
 
 [tool.ruff]
 line-length    = 100

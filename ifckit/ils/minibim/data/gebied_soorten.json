@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Gebied sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Gebruiksfunctie",
+      "naam": "Gebruiksfunctie"
+    },
+    {
+      "code": "Nevengebruiksfunctie",
+      "naam": "Nevengebruiksfunctie"
+    },
+    {
+      "code": "Gemeenschappelijke ruimte *",
+      "naam": "Gemeenschappelijke ruimte *"
+    },
+    {
+      "code": "Gemeenschappelijk verblijfsgebied",
+      "naam": "Gemeenschappelijk verblijfsgebied"
+    },
+    {
+      "code": "Brandcompartiment",
+      "naam": "Brandcompartiment"
+    },
+    {
+      "code": "Thermische rekenzone",
+      "naam": "Thermische rekenzone"
+    }
+  ]
+}

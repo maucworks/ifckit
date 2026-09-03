@@ -1,0 +1,389 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Omschrijvingen sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM/Aedes (ILS-woco 3.0a)"
+  },
+  "items": [
+    {
+      "code": "Atrium",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een centrale binnenruimte in een gebouw, omgeven door meerdere verdiepingen, ontworpen om natuurlijk licht binnen te laten en een gevoel van openheid te creëren."
+    },
+    {
+      "code": "Badruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte in een gebouw met sanitair voor het nemen van baden en douches, inclusief voorzieningen zoals een badkuip, douchebak, wastafel en toilet, vaak voorzien van waterdichte materialen en afvoersystemen. De term badruimte komt vanuit het bouwbesluit. In de volksmond wordt de ruimte op plattegronden meestal aangeduid als badkamer."
+    },
+    {
+      "code": "Bedrijfsruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een enkele ruimte binnen een gebouw die is ontworpen voor commerciële of zakelijke activiteiten, zoals winkels, zorgverlening, fabrieken of werkplaatsen, meestal voorzien van specifieke infrastructuur en voorzieningen voor de betreffende bedrijfsactiviteiten. Niet te verwarren met kantoorruimten."
+    },
+    {
+      "code": "Bedruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een verblijfsruimte voor 1 of meer bedden om te slapen, of voor het verblijf van aan bed gebonden personen in deze ruimte. Denk aan een slaapruimte in een crèche, hotelkamer of verpleegruimte in een ziekenhuis. Niet te verwarren met slaapkamer."
+    },
+    {
+      "code": "Berging inpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte buiten de schil van de woning, maar binnen een gebouw met ook andere functies. Vaak gebruikt voor het opslaan van goederen, gereedschappen, fietsen, of andere items, vaak voorzien van planken, rekken of kasten voor organisatie. Toegang niet vanuit de woning. Een berging in een ander gebouw, is dus ook inpandig. Niet bestemd voor technische installaties."
+    },
+    {
+      "code": "Berging uitpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een al dan niet afgesloten ruimte buiten het gebouw. Losstaand of in een cluster met enkel bergingen. Vaak gebruikt voor het opslaan van goederen, gereedschappen, fietsen, of andere items, vaak voorzien van planken, rekken of kasten voor organisatie. Niet bestemd voor technische installaties."
+    },
+    {
+      "code": "Bergruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen de schil van een woning en/of met toegang vanuit de woning. Vaak gebruikt voor het opslaan van goederen, gereedschappen, of andere items, vaak voorzien van planken, rekken of kasten voor organisatie."
+    },
+    {
+      "code": "Bijkeuken",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een (kleine) ruimte naast de keuken, vaak gebruikt voor het opslaan van voorraad, schoonmaakartikelen, wasmachines, drogers en andere huishoudelijke apparaten."
+    },
+    {
+      "code": "Cel",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een kleine afgesloten ruimte binnen een gebouw, vaak gebruikt in gevangenissen, detentiecentra of politiebureaus voor het opsluiten van individuen, met minimale voorzieningen voor comfort en veiligheid."
+    },
+    {
+      "code": "Corridor",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een gang in een gemeenschappelijke ruimte die toegang verschaft tot meerdere gebruiksfuncties."
+    },
+    {
+      "code": "Entree",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Ruimte tussen de toegangsdeur en een verkeersruimte. Deze ruimte is van toeapssing op een gebouw en op een gebruiksfunctie."
+    },
+    {
+      "code": "Fietsenstalling inpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw die bedoeld is voor het parkeren van fietsen."
+    },
+    {
+      "code": "Fietsenstalling uitpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een al dan niet overdekte of afgesloten ruimte buiten het gebouw die bedoeld is voor het parkeren van fietsen."
+    },
+    {
+      "code": "Gang",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een doorgangsruimte met lengte- breedte verhouding van 1:n. Bevindt zich binnen een gebouw, gebruikt als verbindingsroute tussen verschillende ruimtes. Deze ruimte bevat geen deur waarmee toegang wordt verleend tot een gebruiksfunctie."
+    },
+    {
+      "code": "Garage inpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een inpandige garage is een garage die deel uitmaakt van een gebouw. Deze ruimte is meestal direct toegankelijk vanuit het interieur van het gebouw, bijvoorbeeld via een deur die leidt naar een gang, keuken, of bijkeuken. De garage is voorzien van een garagedeur die naar buiten opent. Een garage is gebonden aan een enkele woning, niet te verwarren met parkeergarage."
+    },
+    {
+      "code": "Garage uitpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een uitpandige garage is een garage die geen deel uitmaakt van het gebouw. Deze ruimte is niet direct toegankelijk vanuit het interieur van het gebouw. De uitpandige garage is via de oprijlaan van de woonruimte te bereiken en daarom betreft het een aanhorigheid van de woonruimte. De garage is voorzien van een garagedeur die naar buiten opent. Een garage is gebonden aan een enkele woning, niet te verwarren met parkeergarage."
+    },
+    {
+      "code": "Garagebox",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een garagebox is een afgesloten, individuele ruimte bedoeld voor het stallen van een voertuig of het opslaan van goederen. Garageboxen zijn voorzien van een garagedeur die op slot kan, vaak een kanteldeur of een roldeur. Deze boxen kunnen losstaand zijn of deel uitmaken van een groter complex met meerdere garageboxen. Een garagebox is een afzonderlijk object van een woonruimte als het een vrijstaande garagebox is die middels een afzonderlijk terrein bereikbaar is of als het een garagebox is die in de plint (begane grond) van een appartementencomplex zit."
+    },
+    {
+      "code": "Groepsruimte",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een verblijfsruimte in een kinderdagverblijf."
+    },
+    {
+      "code": "Hal",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een doorgangsruimte met een nagenoeg gelijke lengte- breedte verhouding. Bevindt zich binnen een gebouw, gebruikt als verbindingsroute tussen verschillende ruimtes. Deze ruimte bevat geen deur waarmee toegang wordt verleend tot een gebruiksfunctie"
+    },
+    {
+      "code": "Huiskamer",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een verblijfsruimte in een gemeenschappelijk verblijfsgebied, meestal in een woongebouw."
+    },
+    {
+      "code": "Kantoorruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een enkele ruimte binnen een gebouw die specifiek is ontworpen voor kantoorwerkzaamheden."
+    },
+    {
+      "code": "Kast",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een opbergruimte, behorende tot de aangrenzende ruimte, onderdeel uitmakend van de bouwconstructie."
+    },
+    {
+      "code": "Kelder",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een (deels) ondergrondse ruimte onder de begane grond van een gebouw, meestal gebruikt voor opslag, nutsvoorzieningen, wasruimte en soms leefruimte. De toegang is via een trap of luik. In de kelder kan een volwassen persoon rechtop staan."
+    },
+    {
+      "code": "Keuken",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw die is ontworpen en uitgerust voor het bereiden van voedsel, voorzien van een keukenblok."
+    },
+    {
+      "code": "Lifthal",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een voorruimte die vanuit een verkeersruimte toegang geeft tot een lift."
+    },
+    {
+      "code": "Liftmachineruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een aparte ruimte binnen een gebouw waarin de liftmachines, aandrijvingen, regelapparatuur en veiligheidsvoorzieningen zich bevinden, vaak gelegen boven of naast de liftschacht."
+    },
+    {
+      "code": "Liftschacht",
+      "herkomst": "MiniBIM",
+      "omschrijving": "De ruimte in een bouwkundige liftschacht."
+    },
+    {
+      "code": "Meterruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw waar meters voor gas, elektriciteit, water, of andere nutsvoorzieningen worden geïnstalleerd en onderhouden, meestal toegankelijk voor nutsbedrijven voor het aflezen en onderhouden van de meters."
+    },
+    {
+      "code": "Onbenoemde ruimte",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een ruimte zonder beoogd gebruik die bij de toets aan het BBL, de vergunningsaanvraag Omgevingsplantoets (OPA) of de aanvraag Technische Activiteit (WKB) buiten beschouwing dient te worden gelaten."
+    },
+    {
+      "code": "Opstelplaats koelkast",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een opstelplaats is de aangewezen ruimte waar bepaalde installaties, apparatuur of objecten worden geplaatst, opgesteld. In dit geval specifiek een koelkast. Dit is voor onbepaalde tijd en kan dus ook zeer lang zijn."
+    },
+    {
+      "code": "Opstelplaats kooktoestel",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een opstelplaats is de aangewezen ruimte waar bepaalde installaties, apparatuur of objecten worden geplaatst, opgesteld. In dit geval specifiek een kooktoestel. Dit is voor onbepaalde tijd en kan dus ook zeer lang zijn."
+    },
+    {
+      "code": "Opstelplaats vaatwasser",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een opstelplaats is de aangewezen ruimte waar bepaalde installaties, apparatuur of objecten worden geplaatst, opgesteld. In dit geval specifiek een vaatwasser. Dit is voor onbepaalde tijd en kan dus ook zeer lang zijn."
+    },
+    {
+      "code": "Opstelplaats wasdroger",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een opstelplaats is de aangewezen ruimte waar bepaalde installaties, apparatuur of objecten worden geplaatst, opgesteld. In dit geval specifiek een wasdroger. Dit is voor onbepaalde tijd en kan dus ook zeer lang zijn."
+    },
+    {
+      "code": "Opstelplaats wasmachine",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een opstelplaats is de aangewezen ruimte waar bepaalde installaties, apparatuur of objecten worden geplaatst, opgesteld. In dit geval specifiek een wasmachine. Dit is voor onbepaalde tijd en kan dus ook zeer lang zijn."
+    },
+    {
+      "code": "Overige ruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een algemene term die wordt gebruikt voor ruimtes binnenin een gebouw die niet passen in andere categorieën."
+    },
+    {
+      "code": "Overloop",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een overgangsgebied die ruimtes met een trap verbindt. Niet gelegen op de onderste bouwlaag van een adres."
+    },
+    {
+      "code": "Parkeergarage niet-openbaar",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een niet-openbare parkeergarage is een gebouwde parkeervoorziening met meerdere parkeerplaatsen, soms verdeeld over meerdere verdiepingen en kan zowel bovengronds als ondergronds (parkeerkelder) zijn. Alleen toegankelijk voor specifieke gebruikers, zoals bewoners of werknemers. Hoofdzakelijk bestemd voor vaste gebruikers zonder vaste parkeerplaats (zwerfplek)."
+    },
+    {
+      "code": "Parkeergarage openbaar",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een openbare parkeergarage is een gebouwde parkeervoorziening met meerdere parkeerplaatsen, soms verdeeld over meerdere verdiepingen en kan zowel bovengronds als ondergronds (parkeerkelder) zijn. Toegankelijk voor het algemene publiek, vaak tegen betaling, en bedoeld voor kort- of langparkeren. Te gebruiken door meer dan 20 % niet-vaste gebruikers. Niet-vaste gebruikers is hier algemeen publiek."
+    },
+    {
+      "code": "Parkeergarage stallingsgarage",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een stallingsgarage is een gebouwde parkeervoorziening met meerdere parkeerplaatsen, soms verdeeld over meerdere verdiepingen en kan zowel bovengronds als ondergronds (kelder) zijn. Gebruikt voor langdurig stallen van voertuigen (bijvoorbeeld campers of oldtimers), vaak veilig en bewaakt, en kan zowel openbaar als niet-openbaar zijn. Hoofdzakelijk bestemd voor vaste gebruikers met vaste parkeerplaats met maximaal 80 parkeerplaatsen."
+    },
+    {
+      "code": "Parkeerplaats auto",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een auto."
+    },
+    {
+      "code": "Parkeerplaats bakfiets",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een bakfiets."
+    },
+    {
+      "code": "Parkeerplaats fiets hoog",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een fiets, bovenin een rek."
+    },
+    {
+      "code": "Parkeerplaats fiets laag",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een fiets, onderin een rek of op vloerniveau."
+    },
+    {
+      "code": "Parkeerplaats motorfiets",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een motorfiets."
+    },
+    {
+      "code": "Parkeerplaats scooter",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een scooter."
+    },
+    {
+      "code": "Parkeerplaats scootmobiel",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een parkeerplaats is een specifiek aangewezen plek, waar voertuigen tijdelijk geparkeerd of gestald kunnen worden. In dit geval specifiek een scootmobiel."
+    },
+    {
+      "code": "Rooksluis",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een voorruimte die vanuit een verkeersruimte toegang geeft tot een trappenhuis met als doel het trappenhuis rookvrij te houden."
+    },
+    {
+      "code": "Schacht",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een verticale doorgang of ruimte binnen een gebouw, gebruikt voor ventilatie, bekabeling of leidingen vaak voorzien van brandwerende materialen en afsluitingen."
+    },
+    {
+      "code": "Serre",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een serre is een verwarmde binnenruimte die als (semi) buitenruimte gebruikt kan worden en valt binnen de GO. Niet te verwarren met een loggia, dat is een onverwarmde verglaasde buitenruimte."
+    },
+    {
+      "code": "Slaapkamer",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw die is ontworpen en bestemd voor slapen. Niet te verwarren met een bedruimte."
+    },
+    {
+      "code": "Stalling inpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een afgesloten ruimte binnen een gebouw die bedoeld is voor het parkeren of opslaan van gemotoriseerde (vaak elektrische) voertuigen, niet zijnde auto's. Bijvoorbeeld scootmobielen, scooters of elektrische fietsen."
+    },
+    {
+      "code": "Stalling uitpandig",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een al dan niet overdekte of afgesloten ruimte buiten het gebouw die bedoeld is voor het parkeren of opslaan van gemotoriseerde (vaak elektrische) voertuigen, niet zijnde auto's. Bijvoorbeeld scootmobielen, scooters of elektrische fietsen."
+    },
+    {
+      "code": "Technische ruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw waar technische installaties worden geplaatst en onderhouden, zoals Verwarmingsinstallaties, ventilatie- of airconditioningsystemen, datacenters, of telecomapparatuur. Niet te gebruiken als meterruimte of liftmachineruimte."
+    },
+    {
+      "code": "Toiletruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw waarin toiletten en wastafels zijn geïnstalleerd, bedoeld voor persoonlijke hygiëne, vaak voorzien van sanitair, ventilatie, en sanitaire voorzieningen."
+    },
+    {
+      "code": "Trapgat",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Open ruimte in de verdiepingsvloer, bestemd om een trap te plaatsen."
+    },
+    {
+      "code": "Trappenhuis",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een verticale doorgangsruimte binnen een gebouw die wordt gebruikt om tussen verschillende verdiepingen te reizen, voorzien van een trap of trappen en vaak ook een lift, met veiligheidsvoorzieningen en nooduitgangen."
+    },
+    {
+      "code": "Vide",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een open ruimte binnen een gebouw, zonder fysieke afscheiding met de bouwlaag eronder. Bestemd om een een ruimtelijk gevoel te creeren."
+    },
+    {
+      "code": "Wasruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een ruimte binnen een gebouw, specifiek bestemd voor wasmachines, drogers en andere apparaten voor wasgoed , voorzien van wateraansluitingen, afvoer en ventilatie."
+    },
+    {
+      "code": "Woonkamer",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een centrale ruimte binnen een woning, meestal gebruikt voor ontspanning, entertainment en sociale activiteiten, ingericht met zitplaatsen, meubels, elektronica en decoratieve elementen, vaak verbonden met andere delen van de woning zoals de eetkamer en keuken."
+    },
+    {
+      "code": "Woonkamer-keuken",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Ruimte met een gecombineerde functie van keuken en woonkamer."
+    },
+    {
+      "code": "Woonkamer-keuken-slaapkamer",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Ruimte met een gecombineerde functie van keuken, woonkamer en slaapkamer."
+    },
+    {
+      "code": "Woon-slaapkamer",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Ruimte met een gecombineerde functie van woonkamer en slaapkamer."
+    },
+    {
+      "code": "Zolderruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een toegankelijke ruimte binnen een gebouw, direct gelegen onder het dak."
+    },
+    {
+      "code": "BuitenruimteType",
+      "herkomst": "Herkomst",
+      "omschrijving": "Omschrijving"
+    },
+    {
+      "code": "Balkon",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een platform aan de buitenkant van een gebouw, vaak ondersteund door balken of kolommen en voorzien van een balustrade voor veiligheid, bedoeld voor recreatie of buitenactiviteiten, niet zijnde verkeersruimten."
+    },
+    {
+      "code": "Carport",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een overdekte structuur naast een gebouw, met één of meer open zijden, ontworpen om voertuigen te beschermen tegen weersinvloeden zoals regen, sneeuw en zon. In tegenstelling tot een garage heeft een carport meestal geen muren of deuren. Carports kunnen vrijstaand zijn of aan een gebouw bevestigd worden. Onder carport vallen ook ander soortige overdekte (buiten) parkeervakken, zoals die in de plint (begane grond) van een appartementencomplex."
+    },
+    {
+      "code": "Dakterras",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een niet-geheel-overdekte buitenruimte, gelegen op de dakconstructie van de onderliggende bouwlaag."
+    },
+    {
+      "code": "Galerij",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een aan de buitenkant van een gebouw hangende open gang, gebruikt als verbindingsroute tussen verschillende delen van het gebouw. Deze verschaft toegang tot afzonderlijke gebruiksfuncties."
+    },
+    {
+      "code": "Kruipruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een kruipruimte is een ondiepe, vaak ongebruikte ruimte onder de vloer van een gebouw. De ruimte heeft een vrije hoogte van minder dan 1,5 meter (cf. NEN2580) en staat direct in verbinding met de buitenlucht of de bodem. Deze ruimte, die meestal hoog genoeg is om in te kruipen maar te laag om rechtop te staan, wordt gebruikt voor het leggen van leidingen, kabels en isolatie. Meestal is deze niet verwarmd."
+    },
+    {
+      "code": "Loggia",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een loggia is een inpandig balkon: een aan drie zijden gesloten buitenruimte die zich binnen het gevelvlak bevindt. De opening bevindt zich in de gevel. De loggia heeft een borstwering. Meestal bevindt de loggia zich op de verdieping."
+    },
+    {
+      "code": "Overige buitenruimte",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een algemene term die wordt gebruikt voor ruimtes buiten een gebouw die niet passen in andere categorieën."
+    },
+    {
+      "code": "Parkeerterrein",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een parkeerterrein is een open, meestal verharde locatie die speciaal is ingericht voor het parkeren van voertuigen."
+    },
+    {
+      "code": "Patio",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een open binnenplaats of verharde ruimte buiten een gebouw, omringd door muren."
+    },
+    {
+      "code": "Terras",
+      "herkomst": "ILS-woco 3.0a",
+      "omschrijving": "Een aan de woning verbonden bestrate buitenruimte en dat zich op de onderste woonlaag van de eenheid bevindt."
+    },
+    {
+      "code": "Tuin",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een buitenruimte buiten de gevelconstructie, vaak aangelegd met planten, gazon, bestrating en/of andere landschapskenmerken, bedoeld voor recreatie, tuinieren, sociale activiteiten en visuele esthetiek."
+    },
+    {
+      "code": "Veranda",
+      "herkomst": "MiniBIM",
+      "omschrijving": "Een, door middel van een zelfstandige constructie, overdekte buitenruimte."
+    }
+  ]
+}

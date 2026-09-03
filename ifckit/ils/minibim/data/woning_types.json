@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Gebied sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM",
+    "opmerking": "Sheet bevat alleen A/B; mogelijk inkompleet — aanvullen uit PDF indien nodig"
+  },
+  "items": [
+    {
+      "code": "A",
+      "naam": "A"
+    },
+    {
+      "code": "B",
+      "naam": "B"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B (Gebied/Ruimte/Buitenruimte) / ILS-woco",
+    "versie": "3.1",
+    "licentie": "NEPROM/Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "Noord",
+      "naam": "Noord"
+    },
+    {
+      "code": "Noordoost",
+      "naam": "Noordoost"
+    },
+    {
+      "code": "Oost",
+      "naam": "Oost"
+    },
+    {
+      "code": "Zuidoost",
+      "naam": "Zuidoost"
+    },
+    {
+      "code": "Zuid",
+      "naam": "Zuid"
+    },
+    {
+      "code": "Zuidwest",
+      "naam": "Zuidwest"
+    },
+    {
+      "code": "West",
+      "naam": "West"
+    },
+    {
+      "code": "Noordwest",
+      "naam": "Noordwest"
+    }
+  ]
+}

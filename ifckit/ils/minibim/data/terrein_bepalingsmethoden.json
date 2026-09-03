@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Terrein sheet (terrein-specifiek, niet NEN 2580)",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Bebouwde terreinoppervlakte",
+      "naam": "Bebouwde terreinoppervlakte"
+    },
+    {
+      "code": "Onbebouwde terreinoppervlakte",
+      "naam": "Onbebouwde terreinoppervlakte"
+    },
+    {
+      "code": "Overbouwde terreinoppervlakte",
+      "naam": "Overbouwde terreinoppervlakte"
+    },
+    {
+      "code": "Onderbouwde terreinoppervlakte",
+      "naam": "Onderbouwde terreinoppervlakte"
+    }
+  ]
+}

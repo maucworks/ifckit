@@ -1,0 +1,2 @@
+ILS_VERSION = "3.1"
+ILS_NAME = "MiniBIM ILS"

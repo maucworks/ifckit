@@ -1,0 +1,101 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Bouwwerk sheet (BBL/SOR)",
+    "versie": "3.1",
+    "licentie": "NEPROM/BBL/SOR"
+  },
+  "items": [
+    {
+      "code": "Bedrijfsgebouw",
+      "naam": "Bedrijfsgebouw"
+    },
+    {
+      "code": "Bijeenkomstgebouw",
+      "naam": "Bijeenkomstgebouw"
+    },
+    {
+      "code": "Bijeenkomstgebouw voor kinderopvang",
+      "naam": "Bijeenkomstgebouw voor kinderopvang"
+    },
+    {
+      "code": "Bijgebouw",
+      "naam": "Bijgebouw"
+    },
+    {
+      "code": "Bouwwerk geen gebouw zijnde",
+      "naam": "Bouwwerk geen gebouw zijnde"
+    },
+    {
+      "code": "Celgebouw",
+      "naam": "Celgebouw"
+    },
+    {
+      "code": "Doelgroepengebouw",
+      "naam": "Doelgroepengebouw"
+    },
+    {
+      "code": "Gebedsgebouw",
+      "naam": "Gebedsgebouw"
+    },
+    {
+      "code": "Gezondheidszorggebouw",
+      "naam": "Gezondheidszorggebouw"
+    },
+    {
+      "code": "Groepszorgwoning",
+      "naam": "Groepszorgwoning"
+    },
+    {
+      "code": "Industriegebouw",
+      "naam": "Industriegebouw"
+    },
+    {
+      "code": "Installatiegebouw",
+      "naam": "Installatiegebouw"
+    },
+    {
+      "code": "Kantoorgebouw",
+      "naam": "Kantoorgebouw"
+    },
+    {
+      "code": "Logiesgebouw",
+      "naam": "Logiesgebouw"
+    },
+    {
+      "code": "Multifunctioneel gebouw",
+      "naam": "Multifunctioneel gebouw"
+    },
+    {
+      "code": "Onderwijsgebouw",
+      "naam": "Onderwijsgebouw"
+    },
+    {
+      "code": "Overig gebouw",
+      "naam": "Overig gebouw"
+    },
+    {
+      "code": "Recreatiegebouw",
+      "naam": "Recreatiegebouw"
+    },
+    {
+      "code": "Sportgebouw",
+      "naam": "Sportgebouw"
+    },
+    {
+      "code": "Stallinggebouw",
+      "naam": "Stallinggebouw"
+    },
+    {
+      "code": "Winkelgebouw",
+      "naam": "Winkelgebouw"
+    },
+    {
+      "code": "Woning",
+      "naam": "Woning"
+    },
+    {
+      "code": "Woongebouw",
+      "naam": "Woongebouw"
+    }
+  ]
+}

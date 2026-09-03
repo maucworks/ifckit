@@ -1,0 +1,695 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Uitvoeringsplan sheet (ruwe boolean matrix, headers incompleet in openpyxl)",
+    "versie": "3.1",
+    "licentie": "NEPROM",
+    "opmerking": "Kolommen 25-41 booleans komen overeen met verplicht-velden maar header-mapping vereist handmatige verificatie uit PDF"
+  },
+  "headers": {
+    "2": "Onderdeel",
+    "3": "Type/Soort",
+    "4": "SO",
+    "5": "VO",
+    "6": "DO",
+    "8": "Afnemer",
+    "9": "BouwwerkNummer",
+    "10": "BouwwerkType",
+    "11": "BuitenruimteType",
+    "12": "EenheidNummer",
+    "13": "GebiedsType",
+    "14": "Gebruiksbestemming",
+    "15": "Orientatie",
+    "16": "Programma",
+    "17": "RuimteNummer",
+    "18": "RuimteType",
+    "19": "Segment",
+    "20": "WoningType",
+    "21": "Bepalingsmethode",
+    "22": "IfcEntityClass",
+    "23": "Toelichting"
+  },
+  "rows": [
+    {
+      "row": 17,
+      "onderdeel": "",
+      "type_soort": "Kadastraalperceel",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "29": true,
+        "32": true
+      }
+    },
+    {
+      "row": 18,
+      "onderdeel": "",
+      "type_soort": "Bouwwerkperceel",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "29": true,
+        "32": true
+      }
+    },
+    {
+      "row": 20,
+      "onderdeel": "",
+      "type_soort": "Bebouwd",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "Bebouwde Terreinoppervlakte",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "29": true,
+        "32": true
+      }
+    },
+    {
+      "row": 21,
+      "onderdeel": "",
+      "type_soort": "Onbebouwd",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "Onbebouwde Terreinoppervlakte",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 22,
+      "onderdeel": "",
+      "type_soort": "Overbouwd",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "Overbouwde Terreinoppervlakte",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 23,
+      "onderdeel": "",
+      "type_soort": "Onderbouwd",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "Onderbouwde Terreinoppervlakte",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 25,
+      "onderdeel": "",
+      "type_soort": "Uitgeefbaar",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "28": false,
+        "29": false,
+        "32": false,
+        "35": false,
+        "36": false,
+        "40": false,
+        "41": false
+      }
+    },
+    {
+      "row": 27,
+      "onderdeel": "",
+      "type_soort": "Begroeid terreindeel",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 28,
+      "onderdeel": "",
+      "type_soort": "Onbegroeid terreindeel",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 29,
+      "onderdeel": "",
+      "type_soort": "Pand",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 30,
+      "onderdeel": "",
+      "type_soort": "Waterdeel",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 31,
+      "onderdeel": "",
+      "type_soort": "Wegdeel",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": false,
+        "32": false
+      }
+    },
+    {
+      "row": 33,
+      "onderdeel": "Bouwwerk",
+      "type_soort": "",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BI",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "29": true,
+        "30": true,
+        "32": true
+      }
+    },
+    {
+      "row": 36,
+      "onderdeel": "",
+      "type_soort": "Gebruiksfunctie",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": false,
+        "27": false,
+        "28": true,
+        "29": true,
+        "32": false,
+        "33": false,
+        "34": true,
+        "35": false,
+        "36": false,
+        "40": false,
+        "41": false
+      }
+    },
+    {
+      "row": 37,
+      "onderdeel": "",
+      "type_soort": "Gebruiksfunctie",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": true,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": true,
+        "33": true,
+        "34": true,
+        "35": false,
+        "36": true,
+        "40": true,
+        "41": true
+      }
+    },
+    {
+      "row": 38,
+      "onderdeel": "",
+      "type_soort": "Gebruiksfunctie",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "GO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": true,
+        "33": true,
+        "34": true,
+        "35": false,
+        "36": true,
+        "40": true,
+        "41": true
+      }
+    },
+    {
+      "row": 39,
+      "onderdeel": "",
+      "type_soort": "Gebruiksfunctie",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "VVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": true,
+        "33": true,
+        "34": true,
+        "35": false,
+        "36": false,
+        "40": false,
+        "41": false
+      }
+    },
+    {
+      "row": 40,
+      "onderdeel": "",
+      "type_soort": "Nevengebruiksfunctie",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "GO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": true,
+        "33": true,
+        "34": true,
+        "35": false,
+        "36": false,
+        "40": false,
+        "41": false
+      }
+    },
+    {
+      "row": 41,
+      "onderdeel": "",
+      "type_soort": "Gemeenschappelijke ruimte",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": false,
+        "33": true,
+        "34": true
+      }
+    },
+    {
+      "row": 42,
+      "onderdeel": "",
+      "type_soort": "Gemeenschappelijke ruimte",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "GO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": false,
+        "33": true,
+        "34": true
+      }
+    },
+    {
+      "row": 43,
+      "onderdeel": "",
+      "type_soort": "Gemeenschappelijk verblijfsgebied",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": false,
+        "33": true,
+        "34": true,
+        "35": false
+      }
+    },
+    {
+      "row": 44,
+      "onderdeel": "",
+      "type_soort": "Gemeenschappelijk verblijfsgebied",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "GO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "28": true,
+        "29": true,
+        "32": false,
+        "33": true,
+        "34": true,
+        "35": false
+      }
+    },
+    {
+      "row": 46,
+      "onderdeel": "",
+      "type_soort": "Brandcompartiment",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": true,
+        "29": true,
+        "32": false,
+        "34": false
+      }
+    },
+    {
+      "row": 47,
+      "onderdeel": "",
+      "type_soort": "Thermische rekenzone",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "BVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": false,
+        "27": false,
+        "29": true,
+        "32": false,
+        "33": true,
+        "34": true,
+        "35": false
+      }
+    },
+    {
+      "row": 50,
+      "onderdeel": "",
+      "type_soort": "Verblijfsruimte",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": true,
+        "27": true,
+        "29": true,
+        "32": true,
+        "35": false,
+        "37": true,
+        "38": true,
+        "39": true
+      }
+    },
+    {
+      "row": 51,
+      "onderdeel": "",
+      "type_soort": "Functieruimte",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": true,
+        "27": true,
+        "29": true,
+        "32": true,
+        "35": false,
+        "37": true,
+        "38": true,
+        "39": true
+      }
+    },
+    {
+      "row": 52,
+      "onderdeel": "",
+      "type_soort": "Restruimte",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": true,
+        "27": true,
+        "29": true,
+        "32": true,
+        "35": false,
+        "37": true,
+        "38": true,
+        "39": true
+      }
+    },
+    {
+      "row": 53,
+      "onderdeel": "",
+      "type_soort": "Subruimte*",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "29": true,
+        "32": true,
+        "35": false,
+        "37": true,
+        "38": true,
+        "39": true
+      }
+    },
+    {
+      "row": 55,
+      "onderdeel": "",
+      "type_soort": "Overdekt",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": true,
+        "27": true,
+        "29": true,
+        "31": true,
+        "32": true,
+        "35": false
+      }
+    },
+    {
+      "row": 56,
+      "onderdeel": "",
+      "type_soort": "Niet-overdekt",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": false,
+        "26": true,
+        "27": true,
+        "29": true,
+        "31": true,
+        "32": true,
+        "35": false
+      }
+    },
+    {
+      "row": 57,
+      "onderdeel": "",
+      "type_soort": "Subruimte*",
+      "SO": null,
+      "VO": null,
+      "DO": null,
+      "props": {
+        "Bepalingsmethode": "NVO",
+        "IfcEntityClass": "IfcSpace"
+      },
+      "bools": {
+        "25": true,
+        "26": true,
+        "27": true,
+        "29": true,
+        "31": true,
+        "32": true,
+        "35": false
+      }
+    }
+  ]
+}

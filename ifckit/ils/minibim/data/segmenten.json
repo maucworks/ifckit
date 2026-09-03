@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Gebied sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "SSH",
+      "naam": "SSH"
+    },
+    {
+      "code": "MSH",
+      "naam": "MSH"
+    },
+    {
+      "code": "VSH",
+      "naam": "VSH"
+    },
+    {
+      "code": "SSK",
+      "naam": "SSK"
+    },
+    {
+      "code": "MSK",
+      "naam": "MSK"
+    },
+    {
+      "code": "VSK",
+      "naam": "VSK"
+    },
+    {
+      "code": "SHV",
+      "naam": "SHV"
+    },
+    {
+      "code": "ZHV",
+      "naam": "ZHV"
+    },
+    {
+      "code": "Huur",
+      "naam": "Huur"
+    },
+    {
+      "code": "Koop",
+      "naam": "Koop"
+    }
+  ]
+}

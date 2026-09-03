@@ -1,0 +1,45 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Terrein sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Terreinoppervlakte",
+      "naam": "Terreinoppervlakte"
+    },
+    {
+      "code": "Kadastraal perceel",
+      "naam": "Kadastraal perceel"
+    },
+    {
+      "code": "Bouwwerkperceel",
+      "naam": "Bouwwerkperceel"
+    },
+    {
+      "code": "Uitgeefbaar",
+      "naam": "Uitgeefbaar"
+    },
+    {
+      "code": "Begroeid terreindeel",
+      "naam": "Begroeid terreindeel"
+    },
+    {
+      "code": "Onberoeid terreindeel",
+      "naam": "Onberoeid terreindeel"
+    },
+    {
+      "code": "Pand",
+      "naam": "Pand"
+    },
+    {
+      "code": "Waterdeel",
+      "naam": "Waterdeel"
+    },
+    {
+      "code": "Wegdeel",
+      "naam": "Wegdeel"
+    }
+  ]
+}

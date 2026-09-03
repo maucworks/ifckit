@@ -1,0 +1,209 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Gebied sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Gebruiksgebied",
+      "naam": "Gebruiksgebied"
+    },
+    {
+      "code": "Verblijfsgebied",
+      "naam": "Verblijfsgebied"
+    },
+    {
+      "code": "Bedgebied",
+      "naam": "Bedgebied"
+    },
+    {
+      "code": "Functiegebied",
+      "naam": "Functiegebied"
+    },
+    {
+      "code": "Restgebied",
+      "naam": "Restgebied"
+    },
+    {
+      "code": "Appartement",
+      "naam": "Appartement"
+    },
+    {
+      "code": "Benedenwoning",
+      "naam": "Benedenwoning"
+    },
+    {
+      "code": "Bovenwoning",
+      "naam": "Bovenwoning"
+    },
+    {
+      "code": "Friendswoning",
+      "naam": "Friendswoning"
+    },
+    {
+      "code": "Hoekwoning",
+      "naam": "Hoekwoning"
+    },
+    {
+      "code": "Maisonette",
+      "naam": "Maisonette"
+    },
+    {
+      "code": "Tussenwoning",
+      "naam": "Tussenwoning"
+    },
+    {
+      "code": "Twee-onder-één-kap",
+      "naam": "Twee-onder-één-kap"
+    },
+    {
+      "code": "Vrijstaand",
+      "naam": "Vrijstaand"
+    },
+    {
+      "code": "Wooneenheid",
+      "naam": "Wooneenheid"
+    },
+    {
+      "code": "Woongebied",
+      "naam": "Woongebied"
+    },
+    {
+      "code": "Garage inpandig",
+      "naam": "Garage inpandig"
+    },
+    {
+      "code": "Garage uitpandig",
+      "naam": "Garage uitpandig"
+    },
+    {
+      "code": "Apotheek",
+      "naam": "Apotheek"
+    },
+    {
+      "code": "Berging inpandig",
+      "naam": "Berging inpandig"
+    },
+    {
+      "code": "Berging uitpandig",
+      "naam": "Berging uitpandig"
+    },
+    {
+      "code": "Bioscoop",
+      "naam": "Bioscoop"
+    },
+    {
+      "code": "Café",
+      "naam": "Café"
+    },
+    {
+      "code": "Cafetaria",
+      "naam": "Cafetaria"
+    },
+    {
+      "code": "Fietsenstalling inpandig",
+      "naam": "Fietsenstalling inpandig"
+    },
+    {
+      "code": "Fietsenstalling uitpandig",
+      "naam": "Fietsenstalling uitpandig"
+    },
+    {
+      "code": "Hotel",
+      "naam": "Hotel"
+    },
+    {
+      "code": "Huisartsenpraktijk",
+      "naam": "Huisartsenpraktijk"
+    },
+    {
+      "code": "Huiskamer",
+      "naam": "Huiskamer"
+    },
+    {
+      "code": "Kantine",
+      "naam": "Kantine"
+    },
+    {
+      "code": "Kantoor",
+      "naam": "Kantoor"
+    },
+    {
+      "code": "Kinderdagverblijf",
+      "naam": "Kinderdagverblijf"
+    },
+    {
+      "code": "Maatschappelijke dienstverlening",
+      "naam": "Maatschappelijke dienstverlening"
+    },
+    {
+      "code": "Medisch centrum",
+      "naam": "Medisch centrum"
+    },
+    {
+      "code": "Parkeergarage niet-openbaar",
+      "naam": "Parkeergarage niet-openbaar"
+    },
+    {
+      "code": "Parkeergarage openbaar",
+      "naam": "Parkeergarage openbaar"
+    },
+    {
+      "code": "Parkeergarage stalling",
+      "naam": "Parkeergarage stalling"
+    },
+    {
+      "code": "Restaurant",
+      "naam": "Restaurant"
+    },
+    {
+      "code": "Retail",
+      "naam": "Retail"
+    },
+    {
+      "code": "Short stay",
+      "naam": "Short stay"
+    },
+    {
+      "code": "Stalling inpandig",
+      "naam": "Stalling inpandig"
+    },
+    {
+      "code": "Stalling uitpandig",
+      "naam": "Stalling uitpandig"
+    },
+    {
+      "code": "Supermarkt",
+      "naam": "Supermarkt"
+    },
+    {
+      "code": "Techniekruimte",
+      "naam": "Techniekruimte"
+    },
+    {
+      "code": "Theater",
+      "naam": "Theater"
+    },
+    {
+      "code": "Verkeersruimte",
+      "naam": "Verkeersruimte"
+    },
+    {
+      "code": "Winkel",
+      "naam": "Winkel"
+    },
+    {
+      "code": "Onverwarmde ruimte",
+      "naam": "Onverwarmde ruimte"
+    },
+    {
+      "code": "Sterk geventileerde ruimte",
+      "naam": "Sterk geventileerde ruimte"
+    },
+    {
+      "code": "Verwarmde ruimte",
+      "naam": "Verwarmde ruimte"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Gebied sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Studio",
+      "naam": "Studio"
+    },
+    {
+      "code": "2 kamer",
+      "naam": "2 kamer"
+    },
+    {
+      "code": "3 kamer",
+      "naam": "3 kamer"
+    },
+    {
+      "code": "4 kamer",
+      "naam": "4 kamer"
+    },
+    {
+      "code": "5 kamer",
+      "naam": "5 kamer"
+    },
+    {
+      "code": "6 kamer",
+      "naam": "6 kamer"
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Begrippen sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "begrip": "Afnemer",
+      "herkomst": "WOZ",
+      "toelichting": "(Beoogd) eigenaar."
+    },
+    {
+      "begrip": "BaseQuantities",
+      "herkomst": "BIPM",
+      "toelichting": "De basis-afmetingen van objecten zoals lengte, breedte, inhoud etc."
+    },
+    {
+      "begrip": "Bepalingsmethode",
+      "herkomst": "NEN 2580:2007 nl (o.a.)",
+      "toelichting": "Wijze van meten."
+    },
+    {
+      "begrip": "Bouwwerk",
+      "herkomst": "VORM",
+      "toelichting": "De ruimtelijke demarcatie van een bouwkundig en constructief zelfstandige eenheid of een afsluitbaar deel van die eenheid."
+    },
+    {
+      "begrip": "BouwwerkNummer",
+      "herkomst": "VORM",
+      "toelichting": "Unieke nummering van bouwwerken."
+    },
+    {
+      "begrip": "Bouwwerkperceel",
+      "herkomst": "BBL",
+      "toelichting": "Perceel dat als uitgangspunt dient bij het toetsen van een bouwwerk aan het BBL, de vergunningsaanvraag Omgevingsplantoets (OPA) of de aanvraag Technische Activiteit (WKB)."
+    },
+    {
+      "begrip": "BouwwerkType",
+      "herkomst": "BBL/SOR",
+      "toelichting": "Enumeratie van bouwwerken."
+    },
+    {
+      "begrip": "Brandcompartiment",
+      "herkomst": "BBL",
+      "toelichting": "Gedeelte van een of meer bouwwerken bestemd als maximaal uitbreidingsgebied van brand."
+    },
+    {
+      "begrip": "Buitenruimte",
+      "herkomst": "NEN 2580:2007nl",
+      "toelichting": "Een deel van een Bouwwerkperceel of een deel van een Bouwwerk buiten de thermische schil dat permanent in open verbinding staat met de bodem en/of de buitenlucht en toegankelijk is voor mensen of voor het stallen van (motor)voertuigen."
+    },
+    {
+      "begrip": "BuitenruimteSoort",
+      "herkomst": "NEN 2580:2007nl",
+      "toelichting": "Groepering van buitenruimten naar functie."
+    },
+    {
+      "begrip": "BuitenruimteType",
+      "herkomst": "Aedes/Geonovum",
+      "toelichting": "Enumeratie van buitenruimten."
+    },
+    {
+      "begrip": "Categorie",
+      "herkomst": "VORM",
+      "toelichting": "Enumeratie van marktsegmenten."
+    },
+    {
+      "begrip": "EenheidNummer",
+      "herkomst": "VORM",
+      "toelichting": "Unieke nummering van Gebruikseenheden en/of Eigendomseenheden."
+    },
+    {
+      "begrip": "Eigendomseenheid",
+      "herkomst": "WOZ",
+      "toelichting": "Een onroerende zaak (b.v. woning) inclusief het perceel (kavel) en externe panden (schuur, berging, garage etc) waarvoor een WOZ-waarde wordt vastgesteld."
+    },
+    {
+      "begrip": "Elementen",
+      "herkomst": "VORM",
+      "toelichting": "Fysieke objecten die een Ruimte afbakenen en/of voor de condities zorgen waardoor een beoogd gebruik mogelijk gemaakt wordt of die een bouwkundige of constructieve functie vervullen."
+    },
+    {
+      "begrip": "Enumeratie",
+      "herkomst": "NEN 3610:2022 nl",
+      "toelichting": "Waardelijst."
+    },
+    {
+      "begrip": "Gebied",
+      "herkomst": "VORM",
+      "toelichting": "Een zone in een Bouwwerk waarbinnen een bepaalde conditie voorgeschreven wordt of een rechtsorde geldt en die beperkingen oplegt aan het beoogd gebruik binnen dat Gebied."
+    },
+    {
+      "begrip": "GebiedsSoort",
+      "herkomst": "BBL (o.a.)",
+      "toelichting": "Groepering van gebieden naar functie."
+    },
+    {
+      "begrip": "GebiedsType",
+      "herkomst": "VORM",
+      "toelichting": "Enumeratie van gebieden."
+    },
+    {
+      "begrip": "Gebruiksbestemming",
+      "herkomst": "BBL",
+      "toelichting": "Toegestaan gebruik van een gebruikseenheid: het gebruik."
+    },
+    {
+      "begrip": "Gebruikseenheid",
+      "herkomst": "CORA",
+      "toelichting": "Een gebruikseenheid is het kleinste, afgebakende stuk vastgoed of benoemd terrein met een gebruiksfunctie dat wordt verhuurd, verkocht en/of onderhouden of verkocht is."
+    },
+    {
+      "begrip": "Gebruiksfunctie",
+      "herkomst": "BBL",
+      "toelichting": "Gedeelten van een bouwwerk die dezelfde gebruiksbestemming hebben en die samen een gebruikseenheid vormen: het object."
+    },
+    {
+      "begrip": "Gemeenschappelijke ruimte",
+      "herkomst": "BBL",
+      "toelichting": "Gemeenschappelijke ruimten ten dienste van meerdere gebruiksfuncties (gebruikseenheden), b.v. corridor, entreehal."
+    },
+    {
+      "begrip": "Gemeenschappelijk verblijfsgebied",
+      "herkomst": "BBL",
+      "toelichting": "Gemeenschappelijke verblijfsgebied ten dienste van meerdere gebruiksfuncties (gebruikseenheden)."
+    },
+    {
+      "begrip": "IfcEntityClass",
+      "herkomst": "BuildingSmart",
+      "toelichting": "Classificatie in Ifc van elementen en ruimten (entities)."
+    },
+    {
+      "begrip": "IfcSpace",
+      "herkomst": "BuildingSmart",
+      "toelichting": "Een IfcSpace is een ruimtelijk element in Ifc."
+    },
+    {
+      "begrip": "IfcZone",
+      "herkomst": "BuildingSmart",
+      "toelichting": "Een IfcZone is een groepering van één of meerdere IfcSpace in Ifc."
+    },
+    {
+      "begrip": "Kadastraalperceel",
+      "herkomst": "Kadaster",
+      "toelichting": "Een begrensd deel van het Nederlands grondgebied dat kadastraal geïdentificeerd is en met kadastrale grenzen begrensd is."
+    },
+    {
+      "begrip": "Nevengebruiksfunctie",
+      "herkomst": "BBL",
+      "toelichting": "Een gebruiksfunctie die ten dienste staat van een andere gebruiksfunctie."
+    },
+    {
+      "begrip": "Objecttype",
+      "herkomst": "-",
+      "toelichting": "Groepering op hoogste abstractieniveau van gelijksoortige data met overerfbare eigenschappen naar onderliggende subtypen."
+    },
+    {
+      "begrip": "Orientatie",
+      "herkomst": "Aedes",
+      "toelichting": "Hoofdrichting van een element, een ruimte of een buitenruimte."
+    },
+    {
+      "begrip": "Parameter",
+      "herkomst": "-",
+      "toelichting": "Een parameter is een meetbare eigenschap waarmee een object beschreven wordt."
+    },
+    {
+      "begrip": "PMC",
+      "herkomst": "NCB",
+      "toelichting": "Standaardisatie van woningtypen en huurklassen: PMC (Product Markt Combinatie)."
+    },
+    {
+      "begrip": "Ruimte",
+      "herkomst": "VORM",
+      "toelichting": "Een deel van een Bouwwerk met een beoogd gebruik (min. 1), afgebakend op Fysieke Elementen."
+    },
+    {
+      "begrip": "RuimteNummer",
+      "herkomst": "VORM",
+      "toelichting": "Unieke nummering van ruimten binnen een gebied."
+    },
+    {
+      "begrip": "RuimteSoort",
+      "herkomst": "BBL",
+      "toelichting": "Groepering van ruimten naar functie."
+    },
+    {
+      "begrip": "RuimteType",
+      "herkomst": "Aedes",
+      "toelichting": "Enumeratie van ruimten."
+    },
+    {
+      "begrip": "Subruimte",
+      "herkomst": "VORM",
+      "toelichting": "Een virtuele onderverdeling van een Ruimte, op basis van beoogd gebruik (max. 1)."
+    },
+    {
+      "begrip": "Terrein",
+      "herkomst": "VORM",
+      "toelichting": "Een deel van een stuk grond met een bepaalde functie of waar een bepaalde rechtsorde geldt."
+    },
+    {
+      "begrip": "TerreinType",
+      "herkomst": "VORM",
+      "toelichting": "Enumeratie van terreinen."
+    },
+    {
+      "begrip": "Thermische rekenzone",
+      "herkomst": "NTA 8800:2024 nl",
+      "toelichting": "Een thermische rekenzone is een opdeling van een bouwwerk ten behoeve van energieberekeningen."
+    },
+    {
+      "begrip": "Uitgeefbaar",
+      "herkomst": "Gebiedseconomie",
+      "toelichting": "De grond waarop gebouwd zal worden met bijbehorend erf."
+    },
+    {
+      "begrip": "WoningType",
+      "herkomst": "-",
+      "toelichting": "Enumeratie van woningtypen."
+    }
+  ]
+}

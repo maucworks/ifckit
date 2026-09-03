@@ -1,0 +1,261 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Elementen sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "objectType": "Wand",
+      "name": "Binnenspouwblad",
+      "entity": "IfcWall",
+      "predefinedType": "",
+      "nlsfb": "21.12",
+      "nlsfbTekst": "spouwwanden",
+      "afmeting": "100"
+    },
+    {
+      "objectType": "Wand",
+      "name": "Binnenwand",
+      "entity": "IfcWall",
+      "predefinedType": "",
+      "nlsfb": "22.10",
+      "nlsfbTekst": "binnenwanden",
+      "afmeting": "100"
+    },
+    {
+      "objectType": "Wand",
+      "name": "Constructieve wand",
+      "entity": "IfcWall",
+      "predefinedType": "",
+      "nlsfb": "28.20",
+      "nlsfbTekst": "hoofddraagconstructies",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Wand",
+      "name": "Gevelwand",
+      "entity": "IfcWall",
+      "predefinedType": "",
+      "nlsfb": "21.10",
+      "nlsfbTekst": "buitenwanden",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Kolom",
+      "name": "Constructieve kolom",
+      "entity": "IfcColumn",
+      "predefinedType": "",
+      "nlsfb": "28.10",
+      "nlsfbTekst": "hoofddraagconstructies",
+      "afmeting": "300x300"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Begaanbare dakvloer",
+      "entity": "IfcSlab",
+      "predefinedType": "ROOF",
+      "nlsfb": "27.10",
+      "nlsfbTekst": "daken",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Constructieve vloer",
+      "entity": "IfcSlab",
+      "predefinedType": "FLOOR",
+      "nlsfb": "28.20",
+      "nlsfbTekst": "hoofddraagconstructies",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Dakvloer",
+      "entity": "IfcSlab",
+      "predefinedType": "ROOF",
+      "nlsfb": "27.10",
+      "nlsfbTekst": "daken",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Dak",
+      "entity": "IfcRoof",
+      "predefinedType": "ROOF",
+      "nlsfb": "27.10",
+      "nlsfbTekst": "daken",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Funderingvloer",
+      "entity": "IfcSlab",
+      "predefinedType": "FLOOR",
+      "nlsfb": "13.20",
+      "nlsfbTekst": "vloeren op grondslag",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Galerijvloer",
+      "entity": "IfcSlab",
+      "predefinedType": "FLOOR",
+      "nlsfb": "23.10",
+      "nlsfbTekst": "vloeren",
+      "afmeting": "200"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Grijsdak",
+      "entity": "IfcSlab",
+      "predefinedType": "ROOF",
+      "nlsfb": "27.10",
+      "nlsfbTekst": "daken",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Groendak",
+      "entity": "IfcSlab",
+      "predefinedType": "ROOF",
+      "nlsfb": "27.10",
+      "nlsfbTekst": "daken",
+      "afmeting": "250"
+    },
+    {
+      "objectType": "Vloer",
+      "name": "Hellingbaan",
+      "entity": "IfcSlab",
+      "predefinedType": "FLOOR",
+      "nlsfb": "24.20",
+      "nlsfbTekst": "trappen en hellingen",
+      "afmeting": "200"
+    },
+    {
+      "objectType": "Deur",
+      "name": "Garagedeur",
+      "entity": "IfcDoor",
+      "predefinedType": "",
+      "nlsfb": "31.30",
+      "nlsfbTekst": "buitenwandopeningen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Deur",
+      "name": "Vluchtdeur",
+      "entity": "IfcDoor",
+      "predefinedType": "",
+      "nlsfb": "32.30",
+      "nlsfbTekst": "binnenwandopeningen",
+      "afmeting": "1050x2400"
+    },
+    {
+      "objectType": "Deur",
+      "name": "Vluchtdeur",
+      "entity": "IfcDoor",
+      "predefinedType": "",
+      "nlsfb": "31.30",
+      "nlsfbTekst": "buitenwandopeningen",
+      "afmeting": "1050x2400"
+    },
+    {
+      "objectType": "Deur",
+      "name": "Woningtoegangsdeur",
+      "entity": "IfcDoor",
+      "predefinedType": "",
+      "nlsfb": "32.30",
+      "nlsfbTekst": "binnenwandopeningen",
+      "afmeting": "1050x2400"
+    },
+    {
+      "objectType": "Deur",
+      "name": "Woningtoegangsdeur",
+      "entity": "IfcDoor",
+      "predefinedType": "",
+      "nlsfb": "31.30",
+      "nlsfbTekst": "buitenwandopeningen",
+      "afmeting": "1050x2400"
+    },
+    {
+      "objectType": "Trap",
+      "name": "Hoofdtrap",
+      "entity": "IfcStair",
+      "predefinedType": "",
+      "nlsfb": "24.10",
+      "nlsfbTekst": "trappen en hellingen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Trap",
+      "name": "Vluchttrap",
+      "entity": "IfcStair",
+      "predefinedType": "",
+      "nlsfb": "24.10",
+      "nlsfbTekst": "trappen en hellingen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Transport",
+      "name": "Brandweerlift",
+      "entity": "IfcTransportElement",
+      "predefinedType": "ELEVATOR",
+      "nlsfb": "66.10",
+      "nlsfbTekst": "liftinstallaties",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Transport",
+      "name": "Lift",
+      "entity": "IfcTransportElement",
+      "predefinedType": "ELEVATOR",
+      "nlsfb": "66.10",
+      "nlsfbTekst": "liftinstallaties",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Transport",
+      "name": "Roltrap",
+      "entity": "IfcTransportElement",
+      "predefinedType": "ESCALATOR",
+      "nlsfb": "66.20",
+      "nlsfbTekst": "roltrappen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Kozijn",
+      "name": "Pui",
+      "entity": "IfcWindow",
+      "predefinedType": "WINDOW",
+      "nlsfb": "31.20",
+      "nlsfbTekst": "buitenwandopeningen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Kozijn",
+      "name": "Raam",
+      "entity": "IfcWindow",
+      "predefinedType": "WINDOW",
+      "nlsfb": "32.20",
+      "nlsfbTekst": "buitenwandopeningen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Sanitair",
+      "name": "Badruimte unit",
+      "entity": "IfcElementAssembly",
+      "predefinedType": "",
+      "nlsfb": "74.10",
+      "nlsfbTekst": "sanitaire voorzieningen",
+      "afmeting": ""
+    },
+    {
+      "objectType": "Sanitair",
+      "name": "Toiletruimte unit",
+      "entity": "IfcElementAssembly",
+      "predefinedType": "",
+      "nlsfb": "74.10",
+      "nlsfbTekst": "sanitaire voorzieningen",
+      "afmeting": ""
+    }
+  ]
+}

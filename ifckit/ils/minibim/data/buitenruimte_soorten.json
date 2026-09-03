@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Buitenruimte sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Overdekt****",
+      "naam": "Overdekt****"
+    },
+    {
+      "code": "Niet-overdekt****",
+      "naam": "Niet-overdekt****"
+    },
+    {
+      "code": "Subruimte *",
+      "naam": "Subruimte *"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "herkomst": "NEN 2580:2007 nl (via MiniBIM ILS v3.1 deel B, Gebied/Ruimte)",
+    "versie": "3.1",
+    "licentie": "NEN/BIM Loket — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "BI",
+      "naam": "BI"
+    },
+    {
+      "code": "NI",
+      "naam": "NI"
+    },
+    {
+      "code": "BVO",
+      "naam": "BVO"
+    },
+    {
+      "code": "GO",
+      "naam": "GO"
+    },
+    {
+      "code": "VVO",
+      "naam": "VVO"
+    },
+    {
+      "code": "NVO",
+      "naam": "NVO"
+    },
+    {
+      "code": "Meetinstructie",
+      "naam": "Meetinstructie"
+    },
+    {
+      "code": "JVO",
+      "naam": "JVO"
+    }
+  ]
+}

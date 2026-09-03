@@ -349,4 +349,23 @@ def write_psets(
         _write_pset(ifc_file, element, "EPset_IfcKit", user_props)
 
 
-__all__ = ["write_psets"]
+def write_named_pset(
+    ifc_file: ifcopenshell.file,
+    element: ifcopenshell.entity_instance,
+    pset_name: str,
+    props: Dict[str, Any],
+) -> None:
+    """
+    Write a named property set with typed values onto *element*.
+
+    Generic mechanism for any pset name (e.g. ``MiniBIM ILS``).  Values are
+    type-inferred like ``EPset_IfcKit`` (bool→IfcBoolean, int→IfcInteger,
+    float→IfcReal, str→IfcLabel, other→IfcLabel).
+    """
+    if not pset_name or not props:
+        return
+    prop_entities = [_prop(ifc_file, k, v) for k, v in props.items()]
+    _write_pset(ifc_file, element, pset_name, prop_entities)
+
+
+__all__ = ["write_psets", "write_named_pset"]

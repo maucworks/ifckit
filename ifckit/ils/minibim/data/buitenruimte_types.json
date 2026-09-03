@@ -1,0 +1,93 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, Buitenruimte sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "code": "Balkon",
+      "naam": "Balkon"
+    },
+    {
+      "code": "Dakterras",
+      "naam": "Dakterras"
+    },
+    {
+      "code": "Loggia",
+      "naam": "Loggia"
+    },
+    {
+      "code": "Patio",
+      "naam": "Patio"
+    },
+    {
+      "code": "Terras",
+      "naam": "Terras"
+    },
+    {
+      "code": "Tuin",
+      "naam": "Tuin"
+    },
+    {
+      "code": "Veranda",
+      "naam": "Veranda"
+    },
+    {
+      "code": "Galerij",
+      "naam": "Galerij"
+    },
+    {
+      "code": "Carport",
+      "naam": "Carport"
+    },
+    {
+      "code": "Parkeergarage niet-openbaar",
+      "naam": "Parkeergarage niet-openbaar"
+    },
+    {
+      "code": "Parkeergarage openbaar",
+      "naam": "Parkeergarage openbaar"
+    },
+    {
+      "code": "Parkeergarage stalling",
+      "naam": "Parkeergarage stalling"
+    },
+    {
+      "code": "Parkeerplaats auto **",
+      "naam": "Parkeerplaats auto **"
+    },
+    {
+      "code": "Parkeerplaats bakfiets **",
+      "naam": "Parkeerplaats bakfiets **"
+    },
+    {
+      "code": "Parkeerplaats fiets hoog **",
+      "naam": "Parkeerplaats fiets hoog **"
+    },
+    {
+      "code": "Parkeerplaats fiets laag **",
+      "naam": "Parkeerplaats fiets laag **"
+    },
+    {
+      "code": "Parkeerplaats motorfiets**",
+      "naam": "Parkeerplaats motorfiets**"
+    },
+    {
+      "code": "Parkeerplaats scooter **",
+      "naam": "Parkeerplaats scooter **"
+    },
+    {
+      "code": "Parkeerplaats scootmobiel **",
+      "naam": "Parkeerplaats scootmobiel **"
+    },
+    {
+      "code": "Kruipruimte",
+      "naam": "Kruipruimte"
+    },
+    {
+      "code": "Overige buitenruimte",
+      "naam": "Overige buitenruimte"
+    }
+  ]
+}

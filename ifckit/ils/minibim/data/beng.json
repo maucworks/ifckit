@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "herkomst": "MiniBIM ILS v3.1 deel B, BENG sheet",
+    "versie": "3.1",
+    "licentie": "NEPROM"
+  },
+  "items": [
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "PredefinedType": "-",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Bijeenkomstfunctie",
+      "Orientatie": "Noord",
+      "Glaspercentage": "0",
+      "BouwwerkNummer": "00",
+      "BaseQuantities": "NetSideArea"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Celfunctie",
+      "Orientatie": "Noordoost",
+      "Glaspercentage": "5",
+      "BouwwerkNummer": "01",
+      "BaseQuantities": "GrossSideArea"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Gezondheidszorgfunctie",
+      "Orientatie": "Oost",
+      "Glaspercentage": "10",
+      "BouwwerkNummer": "02"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Industriefunctie",
+      "Orientatie": "Zuidoost",
+      "Glaspercentage": "15"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Kantoorfunctie",
+      "Orientatie": "Zuid",
+      "Glaspercentage": "20"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Logiesfunctie",
+      "Orientatie": "Zuidwest",
+      "Glaspercentage": "25"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Onderwijsfunctie",
+      "Orientatie": "West",
+      "Glaspercentage": "30"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Overige gebruiksfunctie",
+      "Orientatie": "Noordwest",
+      "Glaspercentage": "35"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Sportfunctie",
+      "Glaspercentage": "40"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Winkelfunctie",
+      "Glaspercentage": "45"
+    },
+    {
+      "IfcObjectType": "Wand",
+      "IfcName": "Gevelwand",
+      "IfcEntityClass": "IfcWall",
+      "NL-SfB": "21.10",
+      "NL-SfB tekst": "buitenwanden",
+      "Gebruiksbestemming": "Woonfunctie",
+      "Glaspercentage": "50"
+    }
+  ]
+}
