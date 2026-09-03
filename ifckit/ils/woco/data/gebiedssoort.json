@@ -1,0 +1,45 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1 sheet",
+    "versie": "3.1",
+    "licentie": "Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "Gebruiksfunctie",
+      "naam": "Gebruiksfunctie"
+    },
+    {
+      "code": "Nevengebruiksfunctie",
+      "naam": "Nevengebruiksfunctie"
+    },
+    {
+      "code": "Gemeenschappelijke ruimte",
+      "naam": "Gemeenschappelijke ruimte"
+    },
+    {
+      "code": "Gemeenschappelijk verblijfsgebied",
+      "naam": "Gemeenschappelijk verblijfsgebied"
+    },
+    {
+      "code": "Gebruiksgebied",
+      "naam": "Gebruiksgebied"
+    },
+    {
+      "code": "Verblijfsgebied",
+      "naam": "Verblijfsgebied"
+    },
+    {
+      "code": "Bedgebied",
+      "naam": "Bedgebied"
+    },
+    {
+      "code": "Functiegebied",
+      "naam": "Functiegebied"
+    },
+    {
+      "code": "Restgebied",
+      "naam": "Restgebied"
+    }
+  ]
+}

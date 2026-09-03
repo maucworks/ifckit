@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1",
+    "versie": "3.1",
+    "licentie": "Aedes"
+  },
+  "items": [
+    {
+      "code": "Balkon",
+      "naam": "Balkon"
+    },
+    {
+      "code": "Carport",
+      "naam": "Carport"
+    },
+    {
+      "code": "Dakterras",
+      "naam": "Dakterras"
+    },
+    {
+      "code": "Galerij",
+      "naam": "Galerij"
+    },
+    {
+      "code": "Kruipruimte",
+      "naam": "Kruipruimte"
+    },
+    {
+      "code": "Loggia",
+      "naam": "Loggia"
+    },
+    {
+      "code": "Parkeerplaats auto",
+      "naam": "Parkeerplaats auto"
+    },
+    {
+      "code": "Parkeerplaats bakfiets",
+      "naam": "Parkeerplaats bakfiets"
+    },
+    {
+      "code": "Parkeerplaats fiets hoog",
+      "naam": "Parkeerplaats fiets hoog"
+    },
+    {
+      "code": "Parkeerplaats fiets laag",
+      "naam": "Parkeerplaats fiets laag"
+    },
+    {
+      "code": "Parkeerplaats motorfiets",
+      "naam": "Parkeerplaats motorfiets"
+    },
+    {
+      "code": "Parkeerplaats scooter",
+      "naam": "Parkeerplaats scooter"
+    },
+    {
+      "code": "Parkeerplaats scootmobiel",
+      "naam": "Parkeerplaats scootmobiel"
+    },
+    {
+      "code": "Overige buitenruimte",
+      "naam": "Overige buitenruimte"
+    },
+    {
+      "code": "Parkeerterrein",
+      "naam": "Parkeerterrein"
+    },
+    {
+      "code": "Patio",
+      "naam": "Patio"
+    },
+    {
+      "code": "Terras",
+      "naam": "Terras"
+    },
+    {
+      "code": "Tuin",
+      "naam": "Tuin"
+    },
+    {
+      "code": "Veranda",
+      "naam": "Veranda"
+    }
+  ]
+}

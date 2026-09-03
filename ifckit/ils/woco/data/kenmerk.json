@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1 sheet",
+    "versie": "3.1",
+    "licentie": "Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "Buitenruimte",
+      "naam": "Buitenruimte"
+    },
+    {
+      "code": "Deur",
+      "naam": "Deur"
+    },
+    {
+      "code": "Douche",
+      "naam": "Douche"
+    },
+    {
+      "code": "Closetcombi",
+      "naam": "Closetcombi"
+    },
+    {
+      "code": "Keukenblok",
+      "naam": "Keukenblok"
+    },
+    {
+      "code": "Kraan",
+      "naam": "Kraan"
+    },
+    {
+      "code": "Wastafel",
+      "naam": "Wastafel"
+    }
+  ]
+}

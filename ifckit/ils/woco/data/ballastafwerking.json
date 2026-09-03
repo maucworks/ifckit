@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1 sheet",
+    "versie": "3.1",
+    "licentie": "Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "Grind",
+      "naam": "Grind"
+    },
+    {
+      "code": "Betontegel",
+      "naam": "Betontegel"
+    },
+    {
+      "code": "Rubbertegel",
+      "naam": "Rubbertegel"
+    },
+    {
+      "code": "Organisch",
+      "naam": "Organisch"
+    },
+    {
+      "code": "Overig",
+      "naam": "Overig"
+    },
+    {
+      "code": "Geen",
+      "naam": "Geen"
+    }
+  ]
+}

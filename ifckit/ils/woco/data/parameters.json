@@ -1,0 +1,693 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Parameters 3.1",
+    "versie": "3.1",
+    "licentie": "Aedes"
+  },
+  "items": [
+    {
+      "property": "BagPandId",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Unieke ID van het BAG Pand",
+      "voorbeeld": "0599100000685852"
+    },
+    {
+      "property": "BagVerblijfsObject",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Unieke ID van het BAG Verblijfsobject",
+      "voorbeeld": "0599010000058598"
+    },
+    {
+      "property": "Ballastafwerking",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Specificeert het soort ballastafwerking",
+      "voorbeeld": "Grind"
+    },
+    {
+      "property": "Bediening",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Specificeert het soort bediening",
+      "voorbeeld": "Elektrisch"
+    },
+    {
+      "property": "Bepalingsmethode",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "List",
+      "enumeratie": "Ja",
+      "omschrijving": "De methode gebruikt om tot een meetwaarde te komen",
+      "voorbeeld": "GOmeetinstructie; BVO"
+    },
+    {
+      "property": "Brandwerendheid",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Brandwerendheid cf. Wbdbo",
+      "voorbeeld": "30;120"
+    },
+    {
+      "property": "Breedte",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de breedte van een object vastgelegd in mm",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Bron IFC",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Verwijzing naar bron IFC",
+      "voorbeeld": "complex.ifc"
+    },
+    {
+      "property": "DeurId",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "ID per uniek type, om relaties te leggen met overige documentatie",
+      "voorbeeld": "EX.43"
+    },
+    {
+      "property": "Diameter",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de diameter van een object vastgelegd in mm",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Diepte",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de diepte van een object vastgelegd in mm",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Dikte",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de dikte van een object vastgelegd in mm",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Draairichting",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Draairichting volgens IfcDoorTypeOperationEnum of IfcWindowPanelOperationEnum",
+      "voorbeeld": "TiltAndTurnRightHand"
+    },
+    {
+      "property": "EenheidId",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Eenheid nummer zoals aangeleverd door de Opdrachtgever",
+      "voorbeeld": "48463000005 ABC eenheid"
+    },
+    {
+      "property": "Functie",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "List",
+      "enumeratie": "Ja",
+      "omschrijving": "Functie van een object",
+      "voorbeeld": "Constuctief; Kookfunctie"
+    },
+    {
+      "property": "Functie",
+      "waarde_voorbeeld": "Bubbelfunctie",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Bad heeft bubbelfunctie",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Functie",
+      "waarde_voorbeeld": "Constructief",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Object is constructies",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Functie",
+      "waarde_voorbeeld": "Kookfunctie",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Kraan heeft kookfunctie",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Functie",
+      "waarde_voorbeeld": "Verwarmingsfunctie",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Airco heeft verwarmingsfunctie",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Gebiedssoort",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Gebiedsoort volgens de BBL",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Gebruiksbestemming",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Gebruiksbestemming volgens de BBL",
+      "voorbeeld": "Woonfunctie"
+    },
+    {
+      "property": "GORuimteClassificatie",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Parameter om onderscheid te maken in verschillende soorten gebruiksoppervlakte conform de Meetinstructie",
+      "voorbeeld": "Overige inpandige ruimte"
+    },
+    {
+      "property": "Hoogte",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de hoogte van een object vastgelegd in mm",
+      "voorbeeld": ""
+    },
+    {
+      "property": "IfcExportAs",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Combinatie van IfcEntityClass en PrefeniedType cf. BuildingSmart IFC4X3_ADD2",
+      "voorbeeld": "IfcCovering.ROOFING"
+    },
+    {
+      "property": "Inhoud",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de inhoud van een object vastgelegd in m3",
+      "voorbeeld": ""
+    },
+    {
+      "property": "isExterieur",
+      "waarde_voorbeeld": "",
+      "dataType": "Boolean",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Object bevind zich in de schil van het gebouw",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "List",
+      "enumeratie": "Ja",
+      "omschrijving": "Kenmerken van een object.",
+      "voorbeeld": "Apart; Staand; Entreedeur"
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Apart",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Douche losse plaatsing",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Deurdranger",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Deur is voorzien van dranger",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Draaiend",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Deur of Raam is te openen",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Eenhandsmengkraan",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Kraan is eenhandsmengkraan",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Eenpersoons",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Wastafel is eenpersoons",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Entreedeur",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Deur is hoofdentree deur",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Hangend",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Toilet is hangend",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InBad",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Douche in bad",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwElektrischeOven",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw elektrische oven",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwGasKookplaat",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw gas kookplaat",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwGasOven",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw gas oven",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwInductieKookplaat",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw inductie kookplaat",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwKoelkast",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw koelkast",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwKoelvriesCombi",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw koelvriescombi",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwMagnetron",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw magnetron",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "InbouwVriezer",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Keukenblok voorzien van inbouw vriezer",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Meerpersoons",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Wastafel is meerpersoons",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Overdekt",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Buitenruimte is overdekt",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Staand",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Toilet is staand",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Stopcontacten",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Wastafel voorzien van 2 stopcontacen",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Thermostatischemengkraan",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Kraan is thermostatische mengkraan",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Tweehandsmengkraan",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Kraan is tweehandsmengkraan",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Kenmerk",
+      "waarde_voorbeeld": "Woningtoegangsdeur",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Deur is woningtoegansdeur",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Klimaatbeheersing",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "List",
+      "enumeratie": "Ja",
+      "omschrijving": "Klimaat bepalende eigenschappen van een ruimte",
+      "voorbeeld": "Overdekt; verwarmd"
+    },
+    {
+      "property": "Klimaatbeheersing",
+      "waarde_voorbeeld": "Verkoeld",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Ruimte is gekoeld",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Klimaatbeheersing",
+      "waarde_voorbeeld": "Verwarmd",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Ruimte is verwarmd",
+      "voorbeeld": ""
+    },
+    {
+      "property": "KozijnCombinatieId",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "ID per uniek type, om relaties te leggen met overige documentatie",
+      "voorbeeld": "EX.67"
+    },
+    {
+      "property": "Lengte",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de lengte van een object vastgelegd in mm",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Materiaal",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Materiaal volgens de NAA.K.T standaard",
+      "voorbeeld": "hout_multiplex_plaat"
+    },
+    {
+      "property": "ETIM",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Code volgens de ETIM standaard",
+      "voorbeeld": "EC010232"
+    },
+    {
+      "property": "NL-SfB",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "NL/SfB codering op hoofdnummer",
+      "voorbeeld": "21; 42"
+    },
+    {
+      "property": "ObjectSubtype",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Met deze property wordt het object subtype vastgelegd volgens de OTL",
+      "voorbeeld": "Hellend dak"
+    },
+    {
+      "property": "ObjectType",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Met deze property wordt het object vastgelegd volgens de OTL",
+      "voorbeeld": "Aanrecht"
+    },
+    {
+      "property": "Opmerking",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Ruimte om een opmerking te plaatsen",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Oppervlakte",
+      "waarde_voorbeeld": "",
+      "dataType": "Number",
+      "valueType": "List",
+      "enumeratie": "",
+      "omschrijving": "Met deze property wordt de oppervlakte van een object vastgelegd in m2",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Orientatie",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "De orientatie van een object, ook voor buitenruimte",
+      "voorbeeld": "Z; NO"
+    },
+    {
+      "property": "RaamId",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "ID per uniek type, om relaties te leggen met overige documentatie",
+      "voorbeeld": "EX.51"
+    },
+    {
+      "property": "Ruimtenummer",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "ID per ruimte",
+      "voorbeeld": "123.2d"
+    },
+    {
+      "property": "RuimteRelatie",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "",
+      "omschrijving": "Ruimtenummer voor bovenliggende ruimte",
+      "voorbeeld": "123.2d"
+    },
+    {
+      "property": "RuimteSoort",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Ruimtesoort volgens de BBL (was Ruimtefunctie)",
+      "voorbeeld": "Verblijfsruimte, verkeersruimte, bedruimte, badruimte, toiletruimte, buitenruimte, technische ruimte"
+    },
+    {
+      "property": "RuimteType",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Ruimtetype volgens de ruimtelijst",
+      "voorbeeld": "Woonkamer, Slaapkamer etc"
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "List",
+      "enumeratie": "Ja",
+      "omschrijving": "Toegankelijkheid van een ruimte",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "Afsluitbaar",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Ruimte is afsluitbaar",
+      "voorbeeld": ""
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "Collectief",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Een ruimte of object die gedeeld wordt met meerdere verblijfsobjecten, maar zelf niet wordt verhuurd.",
+      "voorbeeld": "Entreehal van een appartementen complex"
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "GedeeldeRuimte",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Ruimte die gedeeld wordt met meerdere huurders binnen een verblijfsobject",
+      "voorbeeld": "Gedeelde woonkamer"
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "GemeenschappelijkeRuimte",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Gedeelde ruimte waar meerdere verblijfsobjecten het exclusieve gebruiksrecht van hebben",
+      "voorbeeld": "Gedeelde keuken of fietsenberging"
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "PubliekToegankelijk",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Ruimte is publiek toegankelijk",
+      "voorbeeld": "Binnentuin zonder afsluiting"
+    },
+    {
+      "property": "Toegang",
+      "waarde_voorbeeld": "Vluchtroute",
+      "dataType": "",
+      "valueType": "",
+      "enumeratie": "",
+      "omschrijving": "Ruimte of object is onderdeel van een vluchtroute",
+      "voorbeeld": ""
+    },
+    {
+      "property": "WWSRuimteType",
+      "waarde_voorbeeld": "",
+      "dataType": "String",
+      "valueType": "Single",
+      "enumeratie": "Ja",
+      "omschrijving": "Parameter om onderscheid te maken in verschillende ruimtetypen voor de WWS",
+      "voorbeeld": "Vertrek; Overige ruimte"
+    }
+  ]
+}

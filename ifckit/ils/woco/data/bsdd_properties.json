@@ -1,0 +1,249 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1 - bSDD.json",
+    "versie": "3.1",
+    "licentie": "Geen licentie"
+  },
+  "items": [
+    {
+      "code": "BAGPANDID",
+      "naam": "BagPandId",
+      "dataType": "String",
+      "definitie": "Unieke ID van het BAG Pand"
+    },
+    {
+      "code": "BAGVERBLIJFSOBJECT",
+      "naam": "BagVerblijfsObject",
+      "dataType": "String",
+      "definitie": "Unieke ID van het BAG Verblijfsobject"
+    },
+    {
+      "code": "BALLASTAFWERKING",
+      "naam": "Ballastafwerking",
+      "dataType": "String",
+      "definitie": "Specificeert het soort ballastafwerking"
+    },
+    {
+      "code": "BEDIENING",
+      "naam": "Bediening",
+      "dataType": "String",
+      "definitie": "Specificeert het soort bediening"
+    },
+    {
+      "code": "BEPALINGSMETHODE",
+      "naam": "Bepalingsmethode",
+      "dataType": "String",
+      "definitie": "De methode gebruikt om tot een meetwaarde te komen"
+    },
+    {
+      "code": "BRANDWERENDHEID",
+      "naam": "Brandwerendheid",
+      "dataType": "Integer",
+      "definitie": "Brandwerendheid cf. Wbdbo "
+    },
+    {
+      "code": "BREEDTE",
+      "naam": "Breedte",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de breedte van een object vastgelegd in mm"
+    },
+    {
+      "code": "BRONIFC",
+      "naam": "Bron IFC",
+      "dataType": "String",
+      "definitie": "Verwijzing naar bron IFC"
+    },
+    {
+      "code": "DEURID",
+      "naam": "DeurId",
+      "dataType": "String",
+      "definitie": "ID per uniek type, om relaties te leggen met overige documentatie"
+    },
+    {
+      "code": "DIAMETER",
+      "naam": "Diameter",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de diameter van een object vastgelegd in mm"
+    },
+    {
+      "code": "DIEPTE",
+      "naam": "Diepte",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de diepte van een object vastgelegd in mm"
+    },
+    {
+      "code": "DIKTE",
+      "naam": "Dikte",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de dikte van een object vastgelegd in mm"
+    },
+    {
+      "code": "DRAAIRICHTING",
+      "naam": "Draairichting",
+      "dataType": "String",
+      "definitie": "Draairichting volgens IfcDoorTypeOperationEnum of IfcWindowPanelOperationEnum"
+    },
+    {
+      "code": "EENHEIDID",
+      "naam": "EenheidId",
+      "dataType": "String",
+      "definitie": "Eenheid nummer zoals aangeleverd door de Opdrachtgever"
+    },
+    {
+      "code": "FUNCTIE",
+      "naam": "Functie",
+      "dataType": "String",
+      "definitie": "Functie van een object"
+    },
+    {
+      "code": "GEBIEDSSOORT",
+      "naam": "Gebiedssoort",
+      "dataType": "String",
+      "definitie": "Gebiedsoort volgens de BBL"
+    },
+    {
+      "code": "GEBRUIKSBESTEMMING",
+      "naam": "Gebruiksbestemming",
+      "dataType": "String",
+      "definitie": "Gebruiksbestemming volgens de BBL"
+    },
+    {
+      "code": "GORUIMTECLASSIFICATIE",
+      "naam": "GORuimteClassificatie",
+      "dataType": "String",
+      "definitie": "Parameter om onderscheid te maken in verschillende soorten gebruiksoppervlakte conform de Meetinstructie"
+    },
+    {
+      "code": "HOOGTE",
+      "naam": "Hoogte",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de hoogte van een object vastgelegd in mm"
+    },
+    {
+      "code": "IFCEXPORTAS",
+      "naam": "IfcExportAs",
+      "dataType": "String",
+      "definitie": "Combinatie van IfcEntityClass en PrefeniedType cf. BuildingSmart IFC4X3_ADD2"
+    },
+    {
+      "code": "INHOUD",
+      "naam": "Inhoud",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de inhoud van een object vastgelegd in m3"
+    },
+    {
+      "code": "ISEXTERIEUR",
+      "naam": "isExterieur",
+      "dataType": "Boolean",
+      "definitie": "Object bevind zich in de schil van het gebouw"
+    },
+    {
+      "code": "KENMERK",
+      "naam": "Kenmerk",
+      "dataType": "String",
+      "definitie": "Kenmerken"
+    },
+    {
+      "code": "KLIMAATBEHEERSING",
+      "naam": "Klimaatbeheersing",
+      "dataType": "String",
+      "definitie": "Klimaatbeheersing"
+    },
+    {
+      "code": "KOZIJNCOMBINATIEID",
+      "naam": "KozijnCombinatieId",
+      "dataType": "String",
+      "definitie": "ID per uniek type, om relaties te leggen met overige documentatie"
+    },
+    {
+      "code": "LENGTE",
+      "naam": "Lengte",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de lengte van een object vastgelegd in mm"
+    },
+    {
+      "code": "MATERIAAL",
+      "naam": "Materiaal",
+      "dataType": "String",
+      "definitie": "Materiaal volgens de NAA.K.T standaard"
+    },
+    {
+      "code": "NLSFB",
+      "naam": "NL-SfB",
+      "dataType": "String",
+      "definitie": "NL/SfB codering op hoofdnummer"
+    },
+    {
+      "code": "OBJECTSUBTYPE",
+      "naam": "ObjectSubtype",
+      "dataType": "String",
+      "definitie": "Met deze property wordt het object subtype vastgelegd volgens de OTL"
+    },
+    {
+      "code": "OBJECTTYPE",
+      "naam": "ObjectType",
+      "dataType": "String",
+      "definitie": "Met deze property wordt het object vastgelegd volgens de OTL"
+    },
+    {
+      "code": "OPMERKING",
+      "naam": "Opmerking",
+      "dataType": "String",
+      "definitie": "Ruimte om een opmerking te plaatsen"
+    },
+    {
+      "code": "OPPERVLAKTE",
+      "naam": "Oppervlakte",
+      "dataType": "Real",
+      "definitie": "Met deze property wordt de oppervlakte van een object vastgelegd in m2"
+    },
+    {
+      "code": "ORIENTATIE",
+      "naam": "Orientatie",
+      "dataType": "String",
+      "definitie": "De orientatie van een object, ook voor buitenruimte"
+    },
+    {
+      "code": "RAAMID",
+      "naam": "RaamId",
+      "dataType": "String",
+      "definitie": "ID per uniek type, om relaties te leggen met overige documentatie"
+    },
+    {
+      "code": "RUIMTENUMMER",
+      "naam": "Ruimtenummer",
+      "dataType": "String",
+      "definitie": "ID per ruimte"
+    },
+    {
+      "code": "RUIMTESOORT",
+      "naam": "RuimteSoort ",
+      "dataType": "String",
+      "definitie": "Ruimtesoort volgens de BBL (was Ruimtefunctie)"
+    },
+    {
+      "code": "RUIMTETYPE",
+      "naam": "RuimteType",
+      "dataType": "String",
+      "definitie": "Ruimtetype volgens de ruimtelijst"
+    },
+    {
+      "code": "TOEGANG",
+      "naam": "Toegang",
+      "dataType": "String",
+      "definitie": "Toegang"
+    },
+    {
+      "code": "WWSRUIMTETYPE",
+      "naam": "WWSRuimteType",
+      "dataType": "String",
+      "definitie": "Parameter om onderscheid te maken in verschillende ruimtetypen voor de WWS"
+    },
+    {
+      "code": "ETIM",
+      "naam": "ETIM",
+      "dataType": "String",
+      "definitie": "Code volgens de ETIM standaard"
+    }
+  ]
+}

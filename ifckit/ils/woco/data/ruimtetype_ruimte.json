@@ -1,0 +1,201 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1",
+    "versie": "3.1",
+    "licentie": "Aedes"
+  },
+  "items": [
+    {
+      "code": "Atrium",
+      "naam": "Atrium"
+    },
+    {
+      "code": "Badruimte",
+      "naam": "Badruimte"
+    },
+    {
+      "code": "Bedrijfsruimte",
+      "naam": "Bedrijfsruimte"
+    },
+    {
+      "code": "Bedruimte",
+      "naam": "Bedruimte"
+    },
+    {
+      "code": "Berging inpandig",
+      "naam": "Berging inpandig"
+    },
+    {
+      "code": "Berging uitpandig",
+      "naam": "Berging uitpandig"
+    },
+    {
+      "code": "Bergruimte",
+      "naam": "Bergruimte"
+    },
+    {
+      "code": "Bijkeuken",
+      "naam": "Bijkeuken"
+    },
+    {
+      "code": "Cel",
+      "naam": "Cel"
+    },
+    {
+      "code": "Corridor",
+      "naam": "Corridor"
+    },
+    {
+      "code": "Entree",
+      "naam": "Entree"
+    },
+    {
+      "code": "Fietsenstalling inpandig",
+      "naam": "Fietsenstalling inpandig"
+    },
+    {
+      "code": "Fietsenstalling uitpandig",
+      "naam": "Fietsenstalling uitpandig"
+    },
+    {
+      "code": "Gang",
+      "naam": "Gang"
+    },
+    {
+      "code": "Garage inpandig",
+      "naam": "Garage inpandig"
+    },
+    {
+      "code": "Garage uitpandig",
+      "naam": "Garage uitpandig"
+    },
+    {
+      "code": "Garagebox",
+      "naam": "Garagebox"
+    },
+    {
+      "code": "Hal",
+      "naam": "Hal"
+    },
+    {
+      "code": "Kantoorruimte",
+      "naam": "Kantoorruimte"
+    },
+    {
+      "code": "Kast",
+      "naam": "Kast"
+    },
+    {
+      "code": "Kelder",
+      "naam": "Kelder"
+    },
+    {
+      "code": "Keuken",
+      "naam": "Keuken"
+    },
+    {
+      "code": "Lifthal",
+      "naam": "Lifthal"
+    },
+    {
+      "code": "Liftmachineruimte",
+      "naam": "Liftmachineruimte"
+    },
+    {
+      "code": "Liftschacht",
+      "naam": "Liftschacht"
+    },
+    {
+      "code": "Meterruimte",
+      "naam": "Meterruimte"
+    },
+    {
+      "code": "Overige ruimte",
+      "naam": "Overige ruimte"
+    },
+    {
+      "code": "Overloop",
+      "naam": "Overloop"
+    },
+    {
+      "code": "Parkeergarage niet-openbaar",
+      "naam": "Parkeergarage niet-openbaar"
+    },
+    {
+      "code": "Parkeergarage openbaar",
+      "naam": "Parkeergarage openbaar"
+    },
+    {
+      "code": "Parkeergarage stallingsgarage",
+      "naam": "Parkeergarage stallingsgarage"
+    },
+    {
+      "code": "Rooksluis",
+      "naam": "Rooksluis"
+    },
+    {
+      "code": "Schacht",
+      "naam": "Schacht"
+    },
+    {
+      "code": "Serre",
+      "naam": "Serre"
+    },
+    {
+      "code": "Slaapkamer",
+      "naam": "Slaapkamer"
+    },
+    {
+      "code": "Stalling inpandig",
+      "naam": "Stalling inpandig"
+    },
+    {
+      "code": "Stalling uitpandig",
+      "naam": "Stalling uitpandig"
+    },
+    {
+      "code": "Technische ruimte",
+      "naam": "Technische ruimte"
+    },
+    {
+      "code": "Toiletruimte",
+      "naam": "Toiletruimte"
+    },
+    {
+      "code": "Trapgat",
+      "naam": "Trapgat"
+    },
+    {
+      "code": "Trappenhuis",
+      "naam": "Trappenhuis"
+    },
+    {
+      "code": "Vide",
+      "naam": "Vide"
+    },
+    {
+      "code": "Wasruimte",
+      "naam": "Wasruimte"
+    },
+    {
+      "code": "Woonkamer",
+      "naam": "Woonkamer"
+    },
+    {
+      "code": "Woonkamer-keuken",
+      "naam": "Woonkamer-keuken"
+    },
+    {
+      "code": "Woonkamer-keuken-slaapkamer",
+      "naam": "Woonkamer-keuken-slaapkamer"
+    },
+    {
+      "code": "Woon-slaapkamer",
+      "naam": "Woon-slaapkamer"
+    },
+    {
+      "code": "Zolderruimte",
+      "naam": "Zolderruimte"
+    }
+  ]
+}

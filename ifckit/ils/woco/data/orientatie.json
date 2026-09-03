@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1 sheet",
+    "versie": "3.1",
+    "licentie": "Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "N",
+      "naam": "N"
+    },
+    {
+      "code": "NO",
+      "naam": "NO"
+    },
+    {
+      "code": "O",
+      "naam": "O"
+    },
+    {
+      "code": "ZO",
+      "naam": "ZO"
+    },
+    {
+      "code": "Z",
+      "naam": "Z"
+    },
+    {
+      "code": "ZW",
+      "naam": "ZW"
+    },
+    {
+      "code": "W",
+      "naam": "W"
+    },
+    {
+      "code": "NW",
+      "naam": "NW"
+    }
+  ]
+}

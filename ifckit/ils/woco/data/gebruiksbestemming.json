@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1 sheet",
+    "versie": "3.1",
+    "licentie": "Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "Bijeenkomstfunctie",
+      "naam": "Bijeenkomstfunctie"
+    },
+    {
+      "code": "Bouwwerk geen gebouw zijnde",
+      "naam": "Bouwwerk geen gebouw zijnde"
+    },
+    {
+      "code": "Celfunctie",
+      "naam": "Celfunctie"
+    },
+    {
+      "code": "Gezondheidszorgfunctie",
+      "naam": "Gezondheidszorgfunctie"
+    },
+    {
+      "code": "Industriefunctie",
+      "naam": "Industriefunctie"
+    },
+    {
+      "code": "Kantoorfunctie",
+      "naam": "Kantoorfunctie"
+    },
+    {
+      "code": "Logiesfunctie",
+      "naam": "Logiesfunctie"
+    },
+    {
+      "code": "Onderwijsfunctie",
+      "naam": "Onderwijsfunctie"
+    },
+    {
+      "code": "Overige gebruiksfunctie",
+      "naam": "Overige gebruiksfunctie"
+    },
+    {
+      "code": "Sportfunctie",
+      "naam": "Sportfunctie"
+    },
+    {
+      "code": "Winkelfunctie",
+      "naam": "Winkelfunctie"
+    },
+    {
+      "code": "Woonfunctie",
+      "naam": "Woonfunctie"
+    }
+  ]
+}

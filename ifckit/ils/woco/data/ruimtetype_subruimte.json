@@ -1,0 +1,193 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1",
+    "versie": "3.1",
+    "licentie": "Aedes"
+  },
+  "items": [
+    {
+      "code": "Atrium",
+      "naam": "Atrium"
+    },
+    {
+      "code": "Badruimte",
+      "naam": "Badruimte"
+    },
+    {
+      "code": "Bedrijfsruimte",
+      "naam": "Bedrijfsruimte"
+    },
+    {
+      "code": "Bedruimte",
+      "naam": "Bedruimte"
+    },
+    {
+      "code": "Bergruimte",
+      "naam": "Bergruimte"
+    },
+    {
+      "code": "Bijkeuken",
+      "naam": "Bijkeuken"
+    },
+    {
+      "code": "Cel",
+      "naam": "Cel"
+    },
+    {
+      "code": "Corridor",
+      "naam": "Corridor"
+    },
+    {
+      "code": "Entree",
+      "naam": "Entree"
+    },
+    {
+      "code": "Gang",
+      "naam": "Gang"
+    },
+    {
+      "code": "Garagebox",
+      "naam": "Garagebox"
+    },
+    {
+      "code": "Hal",
+      "naam": "Hal"
+    },
+    {
+      "code": "Kantoorruimte",
+      "naam": "Kantoorruimte"
+    },
+    {
+      "code": "Kast",
+      "naam": "Kast"
+    },
+    {
+      "code": "Kelder",
+      "naam": "Kelder"
+    },
+    {
+      "code": "Keuken",
+      "naam": "Keuken"
+    },
+    {
+      "code": "Lifthal",
+      "naam": "Lifthal"
+    },
+    {
+      "code": "Liftmachineruimte",
+      "naam": "Liftmachineruimte"
+    },
+    {
+      "code": "Liftschacht",
+      "naam": "Liftschacht"
+    },
+    {
+      "code": "Meterruimte",
+      "naam": "Meterruimte"
+    },
+    {
+      "code": "Parkeerplaats auto",
+      "naam": "Parkeerplaats auto"
+    },
+    {
+      "code": "Parkeerplaats bakfiets",
+      "naam": "Parkeerplaats bakfiets"
+    },
+    {
+      "code": "Parkeerplaats fiets hoog",
+      "naam": "Parkeerplaats fiets hoog"
+    },
+    {
+      "code": "Parkeerplaats fiets laag",
+      "naam": "Parkeerplaats fiets laag"
+    },
+    {
+      "code": "Opstelplaats koelkast",
+      "naam": "Opstelplaats koelkast"
+    },
+    {
+      "code": "Opstelplaats kooktoestel",
+      "naam": "Opstelplaats kooktoestel"
+    },
+    {
+      "code": "Parkeerplaats motorfiets",
+      "naam": "Parkeerplaats motorfiets"
+    },
+    {
+      "code": "Parkeerplaats scooter",
+      "naam": "Parkeerplaats scooter"
+    },
+    {
+      "code": "Parkeerplaats scootmobiel",
+      "naam": "Parkeerplaats scootmobiel"
+    },
+    {
+      "code": "Opstelplaats vaatwasser",
+      "naam": "Opstelplaats vaatwasser"
+    },
+    {
+      "code": "Opstelplaats wasdroger",
+      "naam": "Opstelplaats wasdroger"
+    },
+    {
+      "code": "Opstelplaats wasmachine",
+      "naam": "Opstelplaats wasmachine"
+    },
+    {
+      "code": "Overige ruimte",
+      "naam": "Overige ruimte"
+    },
+    {
+      "code": "Overloop",
+      "naam": "Overloop"
+    },
+    {
+      "code": "Rooksluis",
+      "naam": "Rooksluis"
+    },
+    {
+      "code": "Schacht",
+      "naam": "Schacht"
+    },
+    {
+      "code": "Serre",
+      "naam": "Serre"
+    },
+    {
+      "code": "Slaapkamer",
+      "naam": "Slaapkamer"
+    },
+    {
+      "code": "Technische ruimte",
+      "naam": "Technische ruimte"
+    },
+    {
+      "code": "Toiletruimte",
+      "naam": "Toiletruimte"
+    },
+    {
+      "code": "Trapgat",
+      "naam": "Trapgat"
+    },
+    {
+      "code": "Trappenhuis",
+      "naam": "Trappenhuis"
+    },
+    {
+      "code": "Vide",
+      "naam": "Vide"
+    },
+    {
+      "code": "Wasruimte",
+      "naam": "Wasruimte"
+    },
+    {
+      "code": "Woonkamer",
+      "naam": "Woonkamer"
+    },
+    {
+      "code": "Zolderruimte",
+      "naam": "Zolderruimte"
+    }
+  ]
+}

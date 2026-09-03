@@ -1,0 +1,904 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1 - bSDD.json, Aedes/WOCO 3.1",
+    "versie": "3.1",
+    "licentie": "Geen licentie"
+  },
+  "items": [
+    {
+      "code": "BOUWKUNDIGELEMENT",
+      "naam": "Bouwkundig Element",
+      "definitie": "Dit is een Bouwkundig Element"
+    },
+    {
+      "code": "INSTALLATIEELEMENT",
+      "naam": "Installatie Element",
+      "definitie": "Dit is een Installatie Element"
+    },
+    {
+      "code": "AANRECHT",
+      "naam": "Aanrecht",
+      "definitie": "Een werkvlak in de keuken, meestal voorzien van een spoelbak. Het aanrecht dient als oppervlak voor voedselbereiding en andere keukenactiviteiten."
+    },
+    {
+      "code": "ACCU",
+      "naam": "Accu",
+      "definitie": "Een oplaadbare elektrische energieopslag voor gebouwgebonden systemen. Accu's slaan elektriciteit op voor noodgevallen of voor systemen die niet continu op het net aangesloten zijn."
+    },
+    {
+      "code": "AFDEKKER",
+      "naam": "Afdekker",
+      "definitie": "Een element dat een constructieonderdeel afsluit of bedekt. Afdekkers beschermen onderliggende constructies tegen weersinvloeden."
+    },
+    {
+      "code": "AFDICHTER",
+      "naam": "Afdichter",
+      "definitie": "Materiaal of voorziening die voorkomt dat lucht, water of geluid doorgelaten wordt. Afdichters zorgen voor een goede scheiding tussen verschillende ruimtes of tussen binnen- en buitenomgeving."
+    },
+    {
+      "code": "AFWERKLAAG",
+      "naam": "Afwerklaag",
+      "definitie": "De bovenste laag van een constructiedeel die zorgt voor esthetische en/of beschermende functie. De afwerklaag bepaalt vaak het uiterlijk en beschermt onderliggende constructies."
+    },
+    {
+      "code": "AFZUIGKAP",
+      "naam": "Afzuigkap",
+      "definitie": "Een apparaat dat kookdampen, geuren en vocht afzuigt boven een kooktoestel. Afzuigkappen zorgen voor ventilatie en luchtkwaliteit in de keuken."
+    },
+    {
+      "code": "AIRCOBINNENUNIT",
+      "naam": "Airco binnen-unit",
+      "definitie": "Een installatie die de temperatuur, vochtigheid en luchtcirculatie in een ruimte regelt. Airco's kunnen koelen, maar vaak ook verwarmen en ontvochtigen."
+    },
+    {
+      "code": "AIRCOBUITENUNIT",
+      "naam": "Airco buiten-unit",
+      "definitie": "Een installatie die de temperatuur, vochtigheid en luchtcirculatie in een ruimte regelt. Airco's kunnen koelen, maar vaak ook verwarmen en ontvochtigen."
+    },
+    {
+      "code": "AIRCOCOMBIUNIT",
+      "naam": "Airco combi-unit",
+      "definitie": "Een installatie die de temperatuur, vochtigheid en luchtcirculatie in een ruimte regelt. Airco's kunnen koelen, maar vaak ook verwarmen en ontvochtigen."
+    },
+    {
+      "code": "ARMATUUR",
+      "naam": "Armatuur",
+      "definitie": "De behuizing en technische onderdelen van een verlichtingstoestel. Het armatuur bevat de lamp en eventuele voorschakelapparatuur."
+    },
+    {
+      "code": "AUDIOINTERCOMDEURBELINSTALLATIEBINNENUNIT",
+      "naam": "Audio Intercom",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "AUDIOINTERCOMDEURBELINSTALLATIEBUITENUNIT",
+      "naam": "Audio Intercom",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "BAD",
+      "naam": "Bad",
+      "definitie": "Een grote bak waarin men zich kan wassen door onderdompeling in water. Baden kunnen vrijstaand zijn of ingebouwd in een badkamermeubel."
+    },
+    {
+      "code": "BALANSDEUR",
+      "naam": "Balansdeur",
+      "definitie": "Een beweegbare afsluiting in een doorgang in muur of wand. Deuren bieden toegang en afsluiting tussen ruimtes."
+    },
+    {
+      "code": "BALK",
+      "naam": "Balk",
+      "definitie": "Een horizontaal constructie-element dat gewicht draagt en overspant. Balken dragen vloeren en daken en verdelen belastingen naar kolommen of muren."
+    },
+    {
+      "code": "BALKON",
+      "naam": "Balkon",
+      "definitie": "Een verhoogd platform aan de buitenzijde van een gebouw, toegankelijk vanuit de woning. Balkons bieden buitenruimte op hogere verdiepingen."
+    },
+    {
+      "code": "BALUSTRADE",
+      "naam": "Balustrade",
+      "definitie": "Een hekwerk of leuning langs een trap, balkon of andere verhoogde locatie. Balustrades bieden veiligheid en voorkomen vallen van hoogte."
+    },
+    {
+      "code": "BEELDBEVEILIGINGSINSTALLATIE",
+      "naam": "Beeldbeveiligingsinstallatie",
+      "definitie": "Een systeem van camera's en beeldregistratieapparatuur voor bewaking en beveiliging. Deze installaties registreren gebeurtenissen voor veiligheidsdoeleinden."
+    },
+    {
+      "code": "BEGLAZING",
+      "naam": "Beglazing",
+      "definitie": "Glaspanelen geplaatst in kozijnen of een vliesgevel. Beglazing zorgt voor daglicht, zicht en isolatie."
+    },
+    {
+      "code": "BIDET",
+      "naam": "Bidet",
+      "definitie": "Een sanitair toestel voor het wassen van het onderlichaam. Een bidet is een aanvulling op toilet en douche voor persoonlijke hygiëne."
+    },
+    {
+      "code": "BKTFAN",
+      "naam": "B-K-T Fan",
+      "definitie": "Een apparaat dat lucht verplaatst door middel van roterende schoepen. Ventilatoren zorgen voor luchtverplaatsing en ventilatie."
+    },
+    {
+      "code": "BLIKSEMBEVEILIGINGSINSTALLATIE",
+      "naam": "Bliksembeveiligingsinstallatie",
+      "definitie": "Een systeem dat blikseminslag afleidt naar de aarde om schade te voorkomen. Beschermt gebouwen tegen de gevaren van blikseminslag."
+    },
+    {
+      "code": "BOEIBOORD",
+      "naam": "Boeiboord",
+      "definitie": "De afwerking van de dakrand aan de voorzijde van een overstek. Boeiboorden beschermen de dakconstructie en geven een nette afwerking."
+    },
+    {
+      "code": "BOILER",
+      "naam": "Boiler",
+      "definitie": "Een toestel dat water verwarmt en opslaat voor later gebruik. Boilers zorgen voor direct beschikbaar warm water."
+    },
+    {
+      "code": "BORSTWERING",
+      "naam": "Borstwering",
+      "definitie": "Een lage muur of ander element dat dient als afscheiding of valbeveiliging. Borstweringen bieden bescherming tegen vallen bij ramen, vides of balkons."
+    },
+    {
+      "code": "BRANDBLUSSER",
+      "naam": "Brandblusser",
+      "definitie": "Een draagbaar apparaat gevuld met blusmiddel om beginnende branden te blussen. Brandblussers zijn essentieel voor de eerste brandbestrijding."
+    },
+    {
+      "code": "BRANDMELDINSTALLATIE",
+      "naam": "Brandmeldinstallatie",
+      "definitie": "Een systeem dat brand detecteert en alarmeert. Deze installatie waarschuwt gebruikers van een gebouw bij brand."
+    },
+    {
+      "code": "BRANDSLANGHASPEL",
+      "naam": "Brandslanghaspel",
+      "definitie": "Een opgerold stuk brandslang met straalpijp en aansluiting op de waterleiding. Brandslanghaspels zijn bedoeld voor het blussen van een beginnende brand."
+    },
+    {
+      "code": "BUITENJALOEZIE",
+      "naam": "Buitenjaloezie",
+      "definitie": "Een voorziening die zonlicht en zonnewarmte weert uit een gebouw. Zonwering voorkomt oververhitting en verbetert het binnenklimaat."
+    },
+    {
+      "code": "BUITENRUIMTE",
+      "naam": "Buitenruimte",
+      "definitie": "Een buitenruimte is een niet-volledig fysiek afgebakend ruimte die aan het bouwwerk is gebonden. Ligt buiten de gesloten bouwstructuur en staat in direct contact met de buitenlucht Bijvoorbeeld een tuin, balkon, dakterras, carport. Een buitenruimte kan behoren tot een individuele eenheid, maar ook een publieke of gezamenlijke ruimte zijn."
+    },
+    {
+      "code": "CLOSETCOMBINATIE",
+      "naam": "Closetcombinatie",
+      "definitie": "Een compleet toilet bestaande uit pot, reservoir en zitting. De closetcombinatie is het sanitaire element voor toiletgebruik."
+    },
+    {
+      "code": "COMBIMELDER",
+      "naam": "Combimelder",
+      "definitie": "Een sensor die gevaarlijke situaties detecteert en alarmeert. Veiligheidsmelders waarschuwen voor diverse gevaren."
+    },
+    {
+      "code": "CONSOLE",
+      "naam": "Console",
+      "definitie": "Een uitkragend constructie-element dat dient als ondersteuning. Consoles dragen elementen die aan wanden of muren bevestigd zijn."
+    },
+    {
+      "code": "CVKETEL",
+      "naam": "CV-ketel",
+      "definitie": "Een toestel dat water verwarmt voor ruimteverwarming en eventueel warm tapwater. De centrale verwarmingsketel is het hart van een verwarmingssysteem."
+    },
+    {
+      "code": "DAK",
+      "naam": "Dak",
+      "definitie": "De bovenste constructie van een gebouw die bescherming biedt tegen weersinvloeden. Het dak vormt de afsluiting van een gebouw aan de bovenzijde."
+    },
+    {
+      "code": "DAKLUIK",
+      "naam": "Dakluik",
+      "definitie": "Een beweegbare afsluiting van een opening, vaak horizontaal geplaatst. Luiken geven toegang tot kruipruimtes, daken of andere moeilijk bereikbare ruimtes."
+    },
+    {
+      "code": "DAKRAAM",
+      "naam": "Dakraam",
+      "definitie": "Een raam geplaatst in een hellend dakvlak. Dakramen zorgen voor licht en ventilatie in zolderruimtes."
+    },
+    {
+      "code": "DAKRAND",
+      "naam": "Dakrand",
+      "definitie": "De afwerking aan de rand van een dak. De dakrand zorgt voor een nette overgang tussen dak en gevel."
+    },
+    {
+      "code": "DAKVENTILATOR",
+      "naam": "Dakventilator",
+      "definitie": "Een apparaat dat lucht verplaatst door middel van roterende schoepen. Ventilatoren zorgen voor luchtverplaatsing en ventilatie."
+    },
+    {
+      "code": "DEUR",
+      "naam": "Deur",
+      "definitie": "Een beweegbare afsluiting in een doorgang in muur of wand. Deuren bieden toegang en afsluiting tussen ruimtes."
+    },
+    {
+      "code": "DEURBELINSTALLATIEBINNENUNIT",
+      "naam": "Deurbelinstallatie binnen-unit",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "DEURBELINSTALLATIEBUITENUNIT",
+      "naam": "Deurbelinstallatie buiten-unit",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "DOORVALBEVEILIGING",
+      "naam": "Doorvalbeveiliging",
+      "definitie": "Een constructie die voorkomt dat personen door ramen of andere openingen vallen. Doorvalbeveiliging is verplicht bij ramen waar valgevaar bestaat."
+    },
+    {
+      "code": "DOORVOER",
+      "naam": "Doorvoer",
+      "definitie": "Een opening in een constructiedeel waar leidingen of kanalen doorheen gaan. Doorvoeren moeten vaak brandwerend of waterdicht worden afgewerkt."
+    },
+    {
+      "code": "DORPEL",
+      "naam": "Dorpel",
+      "definitie": "Een horizontaal element aan de onderzijde van een deur- of raamopening. Dorpels vormen de overgang tussen verschillende vloerniveaus of materialen."
+    },
+    {
+      "code": "DOUCHE",
+      "naam": "Douche",
+      "definitie": "Een installatie voor het nemen van een staande wasbeurt met stromend water. Douches bestaan uit een douchekop en een afvoer, vaak met omsluitende wanden."
+    },
+    {
+      "code": "DRAAIDEUR",
+      "naam": "Draaideur",
+      "definitie": "Een beweegbare afsluiting in een doorgang in muur of wand. Deuren bieden toegang en afsluiting tussen ruimtes."
+    },
+    {
+      "code": "DROGEBLUSLEIDING",
+      "naam": "Droge blusleiding",
+      "definitie": "Een leidingstelsel zonder water dat bij brand door de brandweer gevuld kan worden. Droge blusleidingen geven de brandweer de mogelijkheid op hoogte te blussen."
+    },
+    {
+      "code": "ELEKTRISCHEBOILER",
+      "naam": "Elektrische boiler",
+      "definitie": "Een toestel dat water verwarmt en opslaat voor later gebruik. Boilers zorgen voor direct beschikbaar warm water."
+    },
+    {
+      "code": "ELEKTRISCHEKACHEL",
+      "naam": "Elektrische kachel",
+      "definitie": "Een verwarmingstoestel dat zelfstandig warmte afgeeft aan de ruimte waarin het staat opgesteld. Geen onderdeel van het verwarmingssysteem. Kachels kunnen werken op verschillende brandstoffen en dienen meestal als aanvullende warmtebron."
+    },
+    {
+      "code": "EXPANSIEVAT",
+      "naam": "Expansievat",
+      "definitie": "Een drukvat dat volumeveranderingen in een verwarmings- of koelsysteem opvangt. Het expansievat vangt drukveranderingen op die ontstaan door temperatuurwisselingen."
+    },
+    {
+      "code": "FLITSLICHT",
+      "naam": "Flitslicht",
+      "definitie": "Een visueel waarschuwingssignaal voor alarmsituaties. Flitslichten maken dove of slechthorende personen attent op een alarm."
+    },
+    {
+      "code": "FLORAENFAUNAVOORZIENING",
+      "naam": "Flora- en faunavoorziening",
+      "definitie": "Bouwkundige elementen die onderdak bieden aan planten of dieren. Deze voorzieningen bevorderen biodiversiteit rond gebouwen."
+    },
+    {
+      "code": "FONTEIN",
+      "naam": "Fontein",
+      "definitie": "Een klein handenwasbassin in een toilet. Een fontein wordt specifiek gebruikt voor het wassen van handen na toiletgebruik."
+    },
+    {
+      "code": "FUNDERINGSPAAL",
+      "naam": "Funderingspaal",
+      "definitie": "Een in de grond aangebracht verticaal element dat gebouwbelastingen overdraagt naar draagkrachtige grondlagen. Funderingspalen worden gebruikt wanneer de bovengrond onvoldoende draagkrachtig is."
+    },
+    {
+      "code": "GALERIJ",
+      "naam": "Galerij",
+      "definitie": "Een gemeenschappelijke gang aan de buitenzijde van een gebouw die toegang geeft tot meerdere woningen. Galerijen komen vaak voor bij flatgebouwen."
+    },
+    {
+      "code": "GARAGEDEUR",
+      "naam": "Garagedeur",
+      "definitie": "Een grote deur die toegang geeft tot een garage of parkeerruimte. Garagedeuren kunnen op verschillende manieren openen."
+    },
+    {
+      "code": "GASBOILER",
+      "naam": "Gasboiler",
+      "definitie": "Een toestel dat water verwarmt en opslaat voor later gebruik. Boilers zorgen voor direct beschikbaar warm water."
+    },
+    {
+      "code": "GASDETECTIE",
+      "naam": "Gasdetectie",
+      "definitie": "Een sensor die gevaarlijke situaties detecteert en alarmeert. Veiligheidsmelders waarschuwen voor diverse gevaren."
+    },
+    {
+      "code": "GASKACHEL",
+      "naam": "Gaskachel",
+      "definitie": "Een verwarmingstoestel dat zelfstandig warmte afgeeft aan de ruimte waarin het staat opgesteld. Geen onderdeel van het verwarmingssysteem. Kachels kunnen werken op verschillende brandstoffen en dienen meestal als aanvullende warmtebron."
+    },
+    {
+      "code": "GEBIED",
+      "naam": "Gebied",
+      "definitie": "Een afgebakende zone binnen een bouwwerk, waarin een specifieke voorwaarde of juridische status geldt die beperkingen oplegt aan het verwachte gebruik van die zone. Een gebied is een opdeling van een bouwwerk volgens een bepaalde regel of bepalingsmethode, bijvoorbeeld BVO of een brandcompartiment. Een gebied heeft altijd een specifiek gebruik. Een gebied kan zowel een functiegebied als een verblijfsgebied zijn. Delen van het gebied dat daar niet onder vallen noemen we restgebied."
+    },
+    {
+      "code": "GEISER",
+      "naam": "Geiser",
+      "definitie": "Een toestel dat water direct verwarmt zonder voorraadvat. Geisers leveren warm water wanneer nodig, zonder opslag."
+    },
+    {
+      "code": "GEVELANKER",
+      "naam": "Gevelanker",
+      "definitie": "Een constructie-element dat een gevel verbindt met de achterliggende draagconstructie. Gevelankers zorgen voor stabiliteit van voorzetwanden en gevelbekleding."
+    },
+    {
+      "code": "GOOT",
+      "naam": "Goot",
+      "definitie": "Een kanaal langs de dakrand dat regenwater verzamelt en afvoert. Goten voorkomen dat regenwater langs de gevel loopt."
+    },
+    {
+      "code": "GROEPENKAST",
+      "naam": "Groepenkast",
+      "definitie": "De centrale verdeelkast voor elektriciteit in een gebouw. De groepenkast bevat zekeringen, aardlekschakelaars en hoofdschakelaars."
+    },
+    {
+      "code": "HANDMELDER",
+      "naam": "Handmelder",
+      "definitie": "Een manueel te activeren alarmpunt in een brandmeldinstallatie. Handmelders stellen gebruikers in staat om brand te melden."
+    },
+    {
+      "code": "HEK",
+      "naam": "Hek",
+      "definitie": "Een afscheiding of afsluiting van een terrein of gebied. Hekken dienen voor beveiliging, markering of decoratie."
+    },
+    {
+      "code": "HELLENDDAK",
+      "naam": "Hellend dak",
+      "definitie": "De bovenste constructie van een gebouw die bescherming biedt tegen weersinvloeden. Het dak vormt de afsluiting van een gebouw aan de bovenzijde."
+    },
+    {
+      "code": "HELLINGBAAN",
+      "naam": "Hellingbaan",
+      "definitie": "Een schuin vlak dat twee verschillende hoogtenniveaus verbindt. Hellingbanen maken gebouwen toegankelijk voor rolstoelgebruikers."
+    },
+    {
+      "code": "HEMELWATERAFVOER",
+      "naam": "Hemelwaterafvoer",
+      "definitie": "Een buisleiding die regenwater van daken afvoert. HWA zorgt voor gecontroleerde afvoer van regenwater."
+    },
+    {
+      "code": "HETELUCHTVERWARMING",
+      "naam": "Heteluchtverwarming",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "HIJSBALK",
+      "naam": "Hijsbalk",
+      "definitie": "Een constructie-element waaraan een hijswerktuig bevestigd kan worden. Hijsbalken maken het mogelijk zware lasten verticaal te verplaatsen."
+    },
+    {
+      "code": "HITTEMELDER",
+      "naam": "Hittemelder",
+      "definitie": "Een sensor die gevaarlijke situaties detecteert en alarmeert. Veiligheidsmelders waarschuwen voor diverse gevaren."
+    },
+    {
+      "code": "HOUTKACHEL",
+      "naam": "Houtkachel",
+      "definitie": "Een verwarmingstoestel dat zelfstandig warmte afgeeft aan de ruimte waarin het staat opgesteld. Geen onderdeel van het verwarmingssysteem. Kachels kunnen werken op verschillende brandstoffen en dienen meestal als aanvullende warmtebron."
+    },
+    {
+      "code": "HYDROFOOR",
+      "naam": "Hydrofoor",
+      "definitie": "Een installatie die de waterdruk in een leidingstelsel verhoogt. Hydrofoors zorgen voor voldoende waterdruk op hogere verdiepingen."
+    },
+    {
+      "code": "INFRAROODPANEEL",
+      "naam": "Infraroodpaneel",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "ISOLATIE",
+      "naam": "Isolatie",
+      "definitie": "Materiaal dat warmte-, geluids- of vochtoverdracht beperkt. Isolatie verbetert comfort en energieprestatie van gebouwen."
+    },
+    {
+      "code": "KACHEL",
+      "naam": "Kachel",
+      "definitie": "Een verwarmingstoestel dat zelfstandig warmte afgeeft aan de ruimte waarin het staat opgesteld. Geen onderdeel van het verwarmingssysteem. Kachels kunnen werken op verschillende brandstoffen en dienen meestal als aanvullende warmtebron."
+    },
+    {
+      "code": "KANAALVENTILATOR",
+      "naam": "Kanaalventilator",
+      "definitie": "Een apparaat dat lucht verplaatst door middel van roterende schoepen. Ventilatoren zorgen voor luchtverplaatsing en ventilatie."
+    },
+    {
+      "code": "KANTELDEUR",
+      "naam": "Kanteldeur",
+      "definitie": "Een grote deur die toegang geeft tot een garage of parkeerruimte. Garagedeuren kunnen op verschillende manieren openen."
+    },
+    {
+      "code": "KAST",
+      "naam": "Kast",
+      "definitie": "Een vast inbouwelement voor opslag. Kasten bieden bergruimte voor goederen en materialen."
+    },
+    {
+      "code": "KEUKENBLOK",
+      "naam": "Keukenblok",
+      "definitie": "Een combinatie van keukenkasten, werkblad en apparatuur als functionele eenheid. Een keukenblok bevat de essentiële onderdelen voor voedselbereiding."
+    },
+    {
+      "code": "KLIMIJZER",
+      "naam": "Klimijzer",
+      "definitie": "Vast gemonteerde metalen stappen die verticale toegang bieden tot hoger gelegen delen. Klimijzers fungeren als permanente ladder aan een gevel of schacht."
+    },
+    {
+      "code": "KOLOM",
+      "naam": "Kolom",
+      "definitie": "Een verticaal constructie-element dat belasting overdraagt naar de fundering. Kolommen dragen gewicht van bovenliggende constructies en vloeren."
+    },
+    {
+      "code": "KOOLMONOXIDEMELDER",
+      "naam": "Koolmonoxidemelder",
+      "definitie": "Een sensor die gevaarlijke situaties detecteert en alarmeert. Veiligheidsmelders waarschuwen voor diverse gevaren."
+    },
+    {
+      "code": "KOZIJN",
+      "naam": "Kozijn",
+      "definitie": "Een vast kader waarin ramen of deuren geplaatst worden. Kozijnen vormen de verbinding tussen een opening in een wand en een beweegbaar deel."
+    },
+    {
+      "code": "KRAAN",
+      "naam": "Kraan",
+      "definitie": "Een afsluiter waaruit water getapt kan worden. Kranen regelen de waterstroom uit waterleiding naar gebruikspunt."
+    },
+    {
+      "code": "LAADPAAL",
+      "naam": "Laadpaal",
+      "definitie": "Een installatie voor het laden van elektrische voertuigen. Laadpalen voorzien elektrische auto's van stroom."
+    },
+    {
+      "code": "LADDER",
+      "naam": "Ladder",
+      "definitie": "Een verticaal verplaatsbaar klimwerktuig met sporten. Ladders bieden tijdelijke toegang tot hoger gelegen plaatsen."
+    },
+    {
+      "code": "LADDERPUNT",
+      "naam": "Ladderpunt",
+      "definitie": "Een voorziening waar een ladder veilig tegen geplaatst kan worden. Ladderpunten maken veilig onderhoud vanaf een ladder mogelijk."
+    },
+    {
+      "code": "LAMELLEN",
+      "naam": "Lamellen",
+      "definitie": "Een voorziening die zonlicht en zonnewarmte weert uit een gebouw. Zonwering voorkomt oververhitting en verbetert het binnenklimaat."
+    },
+    {
+      "code": "LATEI",
+      "naam": "Latei",
+      "definitie": "Een dragende constructie boven een opening in een muur, zoals een deur of raam.  Lateien verdelen het gewicht van het bovenliggende metselwerk en kunnen worden uitgevoerd in staal, beton of hout."
+    },
+    {
+      "code": "LAVET",
+      "naam": "Lavet",
+      "definitie": "Een gecombineerd sanitair element met douche, wastafel en eventueel wasautomaat-aansluiting. Lavetten werden vaak gebruikt in kleine woningen waar ruimtebesparing belangrijk is."
+    },
+    {
+      "code": "LICHTKOEPEL",
+      "naam": "Lichtkoepel",
+      "definitie": "Een doorzichtige of lichtdoorlatende koepelvormige daglichtvoorziening in een plat dak. Lichtkoepels brengen daglicht in ruimtes zonder gevelramen."
+    },
+    {
+      "code": "LICHTSTRAAT",
+      "naam": "Lichtstraat",
+      "definitie": "Een langgerekte daglichtvoorziening bestaande uit meerdere beglaasde elementen. Lichtstraten brengen veel daglicht binnen in diepere ruimtes."
+    },
+    {
+      "code": "LIFT",
+      "naam": "Lift",
+      "definitie": "Een verticaal transportmiddel voor personen of goederen. Liften maken hogere gebouwen toegankelijk zonder trappen te gebruiken."
+    },
+    {
+      "code": "LOODSLAB",
+      "naam": "Loodslab",
+      "definitie": "Een metalen strook die zorgt voor waterdichting tussen verschillende bouwdelen. Loodslabben voorkomen inwatering bij aansluitingen."
+    },
+    {
+      "code": "LUCHTBEHANDELINGSKAST",
+      "naam": "Luchtbehandelingskast",
+      "definitie": "Een installatie die de lucht behandelt (verwarmen, koelen, filteren, bevochtigen) voordat deze in een ruimte wordt geblazen. Luchtbehandelingskasten zijn essentieel voor klimaatbeheersing in grotere gebouwen."
+    },
+    {
+      "code": "LUIFEL",
+      "naam": "Luifel",
+      "definitie": "Een horizontaal overstek aan een gevel ter bescherming tegen weersinvloeden. Luifels beschermen ingangen en gevels tegen regen en zonlicht."
+    },
+    {
+      "code": "LUIK",
+      "naam": "Luik",
+      "definitie": "Een beweegbare afsluiting van een opening, vaak horizontaal geplaatst. Luiken geven toegang tot kruipruimtes, daken of andere moeilijk bereikbare ruimtes."
+    },
+    {
+      "code": "MARKIES",
+      "naam": "Markies",
+      "definitie": "Een voorziening die zonlicht en zonnewarmte weert uit een gebouw. Zonwering voorkomt oververhitting en verbetert het binnenklimaat."
+    },
+    {
+      "code": "MELDSIRENE",
+      "naam": "Meldsirene",
+      "definitie": "Een akoestisch waarschuwingsapparaat voor alarm- of ontruimingssituaties. Meldsirenes maken aanwezigen attent op gevaar."
+    },
+    {
+      "code": "MOEDERHAARD",
+      "naam": "Moederhaard",
+      "definitie": "Een verwarmingstoestel dat zelfstandig warmte afgeeft aan de ruimte waarin het staat opgesteld. Geen onderdeel van het verwarmingssysteem. Kachels kunnen werken op verschillende brandstoffen en dienen meestal als aanvullende warmtebron."
+    },
+    {
+      "code": "MVBOX",
+      "naam": "MV-box",
+      "definitie": "Een centraal opgestelde verwarmingshaard die warmte levert aan meerdere ruimtes. De moederhaard fungeert als centrale warmtebron voor een woning."
+    },
+    {
+      "code": "NEVENINDICATOR",
+      "naam": "Nevenindicator",
+      "definitie": "Mechanische Ventilatie-box; een apparaat dat lucht mechanisch afzuigt uit een ruimte. MV-boxen zorgen voor gecontroleerde luchtafvoer uit vochtige ruimtes."
+    },
+    {
+      "code": "NOODSIGNAAL",
+      "naam": "Noodsignaal",
+      "definitie": "Een optische of akoestische voorziening die waarschuwt in noodsituaties. Noodsignalen helpen bij evacuatie of waakzaamheid."
+    },
+    {
+      "code": "NOODVERLICHTING",
+      "naam": "Noodverlichting",
+      "definitie": "Verlichting die functioneert bij uitval van normale stroomvoorziening. Noodverlichting zorgt voor veilige evacuatie bij stroomuitval."
+    },
+    {
+      "code": "OMVORMER",
+      "naam": "Omvormer",
+      "definitie": "Een apparaat dat gelijkspanning (DC) omzet naar wisselspanning (AC). Omvormers maken zonne-energie geschikt voor gebruik in het elektriciteitsnet."
+    },
+    {
+      "code": "ONDERHOUDSVOORZIENING",
+      "naam": "Onderhoudsvoorziening",
+      "definitie": "Een voorziening die veilig onderhoud aan een gebouw mogelijk maakt. Onderhoudsvoorzieningen zijn essentieel voor gevelonderhoud en reiniging."
+    },
+    {
+      "code": "OPENSLAANDEDEUR",
+      "naam": "Openslaande deur",
+      "definitie": "Een grote deur die toegang geeft tot een garage of parkeerruimte. Garagedeuren kunnen op verschillende manieren openen."
+    },
+    {
+      "code": "OVERHEADDEUR",
+      "naam": "Overheaddeur",
+      "definitie": "Een grote deur die toegang geeft tot een garage of parkeerruimte. Garagedeuren kunnen op verschillende manieren openen."
+    },
+    {
+      "code": "OVERSTEK",
+      "naam": "Overstek",
+      "definitie": "Een uitkragend bouwdeel dat buiten de gevellijn uitsteekt. Overstekken kunnen constructief of esthetisch zijn."
+    },
+    {
+      "code": "PANEEL",
+      "naam": "Paneel",
+      "definitie": "Een vlak element dat dient als vulling of afwerking in een groter geheel. Panelen kunnen diverse functies hebben in een gebouw."
+    },
+    {
+      "code": "PIJPVENTILATOR",
+      "naam": "Pijpventilator",
+      "definitie": "Een apparaat dat lucht verplaatst door middel van roterende schoepen. Ventilatoren zorgen voor luchtverplaatsing en ventilatie."
+    },
+    {
+      "code": "PLAFOND",
+      "naam": "Plafond",
+      "definitie": "De bovenafwerking van een ruimte onder een vloer of dak. Plafonds bepalen de akoestiek en esthetiek van een ruimte."
+    },
+    {
+      "code": "POMP",
+      "naam": "Pomp",
+      "definitie": "Een werktuig dat vloeistoffen of gassen verplaatst. Pompen zijn essentieel in vele gebouwinstallaties."
+    },
+    {
+      "code": "POSTKAST",
+      "naam": "Postkast",
+      "definitie": "Een box voor het ontvangen van post en/of pakketten. Postkasten zorgen voor veilige ontvangst van poststukken."
+    },
+    {
+      "code": "PRIVACYSCHERM",
+      "naam": "Privacyscherm",
+      "definitie": "Een afscheiding die zicht belemmert voor privacy. Privacyschermen scheiden ruimtes visueel zonder ze volledig af te sluiten."
+    },
+    {
+      "code": "RAAM",
+      "naam": "Raam",
+      "definitie": "Een opening in een wand of dak voorzien van glas voor licht en/of ventilatie. Ramen zorgen voor daglicht, ventilatie en uitzicht."
+    },
+    {
+      "code": "RADIATORCV",
+      "naam": "Radiator CV",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "RADIATORELEKTRISCH",
+      "naam": "Radiator elektrisch",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "ROLDEUR",
+      "naam": "Roldeur",
+      "definitie": "Een grote deur die toegang geeft tot een garage of parkeerruimte. Garagedeuren kunnen op verschillende manieren openen."
+    },
+    {
+      "code": "ROLLUIK",
+      "naam": "Rolluik",
+      "definitie": "Een voorziening die zonlicht en zonnewarmte weert uit een gebouw. Zonwering voorkomt oververhitting en verbetert het binnenklimaat."
+    },
+    {
+      "code": "ROLTRAP",
+      "naam": "Roltrap",
+      "definitie": "Een bewegende trap die mensen verticaal transporteert. Roltrappen maken niveauverschillen makkelijk overbrugbaar in publieksgebouwen."
+    },
+    {
+      "code": "ROOKMELDER",
+      "naam": "Rookmelder",
+      "definitie": "Een sensor die gevaarlijke situaties detecteert en alarmeert. Veiligheidsmelders waarschuwen voor diverse gevaren."
+    },
+    {
+      "code": "RUIMTE",
+      "naam": "Ruimte",
+      "definitie": "Een ruimte is een door fysieke elementen afgebakend deel binnen een bouwwerk dat bedoeld is voor een specifiek gebruik Een ruimte wordt gedefinieerd door fysieke grenzen. Dat kan zijn door muren, plafonds, balustrades, hekken of andere scheidingswanden. Dit kunnen ruimten van een specifieke woning of andere gebruikseenheid zijn maar ook gemeenschappelijke ruimten. Een ruimte is altijd gekoppeld aan een woonlaag."
+    },
+    {
+      "code": "SCHOORSTEEN",
+      "naam": "Schoorsteen",
+      "definitie": "Een verticaal kanaal dat rookgassen naar buiten afvoert. Schoorstenen zorgen voor veilige afvoer van verbrandingsgassen."
+    },
+    {
+      "code": "SCHOORSTEENPOT",
+      "naam": "Schoorsteenpot",
+      "definitie": "Een element op de schoorsteenuitmonding dat regeninslag voorkomt en trek bevordert. Schoorsteenpotten beschermen het rookkanaal en verbeteren de werking."
+    },
+    {
+      "code": "SCHUIFDEUR",
+      "naam": "Schuifdeur",
+      "definitie": "Een beweegbare afsluiting in een doorgang in muur of wand. Deuren bieden toegang en afsluiting tussen ruimtes."
+    },
+    {
+      "code": "SLAGBOOM",
+      "naam": "Slagboom",
+      "definitie": "Een beweegbare afsluiting die doorgang voor voertuigen controleert. Slagbomen reguleren toegang tot parkeerterreinen of privégebieden."
+    },
+    {
+      "code": "SPEEDGATE",
+      "naam": "Speedgate",
+      "definitie": "Een grote deur die toegang geeft tot een garage of parkeerruimte. Garagedeuren kunnen op verschillende manieren openen."
+    },
+    {
+      "code": "SPRINKLERINSTALLATIE",
+      "naam": "Sprinklerinstallatie",
+      "definitie": "Een automatisch brandblussysteem met watersproeiers. Sprinklers blussen of beheersen brand voordat de brandweer arriveert."
+    },
+    {
+      "code": "STANDLEIDING",
+      "naam": "Standleiding",
+      "definitie": "Een verticale leiding voor afvoer van water of fecaliën in een gebouw. Standleidingen transporteren afvalwater van hoger gelegen verdiepingen."
+    },
+    {
+      "code": "STEIGER",
+      "naam": "Steiger",
+      "definitie": "Een tijdelijke constructie voor werkzaamheden op hoogte. Steigers maken onderhoud en bouw aan gevels mogelijk."
+    },
+    {
+      "code": "STUWVENTILATOR",
+      "naam": "Stuwventilator",
+      "definitie": "Een apparaat dat lucht verplaatst door middel van roterende schoepen. Ventilatoren zorgen voor luchtverplaatsing en ventilatie."
+    },
+    {
+      "code": "SUBRUIMTE",
+      "naam": "Subruimte",
+      "definitie": "Een subruimte is een onderverdeling van een ruimte dat bedoeld is voor een specifiek gebruik Een ruimte kan bestaan uit meerdere subruimten. Deze grenzen bestaan vaak niet fysiek. Bijvoorbeeld bij een woonkamer in open verbinding met de keuken. De ruimte is dan ‘woonkeuken’, met subruimten ‘woonkamer’ en ‘keuken’. Een opstelplaats (parkeerplek) is een subruimte van een parkeergarage. "
+    },
+    {
+      "code": "SYSTEEMWAND",
+      "naam": "Systeemwand",
+      "definitie": "Een niet-dragende scheidingswand opgebouwd uit geprefabriceerde elementen. Systeemwanden maken flexibele ruimte-indeling mogelijk."
+    },
+    {
+      "code": "TOCHTDEUR",
+      "naam": "Tochtdeur",
+      "definitie": "Een beweegbare afsluiting in een doorgang in muur of wand. Deuren bieden toegang en afsluiting tussen ruimtes."
+    },
+    {
+      "code": "TOURNIQUETDEUR",
+      "naam": "Tourniquetdeur",
+      "definitie": "Een beweegbare afsluiting in een doorgang in muur of wand. Deuren bieden toegang en afsluiting tussen ruimtes."
+    },
+    {
+      "code": "TRADITIONEELDEURBELINSTALLATIEBINNENUNIT",
+      "naam": "Traditioneel",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "TRADITIONEELDEURBELINSTALLATIEBUITENUNIT",
+      "naam": "Traditioneel",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "TRALIES",
+      "naam": "Tralies",
+      "definitie": "Een raster van metalen staven voor beveiliging van openingen. Tralies voorkomen ongewenst binnendringen via ramen of andere openingen."
+    },
+    {
+      "code": "TRAP",
+      "naam": "Trap",
+      "definitie": "Een constructie met treden die verschillende verdiepingen verbindt. Trappen maken verticaal transport mogelijk binnen gebouwen."
+    },
+    {
+      "code": "TRAPLIFT",
+      "naam": "Traplift",
+      "definitie": "Een installatie langs een trap die mindervaliden verticaal transporteert. Trapliften maken woningen toegankelijk voor mensen met mobiliteitsproblemen."
+    },
+    {
+      "code": "UITVALSCHERM",
+      "naam": "Uitvalscherm",
+      "definitie": "Een voorziening die zonlicht en zonnewarmte weert uit een gebouw. Zonwering voorkomt oververhitting en verbetert het binnenklimaat."
+    },
+    {
+      "code": "URINOIR",
+      "naam": "Urinoir",
+      "definitie": "Een sanitair element specifiek voor staand urineren door mannen. Urinoirs besparen water en ruimte in herentoiletten."
+    },
+    {
+      "code": "VALBEVEILIGING",
+      "naam": "Valbeveiliging",
+      "definitie": "Een systeem dat voorkomt dat personen van hoogte vallen tijdens werkzaamheden. Valbeveiliging is verplicht bij werken op hoogte."
+    },
+    {
+      "code": "VEILIGHEIDSMELDER",
+      "naam": "Veiligheidsmelder",
+      "definitie": "Een sensor die gevaarlijke situaties detecteert en alarmeert. Veiligheidsmelders waarschuwen voor diverse gevaren."
+    },
+    {
+      "code": "VENTILATIEKAP",
+      "naam": "Ventilatiekap",
+      "definitie": "Een omkasting van een ventilatie-uitlaat of -inlaat. Ventilatiekappen beschermen ventilatieopeningen tegen weersinvloeden."
+    },
+    {
+      "code": "VENTILATIEROOSTER",
+      "naam": "Ventilatierooster",
+      "definitie": "Een doorlaat in een wand of kozijn voor natuurlijke ventilatie. Ventilatieroosters zorgen voor permanente luchtverversing."
+    },
+    {
+      "code": "VENTILATOR",
+      "naam": "Ventilator",
+      "definitie": "Een apparaat dat lucht verplaatst door middel van roterende schoepen. Ventilatoren zorgen voor luchtverplaatsing en ventilatie."
+    },
+    {
+      "code": "VERGAARBAK",
+      "naam": "Vergaarbak",
+      "definitie": "Een reservoir dat water verzamelt voordat het verder wordt getransporteerd. Vergaarbakken bufferen water van meerdere goten of afvoeren."
+    },
+    {
+      "code": "VERWARMING",
+      "naam": "Verwarming",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "VIDEOINTERCOMDEURBELINSTALLATIEBINNENUNIT",
+      "naam": "Video Intercom",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "VIDEOINTERCOMDEURBELINSTALLATIEBUITENUNIT",
+      "naam": "Video Intercom",
+      "definitie": "Een elektrisch systeem dat een geluidssignaal geeft bij activering door een bezoeker.  Deurbelinstallaties waarschuwen bewoners voor bezoekers en kunnen voorzien zijn van een intercom of camera."
+    },
+    {
+      "code": "VLAKDAK",
+      "naam": "Vlak dak",
+      "definitie": "De bovenste constructie van een gebouw die bescherming biedt tegen weersinvloeden. Het dak vormt de afsluiting van een gebouw aan de bovenzijde."
+    },
+    {
+      "code": "VLIESGEVEL",
+      "naam": "Vliesgevel",
+      "definitie": "Een niet-dragende gevelbekleding die voor een draagconstructie is geplaatst. Vliesgevels bestaan hoofdzakelijk uit glas en profielen."
+    },
+    {
+      "code": "VLIZOTRAP",
+      "naam": "Vlizotrap",
+      "definitie": "Een opvouwbare trap voor toegang tot een zolder of vliering. Vlizotrappen nemen weinig ruimte in wanneer ze niet gebruikt worden."
+    },
+    {
+      "code": "VLOER",
+      "naam": "Vloer",
+      "definitie": "Een horizontaal constructiedeel dat ruimten scheidt en belasting draagt. Vloeren vormen het loopoppervlak en scheiding tussen verdiepingen."
+    },
+    {
+      "code": "VLOERLUIK",
+      "naam": "Vloerluik",
+      "definitie": "Een beweegbare afsluiting van een opening, vaak horizontaal geplaatst. Luiken geven toegang tot kruipruimtes, daken of andere moeilijk bereikbare ruimtes."
+    },
+    {
+      "code": "VLOERVERWARMINGCV",
+      "naam": "Vloerverwarming CV",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "VLOERVERWARMINGELEKTRISCH",
+      "naam": "Vloerverwarming elektrisch",
+      "definitie": "Een installatie die zorgt voor het op temperatuur brengen en houden van een ruimte of gebouw.  Verwarmingssystemen worden centraal aangestuurd door een ketel of warmtepomp met thermostaat. "
+    },
+    {
+      "code": "VLOERVERWARMINGVERDELER",
+      "naam": "Vloerverwarming verdeler",
+      "definitie": "Een unit die het warme water verdeelt over de verschillende vloerverwarmingscircuits. Verdelers regelen de toevoer naar individuele vloerverwarmingslussen."
+    },
+    {
+      "code": "VOORRAADVAT",
+      "naam": "Voorraadvat",
+      "definitie": "Een tank voor opslag van water of andere vloeistoffen. Voorraadvaten bufferen vloeistoffen voor later gebruik."
+    },
+    {
+      "code": "WAND",
+      "naam": "Wand",
+      "definitie": "Een verticale constructie die ruimtes scheidt of afsluit. Wanden kunnen dragend of niet-dragend zijn."
+    },
+    {
+      "code": "WARMTEPOMPBINNENUNIT",
+      "naam": "Warmtepomp binnen-unit",
+      "definitie": "Een installatie die warmte onttrekt aan een bron en op een hoger temperatuurniveau brengt. Warmtepompen zijn energiezuinige verwarmingssystemen."
+    },
+    {
+      "code": "WARMTEPOMPBUITENUNIT",
+      "naam": "Warmtepomp buiten-unit",
+      "definitie": "Een installatie die warmte onttrekt aan een bron en op een hoger temperatuurniveau brengt. Warmtepompen zijn energiezuinige verwarmingssystemen."
+    },
+    {
+      "code": "WARMTEPOMPCOMBIUNIT",
+      "naam": "Warmtepomp combi-unit",
+      "definitie": "Een installatie die warmte onttrekt aan een bron en op een hoger temperatuurniveau brengt. Warmtepompen zijn energiezuinige verwarmingssystemen."
+    },
+    {
+      "code": "WARMTEPOMPBOILER",
+      "naam": "Warmtepompboiler",
+      "definitie": "Een toestel dat water verwarmt en opslaat voor later gebruik. Boilers zorgen voor direct beschikbaar warm water."
+    },
+    {
+      "code": "WASTAFEL",
+      "naam": "Wastafel",
+      "definitie": "Een sanitair element voor het wassen van handen en gezicht. Wastafels zijn essentiële elementen in badkamers en toiletten."
+    },
+    {
+      "code": "WASTROG",
+      "naam": "Wastrog",
+      "definitie": "Een grote, langwerpige bak voor het wassen van voorwerpen of handen. Wastroggen worden vaak gebruikt in industriële of openbare omgevingen."
+    },
+    {
+      "code": "WATERSLAG",
+      "naam": "Waterslag",
+      "definitie": "Een horizontaal element onder een vensterbank dat water van de gevel afvoert. Waterslagen voorkomen dat regenwater langs de gevel loopt."
+    },
+    {
+      "code": "WINDVEER",
+      "naam": "Windveer",
+      "definitie": "Een houten of kunststof afdekking aan de zijkant van een schuin dak. Windveren beschermen de dakranden tegen weersinvloeden."
+    },
+    {
+      "code": "WTWINSTALLATIE",
+      "naam": "WTW-installatie",
+      "definitie": "Warmte-Terugwin-installatie; een systeem dat warmte uit afgevoerde lucht of water hergebruikt. WTW-installaties verhogen de energie-efficiëntie van gebouwen."
+    },
+    {
+      "code": "ZONNECOLLECTOR",
+      "naam": "Zonnecollector",
+      "definitie": "Een apparaat dat zonlicht omzet in warmte voor verwarming of warm water. Zonnecollectoren verwarmen water of een andere warmtedrager."
+    },
+    {
+      "code": "ZONNEPANEEL",
+      "naam": "Zonnepaneel",
+      "definitie": "Een apparaat dat zonlicht omzet in elektriciteit. Zonnepanelen genereren duurzame elektriciteit uit zonlicht."
+    },
+    {
+      "code": "ZONWERING",
+      "naam": "Zonwering",
+      "definitie": "Een voorziening die zonlicht en zonnewarmte weert uit een gebouw. Zonwering voorkomt oververhitting en verbetert het binnenklimaat."
+    }
+  ]
+}

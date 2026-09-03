@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "herkomst": "ILS-woco 3.1.xlsm, Enumeraties 3.1 sheet",
+    "versie": "3.1",
+    "licentie": "Aedes — bronvermelding behouden"
+  },
+  "items": [
+    {
+      "code": "Afsluitbaar",
+      "naam": "Afsluitbaar"
+    },
+    {
+      "code": "CollectieveRuimte",
+      "naam": "CollectieveRuimte"
+    },
+    {
+      "code": "GedeeldeRuimte",
+      "naam": "GedeeldeRuimte"
+    },
+    {
+      "code": "GemeenschappelijkeRuimte",
+      "naam": "GemeenschappelijkeRuimte"
+    },
+    {
+      "code": "PubliekToegankelijk",
+      "naam": "PubliekToegankelijk"
+    },
+    {
+      "code": "Vluchtroute",
+      "naam": "Vluchtroute"
+    }
+  ]
+}
