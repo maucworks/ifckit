@@ -31,16 +31,34 @@ def rows() -> list[dict]:
     return _raw().get("rows", [])
 
 
+def get_row(type_soort: str, onderdeel: str = "") -> dict | None:
+    """Zoek rij op type_soort (en optioneel onderdeel)."""
+    for r in rows():
+        if r.get("type_soort") == type_soort:
+            if not onderdeel or r.get("onderdeel") == onderdeel or not r.get("onderdeel"):
+                # bij lege onderdeel-rijen (de meeste) match op type alleen
+                if r.get("type_soort") == type_soort:
+                    return r
+    return None
+
+
 def is_required(onderdeel: str, type_soort: str, col: int) -> bool | None:
     """
     Vraag of een cel True is. *col* is kolom-index (25-41, overeenkomend met
     openpyxl kolommen Y-AO). Mapping naar fase/property vereist handmatige
     verificatie uit PDF — zie uitvoeringsplan_raw.json opmerking.
     """
-    for r in rows():
-        if r.get("onderdeel") == onderdeel and r.get("type_soort") == type_soort:
-            return r.get("bools", {}).get(str(col))  # note: json keys are strings
-        # also search where onderdeel is empty and type matches
-        if not r.get("onderdeel") and r.get("type_soort") == type_soort and not onderdeel:
-            return r.get("bools", {}).get(str(col))
-    return None
+    row = get_row(type_soort, onderdeel)
+    if row is None:
+        return None
+    bools = row.get("bools", {})
+    # JSON keys zijn strings
+    return bools.get(str(col), bools.get(col))  # type: ignore[arg-type]
+
+
+def required_cols(type_soort: str, onderdeel: str = "") -> list[int]:
+    """Lijst van kolom-indices waar de cel True is voor dit type."""
+    row = get_row(type_soort, onderdeel)
+    if not row:
+        return []
+    return sorted(int(k) for k, v in row.get("bools", {}).items() if v)
