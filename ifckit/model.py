@@ -713,8 +713,11 @@ class IfcModel:
         #   - Block centred on the annotation origin: position (-half, -half, -depth)
         #   - Annotation Z-axis = (0,0,1) — camera looks toward -Z in world space
         #   - Block: 50 m × 50 m × 10 m (large enough for any model)
-        half = 25000.0  # mm — half of 50 m box in XY
-        depth = 10000.0  # mm — 10 m clip depth below the section plane
+        import ifcopenshell.util.unit as unit_util
+
+        unit_scale = unit_util.calculate_unit_scale(self._file)
+        half = 25.0 / unit_scale  # 25 m (halve 50 m box) in bestandseenheden
+        depth = 10.0 / unit_scale  # 10 m clip-diepte in bestandseenheden
 
         # Use the 'Body' subcontext — the geometry iterator only processes
         # representations under subcontexts, not the root Model context.
