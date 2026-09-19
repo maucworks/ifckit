@@ -4,8 +4,9 @@
 Het fundament van de agent-loop: een PvE wordt vastgelegd als getypeerde graaf
 (:class:`RoomProgram`), de gerealiseerde graaf wordt afgeleid uit een IFC-model
 (:func:`space_adjacency`, :func:`wall_graph`), en :func:`conform` vergelijkt de
-twee. Alles draait op een stdlib-graaf (:class:`Graph`); ``networkx`` en
-``shapely`` zijn optioneel.
+twee. Graaf-gedreven operatoren (:mod:`ifckit.spatial.operators`) genereren
+deterministische geometrie uit het PvE. Alles draait op een stdlib-graaf
+(:class:`Graph`); ``networkx`` en ``shapely`` zijn optioneel.
 """
 
 from ifckit.spatial.analysis import (
@@ -28,8 +29,22 @@ from ifckit.spatial.conform import (
     conform,
     validate_circulation,
 )
-from ifckit.spatial.derive import perimeter_spaces, space_adjacency, space_footprints, wall_graph
+from ifckit.spatial.derive import (
+    perimeter_spaces,
+    space_adjacency,
+    space_footprint_points,
+    space_footprints,
+    wall_graph,
+)
 from ifckit.spatial.graph import Graph
+from ifckit.spatial.operators import (
+    add_room,
+    layout_row,
+    mirror_footprint,
+    place_space,
+    remove_room,
+    split_footprint,
+)
 from ifckit.spatial.program import EDGE_KINDS, SPACE_ROLES, ProgramEdge, ProgramSpace, RoomProgram
 
 __all__ = [
@@ -39,11 +54,18 @@ __all__ = [
     "ProgramEdge",
     "EDGE_KINDS",
     "SPACE_ROLES",
+    "place_space",
+    "split_footprint",
+    "mirror_footprint",
+    "add_room",
+    "remove_room",
+    "layout_row",
     "ConformanceReport",
     "CirculationReport",
     "space_adjacency",
     "wall_graph",
     "space_footprints",
+    "space_footprint_points",
     "perimeter_spaces",
     "conform",
     "check_program",
