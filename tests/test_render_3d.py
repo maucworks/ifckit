@@ -44,3 +44,9 @@ def test_render_glb_produces_png(tmp_path):
     assert data[:8] == _PNG_MAGIC
     assert len(data) > 1000
     assert out.exists()
+    # inhoudscontrole: geen zwarte render (vangt ontbrekend licht/camera)
+    image_mod = pytest.importorskip("PIL.Image", reason="Pillow niet geïnstalleerd")
+    import numpy as np
+
+    im = np.asarray(image_mod.open(out).convert("RGB")).astype(float)
+    assert (im.mean(axis=2) > 8).mean() > 0.01

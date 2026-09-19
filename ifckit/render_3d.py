@@ -67,13 +67,15 @@ def main():
     else:  # iso
         cam.location = center + mathutils.Vector((dist, -dist, dist))
 
-    empty = bpy.data.objects.new("__look_at__", None)
-    bpy.context.scene.collection.objects.link(empty)
-    empty.location = center
-    con = cam.constraints.new(type="TRACK_TO")
-    con.target = empty
-    con.track_axis = "TRACK_NEGATIVE_Z"
-    con.up_axis = "UP_Z"
+    # camera direct op het midden richten (zonder constraint)
+    rot = (center - cam.location).to_track_quat("-Z", "Y")
+    cam.rotation_euler = rot.to_euler()
+
+    # verlichting: een zon zodat EEVEE nooit zwart rendert
+    bpy.ops.object.light_add(type="SUN")
+    sun = bpy.context.object
+    sun.data.energy = 10.0
+    sun.rotation_euler = (0.7, 0.0, 1.0)
 
     scene = bpy.context.scene
     scene.render.resolution_x = 1024
