@@ -347,6 +347,9 @@ class IfcModel:
             entity = build_window_model_b(self._file, pending, host.entity, storey, ctx)
         else:
             entity = build_door_model_b(self._file, pending, host.entity, storey, ctx)
+            from ifckit.builders.space_boundary import add_door_space_boundaries
+
+            add_door_space_boundaries(self._file, entity, storey)
         handle = EntityHandle(entity, self)
 
         self._attach_footprint(handle, pending)
@@ -1072,6 +1075,9 @@ class IfcModel:
             type_entity,
             opening_anchor=opening_anchor,
         )
+        from ifckit.builders.space_boundary import add_door_space_boundaries
+
+        add_door_space_boundaries(self._file, door_entity, container.entity)
         return EntityHandle(door_entity, self)
 
     def add_window(

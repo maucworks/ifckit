@@ -48,7 +48,7 @@ def _space_attrs(space) -> dict:
     }
 
 
-def _space_footprint_points(space) -> list[tuple[float, float]] | None:
+def space_footprint_points(space) -> list[tuple[float, float]] | None:
     """2D-footprintpunten van *space* uit zijn FootPrint-representatie."""
     rep = getattr(space, "Representation", None)
     if rep is None:
@@ -72,7 +72,7 @@ def space_footprints(model) -> dict[str, "Polygon"]:
     scale = _unit_scale(model)
     result: dict[str, "Polygon"] = {}
     for space in model.ifc_file.by_type("IfcSpace"):
-        pts = _space_footprint_points(space)
+        pts = space_footprint_points(space)
         if not pts or len(pts) < 3:
             continue
         poly = Polygon([(x * scale, y * scale) for x, y in pts])
