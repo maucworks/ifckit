@@ -9,6 +9,10 @@ onderscheid.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ifckit.spatial.graph import Graph
 
 #: Bekende kanttypen. ``door``/``forbidden``/``facade`` zijn hard;
 #: ``wall``/``visual`` zijn zacht (hints, geen poort).
@@ -16,6 +20,9 @@ EDGE_KINDS = ("door", "forbidden", "facade", "wall", "visual")
 
 #: Harde kanttypen — de conformance-poort toetst deze.
 HARD_EDGE_KINDS = ("door", "forbidden", "facade")
+
+#: Ruimterollen — verkeersruimte telt in GO, niet in NVO.
+SPACE_ROLES = ("verkeer", "verblijf", "facilitair")
 
 
 @dataclass
@@ -30,6 +37,8 @@ class ProgramSpace:
         required: ``False`` = geprefereerd, geen harde eis.
         exterior: ``True`` = buitenruimte-declaratie (buiten, veranda, ...);
             wordt niet als ``IfcSpace`` verwacht.
+        role: ``"verkeer"`` | ``"verblijf"`` | ``"facilitair"`` — functie van de
+            ruimte (verkeersruimte telt in GO, niet in NVO).
     """
 
     name: str = ""
@@ -38,6 +47,11 @@ class ProgramSpace:
     area_max: float | None = None
     required: bool = True
     exterior: bool = False
+    role: str = "verblijf"
+
+    def __post_init__(self) -> None:
+        if self.role not in SPACE_ROLES:
+            raise ValueError(f"onbekende rol {self.role!r}; verwacht een van {SPACE_ROLES}")
 
 
 @dataclass
@@ -87,3 +101,15 @@ class RoomProgram:
         nodes = {k: ProgramSpace(**v) for k, v in data.get("nodes", {}).items()}
         edges = [ProgramEdge(**e) for e in data.get("edges", [])]
         return cls(nodes=nodes, edges=edges)
+
+    def access_graph(self) -> "Graph":
+        """Bouw de verkeersgraaf uit de ``door``-kanten (bedoelde circulatie)."""
+        from ifckit.spatial.graph import Graph
+
+        graph = Graph()
+        for key in self.nodes:
+            graph.add_node(key)
+        for edge in self.edges:
+            if edge.kind == "door":
+                graph.add_edge(edge.a, edge.b, kind="door")
+        return graph

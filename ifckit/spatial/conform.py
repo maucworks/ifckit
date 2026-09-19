@@ -161,3 +161,74 @@ def check_program(program: RoomProgram) -> list[str]:
         if g.degree(key) == 0:
             issues.append(f"geïsoleerde knoop {key!r}")
     return issues
+
+
+@dataclass
+class CirculationReport:
+    """Resultaat van :func:`validate_circulation` op de access-graaf.
+
+    Attributes:
+        root: Wortel van de bereikbaarheidstoets (entree/buitenknoop).
+        reachable: Programmasleutels bereikbaar vanaf de wortel.
+        unreachable: Vereiste, niet-exterieure ruimten die niet bereikbaar zijn.
+        components: Samenhangende componenten van de access-graaf.
+    """
+
+    root: str | None = None
+    reachable: list[str] = field(default_factory=list)
+    unreachable: list[str] = field(default_factory=list)
+    components: list[list[str]] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        """Return whether every required space is reachable."""
+        return not self.unreachable
+
+
+def _default_root(program: RoomProgram) -> str | None:
+    """Wortel: eerste buitenknoop, anders eerste verkeersruimte, anders eerste knoop."""
+    for key, space in program.nodes.items():
+        if space.exterior:
+            return key
+    for key, space in program.nodes.items():
+        if space.role == "verkeer":
+            return key
+    return next(iter(program.nodes), None)
+
+
+def validate_circulation(program: RoomProgram, root: str | None = None) -> CirculationReport:
+    """Toets de verkeersstructuur van een PvE op de access-graaf (``door``-kanten).
+
+    Controleert dat elke vereiste, niet-exterieure ruimte bereikbaar is vanaf
+    de wortel. Dit is de "gang verbindt alles"-toets.
+    """
+    access = program.access_graph()
+    if root is None:
+        root = _default_root(program)
+    report = CirculationReport(root=root)
+    for comp in access.connected_components():
+        report.components.append(sorted(comp))
+
+    if root is None or not access.has_node(root):
+        report.unreachable = sorted(
+            key for key, space in program.nodes.items() if space.required and not space.exterior
+        )
+        return report
+
+    from collections import deque
+
+    seen = {root}
+    queue: deque[str] = deque([root])
+    while queue:
+        cur = queue.popleft()
+        for nbr in access.neighbors(cur):
+            if nbr not in seen:
+                seen.add(nbr)
+                queue.append(nbr)
+    report.reachable = sorted(seen)
+    report.unreachable = sorted(
+        key
+        for key, space in program.nodes.items()
+        if space.required and not space.exterior and key not in seen
+    )
+    return report

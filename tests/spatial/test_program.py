@@ -35,3 +35,32 @@ def test_room_program_defaults_empty():
     program = RoomProgram()
     assert program.nodes == {}
     assert program.edges == []
+
+
+def test_program_space_rejects_unknown_role():
+    with pytest.raises(ValueError):
+        ProgramSpace(name="X", role="nonsense")
+
+
+def test_program_space_role_roundtrip():
+    program = RoomProgram(nodes={"g": ProgramSpace(name="Gang", role="verkeer")}, edges=[])
+    restored = RoomProgram.from_dict(program.to_dict())
+    assert restored.nodes["g"].role == "verkeer"
+
+
+def test_access_graph_only_door_edges():
+    program = RoomProgram(
+        nodes={
+            "a": ProgramSpace(name="A"),
+            "b": ProgramSpace(name="B"),
+            "c": ProgramSpace(name="C"),
+        },
+        edges=[
+            ProgramEdge("a", "b", kind="door"),
+            ProgramEdge("b", "c", kind="wall", required=False),
+        ],
+    )
+    g = program.access_graph()
+    assert g.has_edge("a", "b")
+    assert not g.has_edge("b", "c")
+    assert g.edge_attrs("a", "b")["kind"] == "door"

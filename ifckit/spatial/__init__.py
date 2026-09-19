@@ -8,10 +8,29 @@ twee. Alles draait op een stdlib-graaf (:class:`Graph`); ``networkx`` en
 ``shapely`` zijn optioneel.
 """
 
-from ifckit.spatial.conform import ConformanceReport, check_program, conform
+from ifckit.spatial.analysis import (
+    D_VALUES,
+    SpaceSyntax,
+    analyze,
+    choice,
+    connectivity,
+    control,
+    diamond_value,
+    integration,
+    mean_depth,
+    relative_asymmetry,
+    total_depth,
+)
+from ifckit.spatial.conform import (
+    CirculationReport,
+    ConformanceReport,
+    check_program,
+    conform,
+    validate_circulation,
+)
 from ifckit.spatial.derive import perimeter_spaces, space_adjacency, space_footprints, wall_graph
 from ifckit.spatial.graph import Graph
-from ifckit.spatial.program import EDGE_KINDS, ProgramEdge, ProgramSpace, RoomProgram
+from ifckit.spatial.program import EDGE_KINDS, SPACE_ROLES, ProgramEdge, ProgramSpace, RoomProgram
 
 __all__ = [
     "Graph",
@@ -19,11 +38,25 @@ __all__ = [
     "ProgramSpace",
     "ProgramEdge",
     "EDGE_KINDS",
+    "SPACE_ROLES",
     "ConformanceReport",
+    "CirculationReport",
     "space_adjacency",
     "wall_graph",
     "space_footprints",
     "perimeter_spaces",
     "conform",
     "check_program",
+    "validate_circulation",
+    "D_VALUES",
+    "SpaceSyntax",
+    "analyze",
+    "total_depth",
+    "mean_depth",
+    "relative_asymmetry",
+    "diamond_value",
+    "integration",
+    "connectivity",
+    "control",
+    "choice",
 ]

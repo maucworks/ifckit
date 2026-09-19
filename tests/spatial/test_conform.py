@@ -1,7 +1,14 @@
 # This file was generated with the assistance of an AI coding tool.
 """Tests for conformance: comparing a model against a PvE graph."""
 
-from ifckit.spatial import ProgramEdge, ProgramSpace, RoomProgram, check_program, conform
+from ifckit.spatial import (
+    ProgramEdge,
+    ProgramSpace,
+    RoomProgram,
+    check_program,
+    conform,
+    validate_circulation,
+)
 
 
 def test_conform_two_room_reports_door_violation(two_room_program, two_room_model):
@@ -79,6 +86,44 @@ def test_check_program_clean():
         edges=[ProgramEdge("a", "b", kind="door")],
     )
     assert check_program(program) == []
+
+
+def _circulation_program() -> RoomProgram:
+    return RoomProgram(
+        nodes={
+            "entree": ProgramSpace(name="Entree", role="verkeer"),
+            "woonkamer": ProgramSpace(name="Woonkamer"),
+            "keuken": ProgramSpace(name="Keuken"),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
+        },
+        edges=[
+            ProgramEdge("entree", "buiten", kind="door"),
+            ProgramEdge("entree", "woonkamer", kind="door"),
+            ProgramEdge("entree", "keuken", kind="door"),
+        ],
+    )
+
+
+def test_validate_circulation_reachable():
+    report = validate_circulation(_circulation_program())
+    assert report.ok is True
+    assert report.root == "buiten"
+    assert sorted(report.reachable) == ["buiten", "entree", "keuken", "woonkamer"]
+    assert report.unreachable == []
+
+
+def test_validate_circulation_unreachable():
+    program = _circulation_program()
+    program.nodes["zolder"] = ProgramSpace(name="Zolder")
+    report = validate_circulation(program)
+    assert report.ok is False
+    assert "zolder" in report.unreachable
+
+
+def test_validate_circulation_custom_root():
+    report = validate_circulation(_circulation_program(), root="entree")
+    assert report.root == "entree"
+    assert report.ok is True
 
 
 def test_conform_forbidden_facade_violated(two_room_model):
