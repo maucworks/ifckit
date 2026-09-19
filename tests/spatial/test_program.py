@@ -20,7 +20,7 @@ def test_room_program_to_from_dict_roundtrip():
     program = RoomProgram(
         nodes={
             "k": ProgramSpace(name="1.01", long_name="Keuken", area_min=8),
-            "buiten": ProgramSpace(name="buiten"),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
         },
         edges=[ProgramEdge("k", "buiten", kind="facade")],
     )

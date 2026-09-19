@@ -58,17 +58,22 @@ def conform(model, program: RoomProgram) -> ConformanceReport:
     oppervlakte-ranges en de getypeerde kanten:
 
     - ``door``: vereist een ``door``-kant in de gerealiseerde graaf.
-    - ``forbidden``: overtreden als de twee ruimten een grens delen.
+    - ``forbidden``: tussen twee ruimten overtreden als ze een grens delen;
+      naar een buitenruimte (knoop zonder oppervlakte-eis) betekent "geen
+      buitengevel" en is overtreden als de ruimte op de envelop ligt.
     - ``facade``: voldaan als de ruimte op de envelop ligt (buitengevel).
     - ``wall``/``visual``: zacht; voldaan bij elke grens, anders ``unconstrained``
       (of ``violated`` wanneer expliciet ``required=True``).
+
+    Buitenruimten zijn knopen met ``exterior=True``; die worden niet als
+    ``IfcSpace`` verwacht.
     """
     graph, footprints, perimeter, gid_by_key = _match(model, program)
     report = ConformanceReport()
 
-    # Buitenruimten (doel van een facade-kant) zijn declaraties, geen te
-    # realiseren IfcSpace's; die toetsen we niet op aanwezigheid.
-    exterior_nodes = {e.b for e in program.edges if e.kind == "facade"}
+    # Buitenruimten zijn declaraties (``exterior=True``), geen te realiseren
+    # IfcSpace's; die toetsen we niet op aanwezigheid.
+    exterior_nodes = {key for key, space in program.nodes.items() if space.exterior}
 
     for key, space in program.nodes.items():
         if key in exterior_nodes:
@@ -101,6 +106,15 @@ def conform(model, program: RoomProgram) -> ConformanceReport:
                 report.satisfied.append(label)
             else:
                 report.violated.append(label)
+            continue
+        if edge.kind == "forbidden" and edge.b in exterior_nodes:
+            # verbod op buitengevel: edge.a mag niet op de envelop liggen.
+            if ga is None:
+                report.unconstrained.append(label)
+            elif ga in perimeter:
+                report.violated.append(label)
+            else:
+                report.satisfied.append(label)
             continue
         if ga is None or gb is None:
             report.unconstrained.append(label)

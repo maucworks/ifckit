@@ -21,7 +21,7 @@ def test_conform_satisfied_without_door(two_room_model):
         nodes={
             "k": ProgramSpace(name="1.01", area_min=8),
             "w": ProgramSpace(name="1.02", area_min=20),
-            "buiten": ProgramSpace(name="buiten"),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
         },
         edges=[
             ProgramEdge("k", "buiten", kind="facade"),
@@ -79,3 +79,44 @@ def test_check_program_clean():
         edges=[ProgramEdge("a", "b", kind="door")],
     )
     assert check_program(program) == []
+
+
+def test_conform_forbidden_facade_violated(two_room_model):
+    # "geen buitengevel" overtreden: de ruimte ligt op de envelop.
+    program = RoomProgram(
+        nodes={
+            "k": ProgramSpace(name="1.01", area_min=1),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
+        },
+        edges=[ProgramEdge("k", "buiten", kind="forbidden")],
+    )
+    report = conform(two_room_model, program)
+    assert "edge:k-buiten:forbidden" in report.violated
+
+
+def test_conform_forbidden_facade_satisfied():
+    from ifckit import IfcModel
+    from ifckit.geometry import Vec
+
+    m = IfcModel(name="Grid")
+    site = m.add_site("S")
+    building = m.add_building(site, "B")
+    storey = m.add_storey(building, "00", elevation=0.0)
+    for i in range(3):
+        for j in range(3):
+            x, y = i * 3, j * 3
+            storey.add_space(
+                [Vec(x, y, 0), Vec(x + 3, y, 0), Vec(x + 3, y + 3, 0), Vec(x, y + 3, 0)],
+                height=2.7,
+                name=f"r{i}{j}",
+            )
+    program = RoomProgram(
+        nodes={
+            "mid": ProgramSpace(name="r11", area_min=1),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
+        },
+        edges=[ProgramEdge("mid", "buiten", kind="forbidden")],
+    )
+    report = conform(m, program)
+    assert "edge:mid-buiten:forbidden" in report.satisfied
+    assert report.ok is True

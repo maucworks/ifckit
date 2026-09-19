@@ -33,7 +33,7 @@ def make_program() -> RoomProgram:
         nodes={
             "k": ProgramSpace(name="1.01", long_name="Keuken", area_min=8, area_max=15),
             "w": ProgramSpace(name="1.02", long_name="Woonkamer", area_min=20, area_max=30),
-            "buiten": ProgramSpace(name="buiten"),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
         },
         edges=[
             ProgramEdge("k", "buiten", kind="facade"),
@@ -81,7 +81,12 @@ def _build_walls(storey, program: RoomProgram) -> None:
     )
     storey.add(
         PendingWall(
-            [Vec(total, 0, 0), Vec(total + 0.2, 0, 0), Vec(total + 0.2, DEPTH, 0), Vec(total, DEPTH, 0)],
+            [
+                Vec(total, 0, 0),
+                Vec(total + 0.2, 0, 0),
+                Vec(total + 0.2, DEPTH, 0),
+                Vec(total, DEPTH, 0),
+            ],
             plane=plane,
             height=2.7,
             name="W-rechts",

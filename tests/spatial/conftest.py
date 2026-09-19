@@ -19,7 +19,7 @@ def two_room_program() -> RoomProgram:
         nodes={
             "k": ProgramSpace(name="1.01", long_name="Keuken", area_min=8, area_max=15),
             "w": ProgramSpace(name="1.02", long_name="Woonkamer", area_min=20),
-            "buiten": ProgramSpace(name="buiten"),
+            "buiten": ProgramSpace(name="buiten", exterior=True),
         },
         edges=[
             ProgramEdge("k", "buiten", kind="facade"),

@@ -28,6 +28,8 @@ class ProgramSpace:
         area_min: Ondergrens oppervlak in m² (optioneel).
         area_max: Bovengrens oppervlak in m² (optioneel).
         required: ``False`` = geprefereerd, geen harde eis.
+        exterior: ``True`` = buitenruimte-declaratie (buiten, veranda, ...);
+            wordt niet als ``IfcSpace`` verwacht.
     """
 
     name: str = ""
@@ -35,6 +37,7 @@ class ProgramSpace:
     area_min: float | None = None
     area_max: float | None = None
     required: bool = True
+    exterior: bool = False
 
 
 @dataclass
