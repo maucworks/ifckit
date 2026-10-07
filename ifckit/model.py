@@ -10,7 +10,7 @@ Supports IFC2X3 (legacy buildings), IFC4 (buildings) and IFC4X3 (bridges / infra
 from __future__ import annotations
 
 import warnings as _warnings
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Collection, Iterator, Optional, Union
 
 import ifcopenshell
 import ifcopenshell.api
@@ -1210,10 +1210,14 @@ class IfcModel:
         ``.glb``      Binary glTF 2.0
         ``.gltf``     Binary glTF 2.0 (same as ``.glb``)
         ``.svg``      2-D SVG plan views
-        ``.xml``      ifcXML
-        ``.dae``      Collada (only if ifcopenshell is built with Collada support)
-        ``.ttl``      TTL/WKT geometry (only if supported by installed build)
+        ``.dae``      Collada (only if supported by the installed build)
+        ``.ttl``      TTL/WKT geometry (only if supported by the installed build)
+        ``.stp``      STEP (only if supported by the installed build)
+        ``.igs``      IGES (only if supported by the installed build)
+        ``.usd``      USD (only if supported by the installed build)
         ============  ========================================================
+
+        Requires ifcopenshell == 0.9.0 (see ``ifckit.geom_backend``).
 
         Args:
             path: Destination file path including extension.
@@ -1221,7 +1225,8 @@ class IfcModel:
         Raises:
             ValueError:  If the extension is not recognised.
             ImportError: If the requested serializer is not available in the
-                         current ifcopenshell build (e.g. Collada, HDF5).
+                         current ifcopenshell build, or ifcopenshell < 0.9.0
+                         is installed.
 
         Example::
 
@@ -1239,53 +1244,65 @@ class IfcModel:
             self.save(path)
             return
 
-        try:
-            import ifcopenshell.geom as _geom
-        except ImportError as exc:
-            raise ImportError(
-                "ifcopenshell.geom is required for geometry export. "
-                "Make sure ifcopenshell is installed with geometry support."
-            ) from exc
-
-        try:
-            serializer_factory = _geom.serializers.guess_from_extension(path)
-        except ValueError as exc:
-            raise ValueError(str(exc)) from exc
-
-        if serializer_factory is None:
-            raise ImportError(
-                f"The serializer for .{ext} is not available in this ifcopenshell build."
-            )
-
-        geom_settings = _geom.settings()
-        geom_settings.set(geom_settings.USE_WORLD_COORDS, True)
-        s_settings = _geom.serializer_settings()
+        from ifckit import geom_backend
 
         with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:
             tmp_path = tmp.name
         try:
             self._file.write(tmp_path)
-
-            it = _geom.iterator(geom_settings, tmp_path)
-
-            if ext == "obj":
-                mtl_path = os.path.splitext(path)[0] + ".mtl"
-                serializer = serializer_factory(path, mtl_path, geom_settings, s_settings)
-            else:
-                serializer = serializer_factory(path, geom_settings, s_settings)
-
-            serializer.setFile(it.file)
-            serializer.writeHeader()
-
-            if it.initialize():
-                while True:
-                    serializer.write(it.get())
-                    if not it.next():
-                        break
-
-            serializer.finalize()
+            geom_backend.serialize_to_file(tmp_path, path, geom_backend.make_settings())
         finally:
             os.unlink(tmp_path)
+
+    def iter_mesh_dicts(
+        self,
+        tessellation: Optional[dict] = None,
+        *,
+        skip_openings: bool = True,
+        y_up: bool = True,
+        include_guids: Optional[Collection[str]] = None,
+    ) -> Iterator[dict]:
+        """Stream viewer mesh dicts for every product, without temp files.
+
+        Tessellates the in-memory model and yields one ``triangles`` dict per
+        product (same format as ``Path``/``Surface.to_mesh_dict()``), each
+        carrying the element ``guid`` so callers can diff and selectively
+        update meshes instead of re-tessellating everything.
+
+        Args:
+            tessellation: Optional ``{"linear_deflection": ..., ...}`` overrides.
+            skip_openings: Skip ``IfcOpeningElement`` shapes (default True).
+            y_up: Convert Z-up to Y-up ``(x, z, -y)`` (default True).
+            include_guids: Only yield these GUIDs (selective re-tessellation).
+        """
+        from ifckit import geom_backend
+
+        settings = geom_backend.make_settings(tessellation)
+        shapes = geom_backend.iter_shapes(
+            self._file,
+            settings,
+            skip_openings=skip_openings,
+            include_guids=include_guids,
+        )
+        yield from geom_backend.shapes_to_mesh_dicts(shapes, y_up=y_up)
+
+    def to_mesh_dicts(
+        self,
+        tessellation: Optional[dict] = None,
+        *,
+        skip_openings: bool = True,
+        y_up: bool = True,
+        include_guids: Optional[Collection[str]] = None,
+    ) -> list:
+        """Return all viewer mesh dicts as a list (see :meth:`iter_mesh_dicts`)."""
+        return list(
+            self.iter_mesh_dicts(
+                tessellation,
+                skip_openings=skip_openings,
+                y_up=y_up,
+                include_guids=include_guids,
+            )
+        )
 
     def export_step(self, output_path: str) -> None:
         """Export the model to an ISO 10303 STEP file via ``ifcconvert``.

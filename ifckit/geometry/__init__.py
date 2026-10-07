@@ -36,6 +36,7 @@ from ifckit.geometry.primitives import (
     _polygon_normal,
     _signed_area,
 )
+from ifckit.geometry.spiral import Spiral
 from ifckit.geometry.subdivision import catmull_clark, extract_patches, write_obj
 from ifckit.geometry.surface import Surface
 from ifckit.geometry.transform import Transform
@@ -56,6 +57,8 @@ __all__ = [
     "Curve",
     "solve_biarc",
     "fit_biarcs",
+    # spiral
+    "Spiral",
     # surface
     "Surface",
     "Intersection",

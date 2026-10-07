@@ -595,6 +595,118 @@ class TestModelExport:
         with pytest.raises((ValueError, ImportError)):
             m.export(str(tmp_path / "out.xyz"))
 
+    def test_export_obj_with_mtl_sidecar(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.obj")
+        try:
+            m.export(out)
+        except ImportError:
+            pytest.skip("OBJ serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+        assert os.path.exists(str(tmp_path / "out.mtl"))
+
+    def test_export_glb(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.glb")
+        try:
+            m.export(out)
+        except ImportError:
+            pytest.skip("glTF serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+
+    def test_export_svg(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.svg")
+        try:
+            m.export(out)
+        except ImportError:
+            pytest.skip("SVG serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+
+
+class TestIterMeshDicts:
+    """Laag 2: IfcModel.iter_mesh_dicts() streams guid-keyed viewer dicts."""
+
+    def _model_with_beam_and_slab(self):
+        from ifckit.elements.building import PendingSlab
+
+        m = IfcModel(name="MeshDictTest", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        floor.add(PendingBeam(_BEAM_AXIS, _SQUARE_PROFILE, name="Beam"))
+        floor.add(
+            PendingSlab(
+                footprint=_FOOTPRINT,
+                plane=Plane.world_xy(),
+                thickness=0.2,
+                name="Slab1",
+            )
+        )
+        return m
+
+    def test_guids_match_by_guid(self):
+        m = self._model_with_beam_and_slab()
+        dicts = m.to_mesh_dicts()
+        assert len(dicts) == 2
+        for d in dicts:
+            assert d["primitive"] == "triangles"
+            assert d["guid"]
+            assert d["label"]
+            assert len(d["positions"]) > 0
+            assert len(d["indices"]) > 0
+            entity = m.ifc_file.by_guid(d["guid"])
+            assert entity is not None
+            assert entity.is_a() == d["label"]
+
+    def test_triangle_count_positive(self):
+        m = self._model_with_beam_and_slab()
+        total_tris = sum(len(d["indices"]) // 3 for d in m.iter_mesh_dicts())
+        assert total_tris > 0
+
+    def test_include_guids_selective_update(self):
+        m = self._model_with_beam_and_slab()
+        all_dicts = m.to_mesh_dicts()
+        assert len(all_dicts) == 2
+        wanted = all_dicts[0]["guid"]
+        filtered = m.to_mesh_dicts(include_guids=[wanted])
+        assert [d["guid"] for d in filtered] == [wanted]
+        assert m.to_mesh_dicts(include_guids=[]) == []
+
+    def test_skip_openings(self):
+        from ifckit import PendingWall
+        from ifckit.elements.opening import PendingOpening
+
+        m = IfcModel(name="MeshDictOpeningTest", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        wall = m.add(
+            PendingWall(
+                footprint=[Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0.2, 0), Vec(0, 0.2, 0)],
+                plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+                height=3.0,
+                name="W1",
+            ),
+            floor,
+        )
+        m.add_opening(
+            PendingOpening(
+                plane=Plane(Vec(1.0, 0.0, 0.0), Vec(1, 0, 0), Vec(0, 1, 0)),
+                width=0.9,
+                height=2.1,
+                name="OP1",
+            ),
+            host=wall,
+            container=floor,
+        )
+        with_skip = m.to_mesh_dicts(skip_openings=True)
+        without_skip = m.to_mesh_dicts(skip_openings=False)
+        assert all(d["label"] != "IfcOpeningElement" for d in with_skip)
+        assert any(d["label"] == "IfcOpeningElement" for d in without_skip)
+
 
 # ---------------------------------------------------------------------------
 # TC3 — handle.add() raises ValueError on invalid element
