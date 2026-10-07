@@ -26,11 +26,11 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-ifc = ["ifcopenshell>=0.9.0"]
+ifc = ["ifcopenshell==0.9.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
-    "ifcopenshell>=0.9.0",
+    "ifcopenshell==0.9.0",
     "httpx>=0.27",
     "ruff",
     "mypy",
@@ -41,10 +41,10 @@ api = [
     "uvicorn[standard]>=0.29",
 ]
 occ = ["pythonocc-core>=7.4.0",
-    "ifcopenshell>=0.9.0"
+    "ifcopenshell==0.9.0"
 ]
 all = [
-    "ifcopenshell>=0.9.0",
+    "ifcopenshell==0.9.0",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
     "pythonocc-core>=7.4.0",

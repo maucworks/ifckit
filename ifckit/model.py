@@ -1217,7 +1217,7 @@ class IfcModel:
         ``.usd``      USD (only if supported by the installed build)
         ============  ========================================================
 
-        Requires ifcopenshell >= 0.9.0 (see ``ifckit.geom_backend``).
+        Requires ifcopenshell == 0.9.0 (see ``ifckit.geom_backend``).
 
         Args:
             path: Destination file path including extension.
