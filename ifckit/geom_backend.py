@@ -122,13 +122,24 @@ def make_serializer(path: Union[str, os.PathLike], settings: Any) -> Any:
         ) from exc
 
 
-def serialize_to_file(source: Any, dest: Union[str, os.PathLike], settings: Any) -> None:
+def serialize_to_file(
+    source: Any,
+    dest: Union[str, os.PathLike],
+    settings: Any,
+    *,
+    skip_openings: bool = True,
+    num_threads: int = 1,
+) -> None:
     """Run the geometry iterator over ``source`` into the serializer for ``dest``.
 
     Args:
-        source:   An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
-        dest:     Destination path; format inferred from the extension.
-        settings: Geometry settings, e.g. from :func:`make_settings`.
+        source:        An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
+        dest:          Destination path; format inferred from the extension.
+        settings:      Geometry settings, e.g. from :func:`make_settings`.
+        skip_openings: Skip ``IfcOpeningElement`` shapes — void boxes never render
+                       as solid in a viewer file (default True).
+        num_threads:   Iterator thread count (default 1, status quo). Pass
+                       ``os.cpu_count()`` for large models.
 
     Raises:
         ValueError:  If the extension is not recognised.
@@ -137,17 +148,35 @@ def serialize_to_file(source: Any, dest: Union[str, os.PathLike], settings: Any)
     import ifcopenshell.geom as _geom
 
     serializer = make_serializer(dest, settings)
-    iterator = _geom.iterator(settings, source)
+    iterator = _geom.iterator(settings, source, num_threads)
     # Same upstream quirk as in iter_shapes: only trust iterator.file when
     # constructed from a path; a file object can be passed directly.
     if hasattr(source, "by_guid"):
+        ifc_file = source
         serializer.setFile(source)
     else:
+        import ifcopenshell
+
+        ifc_file = ifcopenshell.open(os.fspath(source))
         serializer.setFile(iterator.file)
     serializer.writeHeader()
     if iterator.initialize():
         while True:
-            serializer.write(iterator.get())
+            shape = iterator.get()
+            if skip_openings:
+                guid = getattr(shape, "guid", "") or ""
+                entity_type = ""
+                if guid:
+                    try:
+                        entity = ifc_file.by_guid(guid)
+                        entity_type = entity.is_a() if entity is not None else ""
+                    except Exception:
+                        entity_type = ""
+                if entity_type in _OPENING_TYPES:
+                    if not iterator.next():
+                        break
+                    continue
+            serializer.write(shape)
             if not iterator.next():
                 break
     serializer.finalize()

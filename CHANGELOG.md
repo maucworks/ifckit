@@ -19,6 +19,11 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
 - `feat(geom_backend): guid_for_id` derives a deterministic 22-char
   GlobalId from a stable element id; `iter_shapes`/`iter_mesh_dicts`
   accept `include_guids` for selective re-tessellation.
+- `fix(model): export skips IfcOpeningElement voids by default`.
+  `serialize_to_file()`/`IfcModel.export()` take `skip_openings=True`
+  (void boxes no longer render as solid in viewer files); pass
+  `skip_openings=False` for the old behavior. `serialize_to_file()`
+  also takes `num_threads` (default 1, status quo).
 
 ### Added — doors, windows, openings (M1–M6)
 

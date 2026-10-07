@@ -156,6 +156,40 @@ class TestIterShapes:
         )
 
 
+class TestSerializeSkipOpenings:
+    def _obj_groups(self, path):
+        with open(path) as f:
+            return [ln for ln in f.read().splitlines() if ln.startswith("g ")]
+
+    def test_skip_openings(self, tmp_path):
+        m = _wall_with_opening_model()
+        settings = geom_backend.make_settings()
+        skipped = str(tmp_path / "skipped.obj")
+        kept = str(tmp_path / "kept.obj")
+        try:
+            geom_backend.serialize_to_file(m.ifc_file, skipped, settings)
+            geom_backend.serialize_to_file(
+                m.ifc_file, kept, settings, skip_openings=False
+            )
+        except ImportError:
+            pytest.skip("OBJ serializer not in this ifcopenshell build")
+        assert len(self._obj_groups(skipped)) == 1
+        assert len(self._obj_groups(kept)) == 2
+
+    def test_num_threads(self, tmp_path):
+        m = _beam_model()
+        out = str(tmp_path / "out.glb")
+        try:
+            geom_backend.serialize_to_file(
+                m.ifc_file, out, geom_backend.make_settings(), num_threads=2
+            )
+        except ImportError:
+            pytest.skip("glTF serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+
+
 class TestShapesToMeshDicts:
     def test_format_and_y_up(self):
         m = _beam_model()
