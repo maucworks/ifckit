@@ -114,6 +114,10 @@ on CI to catch formatting issues.
   but the expectation is that testable code changes come with tests.
 - Tests use **pytest** and are located in the `tests/` directory.
 - Run the existing test suite before submitting: `pytest tests/`
+- No CI: prove dependency lines locally instead —
+  `tools/test-matrix.sh` runs the suite in one venv per ifcopenshell spec
+  (default: pinned version + `latest`). Only the pinned spec fails the script;
+  `latest` is signal-only (green = band may move, red = band stays).
 
 ## Architecture Quick Reference
 
@@ -147,7 +151,8 @@ Never open-ended (`>=x` alone is forbidden). Every dependency gets
 upper bound = the currently verified version, inclusive — so the current
 version is never excluded. In specifiers this is written as `< next-line`,
 which includes the current line. A fresh upstream release never flows in
-silently: CI-matrix proves the new line first, then the band moves.
+silently: `tools/test-matrix.sh` proves the new line first (no CI — local
+matrix), then the band moves.
 Deliberate exceptions with a lower cap only on proven breakage:
 `ifcopenshell==0.9.0` stays exact until point releases prove a band;
 `pythonocc-core<8` until the 8.x wrapper breaks are assessed.
