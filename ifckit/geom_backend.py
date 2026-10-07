@@ -88,7 +88,7 @@ def make_settings(tessellation: Optional[dict] = None) -> Any:
     angular = float(tessellation.get("angular_deflection", DEFAULT_ANGULAR_DEFLECTION))
     settings.set("mesher-linear-deflection", linear)
     settings.set("mesher-angular-deflection", angular)
-    settings.set(settings.USE_WORLD_COORDS, True)
+    settings.set("use-world-coords", True)
     return settings
 
 
