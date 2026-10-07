@@ -118,9 +118,39 @@ def make_serializer(path: Union[str, os.PathLike], settings: Any) -> Any:
         return factory(path_str, settings)
     except AttributeError as exc:
         raise ImportError(
-            f"The serializer for {path_str!r} is not available "
-            "in this ifcopenshell build."
+            f"The serializer for {path_str!r} is not available in this ifcopenshell build."
         ) from exc
+
+
+def serialize_to_file(source: Any, dest: Union[str, os.PathLike], settings: Any) -> None:
+    """Run the geometry iterator over ``source`` into the serializer for ``dest``.
+
+    Args:
+        source:   An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
+        dest:     Destination path; format inferred from the extension.
+        settings: Geometry settings, e.g. from :func:`make_settings`.
+
+    Raises:
+        ValueError:  If the extension is not recognised.
+        ImportError: If the serializer is unavailable in this build.
+    """
+    import ifcopenshell.geom as _geom
+
+    serializer = make_serializer(dest, settings)
+    iterator = _geom.iterator(settings, source)
+    # Same upstream quirk as in iter_shapes: only trust iterator.file when
+    # constructed from a path; a file object can be passed directly.
+    if hasattr(source, "by_guid"):
+        serializer.setFile(source)
+    else:
+        serializer.setFile(iterator.file)
+    serializer.writeHeader()
+    if iterator.initialize():
+        while True:
+            serializer.write(iterator.get())
+            if not iterator.next():
+                break
+    serializer.finalize()
 
 
 def iter_shapes(

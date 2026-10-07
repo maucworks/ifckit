@@ -5,6 +5,14 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
 
 ## [Unreleased]
 
+### Fixed — ifcopenshell 0.9
+
+- `fix(model): export via geom_backend op ifcopenshell 0.9 serializer-API`.
+  New module `ifckit/geom_backend.py` is the single touchpoint for
+  `ifcopenshell.geom` (settings, serializers, GUID shape iteration, viewer
+  mesh dicts); `IfcModel.export()` delegates to it. Minimum version is now
+  ifcopenshell >= 0.9.0 (no 0.8 fallback).
+
 ### Added — doors, windows, openings (M1–M6)
 
 **Elements**

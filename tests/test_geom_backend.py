@@ -2,11 +2,10 @@
 
 import pytest
 
-from ifckit import IfcModel, IfcSchema, PendingWall
+from ifckit import IfcModel, IfcSchema, PendingWall, geom_backend
 from ifckit.elements.opening import PendingOpening
 from ifckit.elements.structural import PendingBeam
 from ifckit.geometry import Line, Plane, Vec
-from ifckit import geom_backend
 
 
 _SQUARE_PROFILE = [Vec(-0.1, -0.1), Vec(0.1, -0.1), Vec(0.1, 0.1), Vec(-0.1, 0.1)]

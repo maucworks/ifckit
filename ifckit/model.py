@@ -1210,10 +1210,14 @@ class IfcModel:
         ``.glb``      Binary glTF 2.0
         ``.gltf``     Binary glTF 2.0 (same as ``.glb``)
         ``.svg``      2-D SVG plan views
-        ``.xml``      ifcXML
-        ``.dae``      Collada (only if ifcopenshell is built with Collada support)
-        ``.ttl``      TTL/WKT geometry (only if supported by installed build)
+        ``.dae``      Collada (only if supported by the installed build)
+        ``.ttl``      TTL/WKT geometry (only if supported by the installed build)
+        ``.stp``      STEP (only if supported by the installed build)
+        ``.igs``      IGES (only if supported by the installed build)
+        ``.usd``      USD (only if supported by the installed build)
         ============  ========================================================
+
+        Requires ifcopenshell >= 0.9.0 (see ``ifckit.geom_backend``).
 
         Args:
             path: Destination file path including extension.
@@ -1221,7 +1225,8 @@ class IfcModel:
         Raises:
             ValueError:  If the extension is not recognised.
             ImportError: If the requested serializer is not available in the
-                         current ifcopenshell build (e.g. Collada, HDF5).
+                         current ifcopenshell build, or ifcopenshell < 0.9.0
+                         is installed.
 
         Example::
 
@@ -1239,51 +1244,13 @@ class IfcModel:
             self.save(path)
             return
 
-        try:
-            import ifcopenshell.geom as _geom
-        except ImportError as exc:
-            raise ImportError(
-                "ifcopenshell.geom is required for geometry export. "
-                "Make sure ifcopenshell is installed with geometry support."
-            ) from exc
-
-        try:
-            serializer_factory = _geom.serializers.guess_from_extension(path)
-        except ValueError as exc:
-            raise ValueError(str(exc)) from exc
-
-        if serializer_factory is None:
-            raise ImportError(
-                f"The serializer for .{ext} is not available in this ifcopenshell build."
-            )
-
-        geom_settings = _geom.settings()
-        geom_settings.set(geom_settings.USE_WORLD_COORDS, True)
-        s_settings = _geom.serializer_settings()
+        from ifckit import geom_backend
 
         with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:
             tmp_path = tmp.name
         try:
             self._file.write(tmp_path)
-
-            it = _geom.iterator(geom_settings, tmp_path)
-
-            if ext == "obj":
-                mtl_path = os.path.splitext(path)[0] + ".mtl"
-                serializer = serializer_factory(path, mtl_path, geom_settings, s_settings)
-            else:
-                serializer = serializer_factory(path, geom_settings, s_settings)
-
-            serializer.setFile(it.file)
-            serializer.writeHeader()
-
-            if it.initialize():
-                while True:
-                    serializer.write(it.get())
-                    if not it.next():
-                        break
-
-            serializer.finalize()
+            geom_backend.serialize_to_file(tmp_path, path, geom_backend.make_settings())
         finally:
             os.unlink(tmp_path)
 

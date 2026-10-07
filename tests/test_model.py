@@ -595,6 +595,40 @@ class TestModelExport:
         with pytest.raises((ValueError, ImportError)):
             m.export(str(tmp_path / "out.xyz"))
 
+    def test_export_obj_with_mtl_sidecar(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.obj")
+        try:
+            m.export(out)
+        except ImportError:
+            pytest.skip("OBJ serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+        assert os.path.exists(str(tmp_path / "out.mtl"))
+
+    def test_export_glb(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.glb")
+        try:
+            m.export(out)
+        except ImportError:
+            pytest.skip("glTF serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+
+    def test_export_svg(self, tmp_path):
+        m = self._model_with_beam()
+        out = str(tmp_path / "out.svg")
+        try:
+            m.export(out)
+        except ImportError:
+            pytest.skip("SVG serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(out) > 0
+
 
 # ---------------------------------------------------------------------------
 # TC3 — handle.add() raises ValueError on invalid element
