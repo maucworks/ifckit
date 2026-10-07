@@ -1196,7 +1196,7 @@ class IfcModel:
         """Serialise the IFC model to a STEP string (no file I/O)."""
         return self._file.to_string()
 
-    def export(self, path: str) -> None:
+    def export(self, path: str, *, skip_openings: bool = True) -> None:
         """
         Export the model to a geometry format via ifcopenshell serializers.
 
@@ -1219,8 +1219,13 @@ class IfcModel:
 
         Requires ifcopenshell == 0.9.0 (see ``ifckit.geom_backend``).
 
+        Since 0.3.1, ``IfcOpeningElement`` voids are skipped by default —
+        void boxes no longer render as solid in viewer files. Pass
+        ``skip_openings=False`` for the old behavior.
+
         Args:
             path: Destination file path including extension.
+            skip_openings: Skip ``IfcOpeningElement`` shapes (default True).
 
         Raises:
             ValueError:  If the extension is not recognised.
@@ -1250,7 +1255,9 @@ class IfcModel:
             tmp_path = tmp.name
         try:
             self._file.write(tmp_path)
-            geom_backend.serialize_to_file(tmp_path, path, geom_backend.make_settings())
+            geom_backend.serialize_to_file(
+                tmp_path, path, geom_backend.make_settings(), skip_openings=skip_openings
+            )
         finally:
             os.unlink(tmp_path)
 

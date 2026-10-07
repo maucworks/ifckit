@@ -25,8 +25,11 @@ from typing import Any, Collection, Iterator, NamedTuple, Optional, Union
 DEFAULT_LINEAR_DEFLECTION = 0.05
 DEFAULT_ANGULAR_DEFLECTION = 0.8
 
-#: Minimum supported ifcopenshell version (merged settings/serializer API).
+#: Supported ifcopenshell line (merged settings/serializer API).
+#: Floor is the proven point (packaging pins it exactly); ceiling is the
+#: next line — a newer minor gets a clean ImportError, never silent breakage.
 MIN_VERSION = (0, 9, 0)
+MAX_VERSION = (0, 10)
 
 #: Entity types skipped with ``skip_openings=True``.
 _OPENING_TYPES = frozenset({"IfcOpeningElement"})
@@ -52,10 +55,11 @@ def get_version() -> str:
 
 
 def require_version() -> str:
-    """Return the ifcopenshell version, raising if it is older than 0.9.0.
+    """Return the ifcopenshell version, raising outside the 0.9 line.
 
     Raises:
-        ImportError: If ifcopenshell is missing or older than 0.9.0.
+        ImportError: If ifcopenshell is missing, older than 0.9.0, or
+            0.10+ (untested line — pin or band must move first).
     """
     version = get_version()
     try:
@@ -64,10 +68,10 @@ def require_version() -> str:
         parts = (0, 0, 0)
     if len(parts) < 3:
         parts = parts + (0,) * (3 - len(parts))
-    if parts < MIN_VERSION:
+    if not (MIN_VERSION <= parts < MAX_VERSION):
         raise ImportError(
-            f"ifckit requires ifcopenshell >= 0.9.0, found {version}. "
-            "Upgrade with: pip install -U ifcopenshell"
+            f"ifckit requires ifcopenshell >= 0.9, < 0.10, found {version}. "
+            "Install a supported line: pip install 'ifcopenshell==0.9.0'"
         )
     return version
 
@@ -122,13 +126,24 @@ def make_serializer(path: Union[str, os.PathLike], settings: Any) -> Any:
         ) from exc
 
 
-def serialize_to_file(source: Any, dest: Union[str, os.PathLike], settings: Any) -> None:
+def serialize_to_file(
+    source: Any,
+    dest: Union[str, os.PathLike],
+    settings: Any,
+    *,
+    skip_openings: bool = True,
+    num_threads: int = 1,
+) -> None:
     """Run the geometry iterator over ``source`` into the serializer for ``dest``.
 
     Args:
-        source:   An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
-        dest:     Destination path; format inferred from the extension.
-        settings: Geometry settings, e.g. from :func:`make_settings`.
+        source:        An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
+        dest:          Destination path; format inferred from the extension.
+        settings:      Geometry settings, e.g. from :func:`make_settings`.
+        skip_openings: Skip ``IfcOpeningElement`` shapes — void boxes never render
+                       as solid in a viewer file (default True).
+        num_threads:   Iterator thread count (default 1, status quo). Pass
+                       ``os.cpu_count()`` for large models.
 
     Raises:
         ValueError:  If the extension is not recognised.
@@ -137,17 +152,35 @@ def serialize_to_file(source: Any, dest: Union[str, os.PathLike], settings: Any)
     import ifcopenshell.geom as _geom
 
     serializer = make_serializer(dest, settings)
-    iterator = _geom.iterator(settings, source)
+    iterator = _geom.iterator(settings, source, num_threads)
     # Same upstream quirk as in iter_shapes: only trust iterator.file when
     # constructed from a path; a file object can be passed directly.
     if hasattr(source, "by_guid"):
+        ifc_file = source
         serializer.setFile(source)
     else:
+        import ifcopenshell
+
+        ifc_file = ifcopenshell.open(os.fspath(source))
         serializer.setFile(iterator.file)
     serializer.writeHeader()
     if iterator.initialize():
         while True:
-            serializer.write(iterator.get())
+            shape = iterator.get()
+            if skip_openings:
+                guid = getattr(shape, "guid", "") or ""
+                entity_type = ""
+                if guid:
+                    try:
+                        entity = ifc_file.by_guid(guid)
+                        entity_type = entity.is_a() if entity is not None else ""
+                    except Exception:
+                        entity_type = ""
+                if entity_type in _OPENING_TYPES:
+                    if not iterator.next():
+                        break
+                    continue
+            serializer.write(shape)
             if not iterator.next():
                 break
     serializer.finalize()

@@ -677,6 +677,43 @@ class TestIterMeshDicts:
         assert [d["guid"] for d in filtered] == [wanted]
         assert m.to_mesh_dicts(include_guids=[]) == []
 
+    def test_export_glb_skips_openings(self, tmp_path):
+        from ifckit import PendingWall
+        from ifckit.elements.opening import PendingOpening
+
+        m = IfcModel(name="ExportOpeningTest", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        wall = m.add(
+            PendingWall(
+                footprint=[Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0.2, 0), Vec(0, 0.2, 0)],
+                plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+                height=3.0,
+                name="W1",
+            ),
+            floor,
+        )
+        m.add_opening(
+            PendingOpening(
+                plane=Plane(Vec(1.0, 0.0, 0.0), Vec(1, 0, 0), Vec(0, 1, 0)),
+                width=0.9,
+                height=2.1,
+                name="OP1",
+            ),
+            host=wall,
+            container=floor,
+        )
+        import os
+
+        skipped = str(tmp_path / "skipped.glb")
+        kept = str(tmp_path / "kept.glb")
+        try:
+            m.export(skipped)
+            m.export(kept, skip_openings=False)
+        except ImportError:
+            pytest.skip("glTF serializer not in this ifcopenshell build")
+        assert os.path.getsize(skipped) > 0
+        assert os.path.getsize(kept) > os.path.getsize(skipped)
+
     def test_skip_openings(self):
         from ifckit import PendingWall
         from ifckit.elements.opening import PendingOpening

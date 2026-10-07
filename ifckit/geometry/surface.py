@@ -44,7 +44,10 @@ except ImportError:
 def require_occ():
     """Import and return the OCC module, or raise ImportError."""
     if not _HAS_OCC:
-        raise ImportError("pythonocc-core is required. Install with: pip install pythonocc-core")
+        raise ImportError(
+            "pythonocc-core is required. It has no PyPI distribution — "
+            "install from conda-forge: conda install -c conda-forge pythonocc-core"
+        )
 
 
 # ---------------------------------------------------------------------------
