@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`
 
+## [0.3.1]
+
+### Fixed — geom ownership
+
+- `fix(model): export skips IfcOpeningElement voids by default`
+  (`serialize_to_file()`/`export()` take `skip_openings=True`; void boxes
+  no longer render as solid). `serialize_to_file()` also takes
+  `num_threads` (default 1, status quo).
+- `fix(packaging): occ out of the all extra` — `pip install ifckit[all]`
+  resolves again (pythonocc-core is conda-forge only; documented in
+  AGENTS.md). `require_version()` enforces the 0.9 line (`>=0.9,<0.10`).
+
 ## [Unreleased]
 
 ### Fixed — ifcopenshell 0.9
