@@ -19,7 +19,7 @@ of re-tessellating everything.
 from __future__ import annotations
 
 import os
-from typing import Any, Iterator, NamedTuple, Optional, Union
+from typing import Any, Collection, Iterator, NamedTuple, Optional, Union
 
 #: Default tessellation, matching ifcopenshell behaviour.
 DEFAULT_LINEAR_DEFLECTION = 0.05
@@ -153,11 +153,27 @@ def serialize_to_file(source: Any, dest: Union[str, os.PathLike], settings: Any)
     serializer.finalize()
 
 
+def guid_for_id(stable_id: str) -> str:
+    """Derive a deterministic 22-char IFC GlobalId from a stable element id.
+
+    ``uuid5``-hash (``ifckit:``-namespaced) compressed to the IFC base64
+    alphabet, so the same ``id`` always maps to the same ``GlobalId`` across
+    builds. Lets clients (e.g. a web configurator) diff on ``id`` and only
+    re-tessellate changed GUIDs via ``include_guids``.
+    """
+    import uuid
+
+    from ifcopenshell.guid import compress
+
+    return compress(str(uuid.uuid5(uuid.NAMESPACE_URL, f"ifckit:{stable_id}")))
+
+
 def iter_shapes(
     source: Any,
     settings: Any,
     *,
     skip_openings: bool = True,
+    include_guids: Optional[Collection[str]] = None,
 ) -> Iterator[IterShape]:
     """Yield :class:`IterShape` records for every product in ``source``.
 
@@ -165,9 +181,11 @@ def iter_shapes(
         source:         An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
         settings:       Geometry settings, e.g. from :func:`make_settings`.
         skip_openings:  Skip ``IfcOpeningElement`` shapes (voids), on by default.
+        include_guids:  Only yield these GUIDs (selective re-tessellation).
     """
     import ifcopenshell.geom as _geom
 
+    wanted = set(include_guids) if include_guids is not None else None
     iterator = _geom.iterator(settings, source)
     # NOTE: ``iterator.file`` is unreliable (upstream keeps the ``file`` class
     # instead of the instance when constructed from a file object), so resolve
@@ -183,24 +201,22 @@ def iter_shapes(
     while True:
         shape = iterator.get()
         guid = getattr(shape, "guid", "") or ""
-        entity_type = ""
-        if guid:
-            try:
-                entity = ifc_file.by_guid(guid)
-                entity_type = entity.is_a() if entity is not None else ""
-            except Exception:
-                entity_type = ""
-        if skip_openings and entity_type in _OPENING_TYPES:
-            if not iterator.next():
-                break
-            continue
-        geometry = shape.geometry
-        yield IterShape(
-            guid=guid,
-            entity_type=entity_type,
-            verts=list(geometry.verts),
-            faces=list(geometry.faces),
-        )
+        if wanted is None or guid in wanted:
+            entity_type = ""
+            if guid:
+                try:
+                    entity = ifc_file.by_guid(guid)
+                    entity_type = entity.is_a() if entity is not None else ""
+                except Exception:
+                    entity_type = ""
+            if not (skip_openings and entity_type in _OPENING_TYPES):
+                geometry = shape.geometry
+                yield IterShape(
+                    guid=guid,
+                    entity_type=entity_type,
+                    verts=list(geometry.verts),
+                    faces=list(geometry.faces),
+                )
         if not iterator.next():
             break
 

@@ -10,7 +10,7 @@ Supports IFC2X3 (legacy buildings), IFC4 (buildings) and IFC4X3 (bridges / infra
 from __future__ import annotations
 
 import warnings as _warnings
-from typing import TYPE_CHECKING, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Collection, Iterator, Optional, Union
 
 import ifcopenshell
 import ifcopenshell.api
@@ -1260,6 +1260,7 @@ class IfcModel:
         *,
         skip_openings: bool = True,
         y_up: bool = True,
+        include_guids: Optional[Collection[str]] = None,
     ) -> Iterator[dict]:
         """Stream viewer mesh dicts for every product, without temp files.
 
@@ -1272,12 +1273,16 @@ class IfcModel:
             tessellation: Optional ``{"linear_deflection": ..., ...}`` overrides.
             skip_openings: Skip ``IfcOpeningElement`` shapes (default True).
             y_up: Convert Z-up to Y-up ``(x, z, -y)`` (default True).
+            include_guids: Only yield these GUIDs (selective re-tessellation).
         """
         from ifckit import geom_backend
 
         settings = geom_backend.make_settings(tessellation)
         shapes = geom_backend.iter_shapes(
-            self._file, settings, skip_openings=skip_openings
+            self._file,
+            settings,
+            skip_openings=skip_openings,
+            include_guids=include_guids,
         )
         yield from geom_backend.shapes_to_mesh_dicts(shapes, y_up=y_up)
 
@@ -1287,11 +1292,15 @@ class IfcModel:
         *,
         skip_openings: bool = True,
         y_up: bool = True,
+        include_guids: Optional[Collection[str]] = None,
     ) -> list:
         """Return all viewer mesh dicts as a list (see :meth:`iter_mesh_dicts`)."""
         return list(
             self.iter_mesh_dicts(
-                tessellation, skip_openings=skip_openings, y_up=y_up
+                tessellation,
+                skip_openings=skip_openings,
+                y_up=y_up,
+                include_guids=include_guids,
             )
         )
 

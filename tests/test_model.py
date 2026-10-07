@@ -668,6 +668,15 @@ class TestIterMeshDicts:
         total_tris = sum(len(d["indices"]) // 3 for d in m.iter_mesh_dicts())
         assert total_tris > 0
 
+    def test_include_guids_selective_update(self):
+        m = self._model_with_beam_and_slab()
+        all_dicts = m.to_mesh_dicts()
+        assert len(all_dicts) == 2
+        wanted = all_dicts[0]["guid"]
+        filtered = m.to_mesh_dicts(include_guids=[wanted])
+        assert [d["guid"] for d in filtered] == [wanted]
+        assert m.to_mesh_dicts(include_guids=[]) == []
+
     def test_skip_openings(self):
         from ifckit import PendingWall
         from ifckit.elements.opening import PendingOpening

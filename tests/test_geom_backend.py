@@ -83,6 +83,27 @@ class TestMakeSerializer:
             geom_backend.make_serializer(str(tmp_path / "out.xyz"), s)
 
 
+class TestGuidForId:
+    def test_deterministic_22_chars(self):
+        g1 = geom_backend.guid_for_id("beam-1")
+        g2 = geom_backend.guid_for_id("beam-1")
+        assert g1 == g2
+        assert len(g1) == 22
+        import re
+
+        assert re.fullmatch(r"[0-9A-Za-z_$]{22}", g1)
+
+    def test_distinct_ids_distinct_guids(self):
+        assert geom_backend.guid_for_id("beam-1") != geom_backend.guid_for_id("beam-2")
+
+    def test_by_guid_roundtrip(self):
+        m = _beam_model()
+        guid = geom_backend.guid_for_id("beam-1")
+        beam = m.ifc_file.by_type("IfcBeam")[0]
+        beam.GlobalId = guid
+        assert m.ifc_file.by_guid(guid) == beam
+
+
 class TestIterShapes:
     def test_beam_shape(self):
         m = _beam_model()
@@ -105,6 +126,34 @@ class TestIterShapes:
         assert all(s.entity_type != "IfcOpeningElement" for s in with_skip)
         assert any(s.entity_type == "IfcOpeningElement" for s in without_skip)
         assert len(without_skip) == len(with_skip) + 1
+
+    def test_include_guids(self):
+        m = _wall_with_opening_model()
+        settings = geom_backend.make_settings()
+        all_shapes = list(
+            geom_backend.iter_shapes(m.ifc_file, settings, skip_openings=False)
+        )
+        assert len(all_shapes) > 1
+        wanted = all_shapes[0].guid
+        filtered = list(
+            geom_backend.iter_shapes(
+                m.ifc_file, settings, skip_openings=False, include_guids=[wanted]
+            )
+        )
+        assert [s.guid for s in filtered] == [wanted]
+
+    def test_include_guids_empty_and_unknown(self):
+        m = _beam_model()
+        settings = geom_backend.make_settings()
+        assert list(geom_backend.iter_shapes(m.ifc_file, settings, include_guids=[])) == []
+        assert (
+            list(
+                geom_backend.iter_shapes(
+                    m.ifc_file, settings, include_guids=["0" * 22]
+                )
+            )
+            == []
+        )
 
 
 class TestShapesToMeshDicts:
