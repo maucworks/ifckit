@@ -10,7 +10,7 @@ Supports IFC2X3 (legacy buildings), IFC4 (buildings) and IFC4X3 (bridges / infra
 from __future__ import annotations
 
 import warnings as _warnings
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Iterator, Optional, Union
 
 import ifcopenshell
 import ifcopenshell.api
@@ -1253,6 +1253,47 @@ class IfcModel:
             geom_backend.serialize_to_file(tmp_path, path, geom_backend.make_settings())
         finally:
             os.unlink(tmp_path)
+
+    def iter_mesh_dicts(
+        self,
+        tessellation: Optional[dict] = None,
+        *,
+        skip_openings: bool = True,
+        y_up: bool = True,
+    ) -> Iterator[dict]:
+        """Stream viewer mesh dicts for every product, without temp files.
+
+        Tessellates the in-memory model and yields one ``triangles`` dict per
+        product (same format as ``Path``/``Surface.to_mesh_dict()``), each
+        carrying the element ``guid`` so callers can diff and selectively
+        update meshes instead of re-tessellating everything.
+
+        Args:
+            tessellation: Optional ``{"linear_deflection": ..., ...}`` overrides.
+            skip_openings: Skip ``IfcOpeningElement`` shapes (default True).
+            y_up: Convert Z-up to Y-up ``(x, z, -y)`` (default True).
+        """
+        from ifckit import geom_backend
+
+        settings = geom_backend.make_settings(tessellation)
+        shapes = geom_backend.iter_shapes(
+            self._file, settings, skip_openings=skip_openings
+        )
+        yield from geom_backend.shapes_to_mesh_dicts(shapes, y_up=y_up)
+
+    def to_mesh_dicts(
+        self,
+        tessellation: Optional[dict] = None,
+        *,
+        skip_openings: bool = True,
+        y_up: bool = True,
+    ) -> list:
+        """Return all viewer mesh dicts as a list (see :meth:`iter_mesh_dicts`)."""
+        return list(
+            self.iter_mesh_dicts(
+                tessellation, skip_openings=skip_openings, y_up=y_up
+            )
+        )
 
     def export_step(self, output_path: str) -> None:
         """Export the model to an ISO 10303 STEP file via ``ifcconvert``.
