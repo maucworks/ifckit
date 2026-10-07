@@ -26,7 +26,8 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Pin policy (see AGENTS.md): never open-ended; >= min-proven, < next-line.
+# Pin policy (see AGENTS.md): never open-ended; >= min-proven, <= current-proven
+# (written as < next-line, so the current version is included).
 ifc = ["ifcopenshell==0.9.0"]
 dev = [
     "pytest>=7,<10",

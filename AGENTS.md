@@ -143,8 +143,11 @@ on CI to catch formatting issues.
 ### Version pins (principle)
 
 Never open-ended (`>=x` alone is forbidden). Every dependency gets
-`>= min-proven, < next-line`, i.e. lower bound = oldest verified version,
-upper bound = the newest verified line. A fresh upstream release never flows
-in silently: CI-matrix proves the new line first, then the band moves
-(`ifcopenshell==0.9.0` stays exact until point releases prove a band;
-`pythonocc-core<8` until the 8.x wrapper breaks are assessed).
+`>= min-proven, <= current-proven`: lower bound = oldest verified version,
+upper bound = the currently verified version, inclusive — so the current
+version is never excluded. In specifiers this is written as `< next-line`,
+which includes the current line. A fresh upstream release never flows in
+silently: CI-matrix proves the new line first, then the band moves.
+Deliberate exceptions with a lower cap only on proven breakage:
+`ifcopenshell==0.9.0` stays exact until point releases prove a band;
+`pythonocc-core<8` until the 8.x wrapper breaks are assessed.
