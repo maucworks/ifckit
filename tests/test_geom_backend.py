@@ -47,7 +47,12 @@ class TestVersion:
 
     def test_require_version_rejects_old(self, monkeypatch):
         monkeypatch.setattr(geom_backend, "get_version", lambda: "0.8.5")
-        with pytest.raises(ImportError, match=">= 0.9.0"):
+        with pytest.raises(ImportError, match=">= 0.9"):
+            geom_backend.require_version()
+
+    def test_require_version_rejects_next_line(self, monkeypatch):
+        monkeypatch.setattr(geom_backend, "get_version", lambda: "0.10.0")
+        with pytest.raises(ImportError, match="< 0.10"):
             geom_backend.require_version()
 
 

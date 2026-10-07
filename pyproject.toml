@@ -45,11 +45,12 @@ api = [
 occ = ["pythonocc-core>=7.4,<8",
     "ifcopenshell==0.9.0"
 ]
+# NOTE: no `occ` here — pythonocc-core has no PyPI distribution
+# (conda-forge only), so it would break `pip install ifckit[all]`.
 all = [
     "ifcopenshell==0.9.0",
     "fastapi>=0.111,<0.137",
     "uvicorn[standard]>=0.29,<0.47",
-    "pythonocc-core>=7.4,<8",
 ]
 
 [project.urls]

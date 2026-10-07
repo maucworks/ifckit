@@ -142,6 +142,9 @@ on CI to catch formatting issues.
 
 - **Runtime**: none required by default
 - **Optional**: `ifcopenshell` for IFC file output
+- **OCC** (`pythonocc-core`, NURBS/intersection paths): conda-forge only —
+  no PyPI distribution exists, so `occ` is deliberately *not* part of the
+  `all` extra (keeps `pip install ifckit[all]` resolvable)
 - **Python**: >= 3.9
 
 ### Version pins (principle)
@@ -154,5 +157,7 @@ which includes the current line. A fresh upstream release never flows in
 silently: `tools/test-matrix.sh` proves the new line first (no CI — local
 matrix), then the band moves.
 Deliberate exceptions with a lower cap only on proven breakage:
-`ifcopenshell==0.9.0` stays exact until point releases prove a band;
+`ifcopenshell==0.9.0` stays exact until point releases prove a band
+(`geom_backend.require_version()` enforces the 0.9 line in code:
+`>=0.9,<0.10`);
 `pythonocc-core<8` until the 8.x wrapper breaks are assessed.
