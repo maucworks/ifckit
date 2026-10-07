@@ -1,0 +1,210 @@
+"""
+ifckit.geom_backend
+===================
+
+Single touchpoint for ``ifcopenshell.geom`` (requires ifcopenshell >= 0.9.0).
+
+All geometry consumers (``IfcModel.export()``, preview tooling, Rhino/Grasshopper
+importers, web configurator backends) build on this facade instead of importing
+``ifcopenshell.geom`` directly, so the 0.9 serializer-API (merged settings, no
+``serializer_settings``) only has to be handled in one place.
+
+Shapes are streamed as :class:`IterShape` records carrying the element GUID, so
+callers can diff and selectively update meshes (configurator, rhinokit) instead
+of re-tessellating everything.
+"""
+
+# This file was generated with the assistance of an AI coding tool.
+
+from __future__ import annotations
+
+import os
+from typing import Any, Iterator, NamedTuple, Optional, Union
+
+#: Default tessellation, matching ifcopenshell behaviour.
+DEFAULT_LINEAR_DEFLECTION = 0.05
+DEFAULT_ANGULAR_DEFLECTION = 0.8
+
+#: Minimum supported ifcopenshell version (merged settings/serializer API).
+MIN_VERSION = (0, 9, 0)
+
+#: Entity types skipped with ``skip_openings=True``.
+_OPENING_TYPES = frozenset({"IfcOpeningElement"})
+
+
+class IterShape(NamedTuple):
+    """One tessellated product: GUID, type, and world-space mesh data."""
+
+    guid: str
+    entity_type: str
+    verts: list
+    faces: list
+
+
+def get_version() -> str:
+    """Return the installed ifcopenshell version string (``"?"`` on failure)."""
+    try:
+        import ifcopenshell
+
+        return str(ifcopenshell.version)
+    except Exception:
+        return "?"
+
+
+def require_version() -> str:
+    """Return the ifcopenshell version, raising if it is older than 0.9.0.
+
+    Raises:
+        ImportError: If ifcopenshell is missing or older than 0.9.0.
+    """
+    version = get_version()
+    try:
+        parts = tuple(int(p) for p in version.split(".")[:3])
+    except ValueError:
+        parts = (0, 0, 0)
+    if len(parts) < 3:
+        parts = parts + (0,) * (3 - len(parts))
+    if parts < MIN_VERSION:
+        raise ImportError(
+            f"ifckit requires ifcopenshell >= 0.9.0, found {version}. "
+            "Upgrade with: pip install -U ifcopenshell"
+        )
+    return version
+
+
+def make_settings(tessellation: Optional[dict] = None) -> Any:
+    """Create geometry settings with world coordinates and tessellation.
+
+    Args:
+        tessellation: Optional overrides, e.g.
+            ``{"linear_deflection": 0.01, "angular_deflection": 0.5}``.
+            Defaults: 0.05 / 0.8 (ifcopenshell behaviour).
+    """
+    import ifcopenshell.geom as _geom
+
+    settings = _geom.settings()
+    tessellation = tessellation or {}
+    linear = float(tessellation.get("linear_deflection", DEFAULT_LINEAR_DEFLECTION))
+    angular = float(tessellation.get("angular_deflection", DEFAULT_ANGULAR_DEFLECTION))
+    settings.set("mesher-linear-deflection", linear)
+    settings.set("mesher-angular-deflection", angular)
+    settings.set(settings.USE_WORLD_COORDS, True)
+    return settings
+
+
+def make_serializer(path: Union[str, os.PathLike], settings: Any) -> Any:
+    """Create a geometry serializer for ``path`` (format from extension).
+
+    The ``.obj`` serializer gets a ``.mtl`` sidecar next to ``path``.
+
+    Raises:
+        ValueError:  If the extension is not recognised.
+        ImportError: If the serializer is unavailable in this build.
+    """
+    import ifcopenshell.geom as _geom
+
+    require_version()
+    path_str = os.fspath(path)
+    try:
+        factory = _geom.serializers.guess_from_extension(path_str)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
+    if factory is None:  # pragma: no cover - defensive, guess raises instead
+        raise ImportError(f"No serializer available for {path_str!r}.")
+    try:
+        if os.path.splitext(path_str)[1].lower() == ".obj":
+            mtl_path = os.path.splitext(path_str)[0] + ".mtl"
+            return factory(path_str, mtl_path, settings)
+        return factory(path_str, settings)
+    except AttributeError as exc:
+        raise ImportError(
+            f"The serializer for {path_str!r} is not available "
+            "in this ifcopenshell build."
+        ) from exc
+
+
+def iter_shapes(
+    source: Any,
+    settings: Any,
+    *,
+    skip_openings: bool = True,
+) -> Iterator[IterShape]:
+    """Yield :class:`IterShape` records for every product in ``source``.
+
+    Args:
+        source:         An open ``ifcopenshell.file`` or a path to an ``.ifc`` file.
+        settings:       Geometry settings, e.g. from :func:`make_settings`.
+        skip_openings:  Skip ``IfcOpeningElement`` shapes (voids), on by default.
+    """
+    import ifcopenshell.geom as _geom
+
+    iterator = _geom.iterator(settings, source)
+    # NOTE: ``iterator.file`` is unreliable (upstream keeps the ``file`` class
+    # instead of the instance when constructed from a file object), so resolve
+    # the lookup file from ``source`` directly.
+    if hasattr(source, "by_guid"):
+        ifc_file = source
+    else:
+        import ifcopenshell
+
+        ifc_file = ifcopenshell.open(os.fspath(source))
+    if not iterator.initialize():
+        return
+    while True:
+        shape = iterator.get()
+        guid = getattr(shape, "guid", "") or ""
+        entity_type = ""
+        if guid:
+            try:
+                entity = ifc_file.by_guid(guid)
+                entity_type = entity.is_a() if entity is not None else ""
+            except Exception:
+                entity_type = ""
+        if skip_openings and entity_type in _OPENING_TYPES:
+            if not iterator.next():
+                break
+            continue
+        geometry = shape.geometry
+        yield IterShape(
+            guid=guid,
+            entity_type=entity_type,
+            verts=list(geometry.verts),
+            faces=list(geometry.faces),
+        )
+        if not iterator.next():
+            break
+
+
+def shapes_to_mesh_dicts(
+    shapes: Iterator[IterShape],
+    *,
+    y_up: bool = True,
+    label_from: str = "type",
+) -> Iterator[dict]:
+    """Convert shapes to viewer mesh dicts (``triangles`` primitive).
+
+    Output matches the ``Path``/``Surface.to_mesh_dict()`` viewer format:
+    ``{"primitive", "positions", "indices", "label", "guid"}``, with the same
+    Z-up to Y-up conversion ``(x, z, -y)``.
+    """
+    for shape in shapes:
+        if y_up:
+            positions = [
+                c
+                for i in range(0, len(shape.verts), 3)
+                for c in (
+                    shape.verts[i],
+                    shape.verts[i + 2],
+                    -shape.verts[i + 1],
+                )
+            ]
+        else:
+            positions = list(shape.verts)
+        label = shape.entity_type if label_from == "type" else shape.guid
+        yield {
+            "primitive": "triangles",
+            "positions": positions,
+            "indices": list(shape.faces),
+            "label": label or shape.guid,
+            "guid": shape.guid,
+        }
