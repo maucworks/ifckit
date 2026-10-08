@@ -8,9 +8,20 @@ Curve — a NURBS/BSpline curve with evaluation (De Boor) and IFC serialisation.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
-from ifckit.geometry.primitives import Arc, Line, Plane, Vec, _copy_with_fresh_meta, _new_id
+from ifckit.geometry.primitives import (
+    Arc,
+    Line,
+    Plane,
+    Vec,
+    _copy_with_fresh_meta,
+    _fmt_num,
+    _new_id,
+    _projected_area,
+    _short_id,
+)
 from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
@@ -118,6 +129,38 @@ def _eval_homo(p: int, uknots: List[float], pts: List[_Homo4D], u: float) -> _Ho
 # ---------------------------------------------------------------------------
 # Curve
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CurveReport:
+    """Immutable measure snapshot of a Curve.
+
+    ``length`` is the chord-length approximation (see ``Curve.length``).
+    ``area`` is the projected (Newell) area over 50 samples when closed,
+    else ``None``.
+    """
+
+    type: str = "curve"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    length: float = 0.0
+    area: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "length": self.length,
+            "area": self.area,
+        }
+
+    def __str__(self) -> str:
+        return (
+            f"CurveReport(id={_short_id(self.id)}, length={_fmt_num(self.length)}, "
+            f"area={_fmt_num(self.area)})"
+        )
 
 
 class Curve:
@@ -351,6 +394,22 @@ class Curve:
         n = max(50, 4 * self.degree)
         pts = self.sample(n)
         return sum((pts[i + 1] - pts[i]).length() for i in range(len(pts) - 1))
+
+    @property
+    def area(self) -> Optional[float]:
+        """Enclosed area for closed curves, else ``None``.
+
+        Projected (Newell) area over ``sample()`` points — exact for
+        polylines, approximate for curved spans. Non-planar loops report
+        their projected area.
+        """
+        if not self.closed:
+            return None
+        return _projected_area(self.sample())
+
+    def report(self) -> "CurveReport":
+        """Immutable measure snapshot (length, area)."""
+        return CurveReport(id=self.id, meta=dict(self.meta), length=self.length, area=self.area)
 
     def sample(self, n: int = 50) -> List[Vec]:
         """Sample *n* evenly‑spaced points in parameter space ``[0, 1]``."""

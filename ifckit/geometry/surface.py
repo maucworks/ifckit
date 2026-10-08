@@ -9,9 +9,10 @@ OCC (``pythonocc-core``) evaluation.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
-from ifckit.geometry.primitives import Vec, _copy_with_fresh_meta, _new_id
+from ifckit.geometry.primitives import Vec, _copy_with_fresh_meta, _fmt_num, _new_id, _short_id
 from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
@@ -53,6 +54,33 @@ def require_occ():
 # ---------------------------------------------------------------------------
 # Surface
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SurfaceReport:
+    """Immutable measure snapshot of a Surface.
+
+    ``area`` sums ``occ_tessellate`` triangles (deflection 0.01) and is
+    ``None`` without ``pythonocc-core`` — consistent with
+    ``Surface.to_mesh_dict``, which also requires OCC.
+    """
+
+    type: str = "surface"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    area: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "area": self.area,
+        }
+
+    def __str__(self) -> str:
+        return f"SurfaceReport(id={_short_id(self.id)}, area={_fmt_num(self.area)})"
 
 
 class Surface:
@@ -115,6 +143,29 @@ class Surface:
     def nv(self) -> int:
         """Number of control points in the V direction."""
         return len(self.control_points[0]) if self.control_points else 0
+
+    @property
+    def area(self) -> Optional[float]:
+        """Surface area via OCC tessellation, else ``None`` without OCC.
+
+        Sums ``occ_tessellate`` triangles (deflection 0.01). Requires
+        ``pythonocc-core`` — returns ``None`` when it is missing instead
+        of raising, so reports stay usable in OCC-less environments.
+        """
+        try:
+            verts, tris = occ_tessellate(self)
+        except ImportError:
+            # require_occ() inside occ_tessellate: no pythonocc-core.
+            return None
+        total = 0.0
+        for a, b, c in tris:
+            pa, pb, pc = (Vec(*verts[i - 1]) for i in (a, b, c))
+            total += abs((pb - pa) ** (pc - pa)) * 0.5
+        return total
+
+    def report(self) -> "SurfaceReport":
+        """Immutable measure snapshot (area)."""
+        return SurfaceReport(id=self.id, meta=dict(self.meta), area=self.area)
 
     # ── evaluation (via OCC) ───────────────────────────────────────
 

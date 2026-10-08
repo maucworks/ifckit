@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
@@ -22,7 +22,10 @@ from ifckit.geometry.primitives import (
     Plane,
     Polyline,
     Vec,
+    _fmt_num,
     _new_id,
+    _projected_area,
+    _short_id,
     _signed_area,
 )
 from ifckit.geometry.transform import Transform
@@ -59,6 +62,44 @@ class PathPoint:
         elif index == 2:
             return self.tangent
         raise IndexError("PathPoint index out of range")
+
+
+@dataclass(frozen=True)
+class PathReport:
+    """Immutable measure snapshot of a Path.
+
+    ``area`` is ``None`` for open or non-planar paths. ``parts`` holds
+    one segment report per segment, in order; ``holes`` holds nested
+    path reports. ``count`` counts segments (holes excluded).
+    """
+
+    type: str = "path"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    length: float = 0.0
+    area: Optional[float] = None
+    count: int = 0
+    parts: tuple = ()
+    holes: tuple = ()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "length": self.length,
+            "area": self.area,
+            "count": self.count,
+            "parts": [p.to_dict() for p in self.parts],
+            "holes": [h.to_dict() for h in self.holes],
+        }
+
+    def __str__(self) -> str:
+        return (
+            f"PathReport(id={_short_id(self.id)}, length={_fmt_num(self.length)}, "
+            f"area={_fmt_num(self.area)}, count={self.count})"
+        )
 
 
 class Path:
@@ -190,6 +231,21 @@ class Path:
     def length(self) -> float:
         """Length of the vector."""
         return sum(seg.length for seg in self._segments)
+
+    @property
+    def area(self) -> Optional[float]:
+        """Enclosed area for closed planar paths, else ``None``.
+
+        Sampled polygon (arcs at 5°) projected via Newell's method, so
+        curved boundaries are approximated. Open or non-planar paths
+        have no well-defined enclosed area → ``None``.
+        """
+        if not self.is_closed or not self.is_planar:
+            return None
+        pts = self.points
+        if len(pts) < 3:
+            return 0.0
+        return _projected_area(pts)
 
     def _segment_and_local_t_at_length(self, d: float) -> "Tuple[int, float]":
         """Map distance *d* along path to ``(segment_index, local_t)``.
@@ -2157,6 +2213,42 @@ class Path:
 
         pts = self.to_profile_points(plane=plane)
         return PolygonProfile(pts, name=name)
+
+    def find(self, id: Optional[str] = None, **criteria: Any) -> List["Line | Arc"]:
+        """Find segments by id and/or metadata (this path and nested holes).
+
+        Exact subset-match on ``meta``: every criterion must be present
+        with an equal value. ``id`` matches the segment identity. Returns
+        matching segments in order; empty list when nothing matches.
+
+        Example::
+
+            path.find(functie="buitenfacade")
+            path.find(id="9f3a…")
+        """
+        out: List["Line | Arc"] = []
+        stack: List["Path"] = [self]
+        while stack:
+            current = stack.pop()
+            stack.extend(current._holes)
+            for seg in current._segments:
+                if id is not None and seg.id != id:
+                    continue
+                if all(k in seg.meta and seg.meta[k] == v for k, v in criteria.items()):
+                    out.append(seg)
+        return out
+
+    def report(self) -> "PathReport":
+        """Immutable measure snapshot (length, area, parts, holes)."""
+        return PathReport(
+            id=self.id,
+            meta=dict(self.meta),
+            length=self.length,
+            area=self.area,
+            count=len(self._segments),
+            parts=tuple(seg.report() for seg in self._segments),
+            holes=tuple(hole.report() for hole in self._holes),
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a plain dict (incl. identity)."""

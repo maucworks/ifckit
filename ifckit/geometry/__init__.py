@@ -18,7 +18,7 @@ frames      — FrameField, transport_frames, fixed_ref_frames, upvector_frames
 """
 
 from ifckit.geometry.biarc import fit_biarcs, solve_biarc
-from ifckit.geometry.curve import Curve
+from ifckit.geometry.curve import Curve, CurveReport
 from ifckit.geometry.frames import (
     FrameField,
     fixed_ref_frames,
@@ -26,19 +26,23 @@ from ifckit.geometry.frames import (
     upvector_frames,
 )
 from ifckit.geometry.intersection import Intersection
-from ifckit.geometry.path import Path, assemble_path
+from ifckit.geometry.path import Path, PathReport, assemble_path
 from ifckit.geometry.primitives import (
     Arc,
+    ArcReport,
     Line,
+    LineReport,
     Plane,
+    PlaneReport,
     Polyline,
     Vec,
+    VecReport,
     _polygon_normal,
     _signed_area,
 )
 from ifckit.geometry.spiral import Spiral
 from ifckit.geometry.subdivision import catmull_clark, extract_patches, write_obj
-from ifckit.geometry.surface import Surface
+from ifckit.geometry.surface import Surface, SurfaceReport
 from ifckit.geometry.transform import Transform
 
 __all__ = [
@@ -50,6 +54,14 @@ __all__ = [
     "Polyline",
     "_polygon_normal",
     "_signed_area",
+    # reports
+    "VecReport",
+    "PlaneReport",
+    "LineReport",
+    "ArcReport",
+    "PathReport",
+    "CurveReport",
+    "SurfaceReport",
     # path
     "Path",
     "assemble_path",

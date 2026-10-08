@@ -17,6 +17,36 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence,
 if TYPE_CHECKING:
     from ifckit.geometry.transform import Transform
 
+from dataclasses import dataclass, field
+
+
+def _fmt_num(x: Optional[float]) -> str:
+    """Human overlay formatting: 3 decimals, or n/a."""
+    return f"{x:.3f}" if x is not None else "n/a"
+
+
+def _short_id(id: Optional[str]) -> str:
+    """Truncated identity for display (8 chars) or –."""
+    return id[:8] if id else "–"
+
+
+def _projected_area(points: "List[Vec]") -> float:
+    """Projected polygon area via Newell's method: ``|n| / 2``.
+
+    Zero for fewer than 3 points or degenerate (zero-area) input.
+    """
+    count = len(points)
+    if count < 3:
+        return 0.0
+    nx = ny = nz = 0.0
+    for i in range(count):
+        cur = points[i]
+        nxt = points[(i + 1) % count]
+        nx += (cur.y - nxt.y) * (cur.z + nxt.z)
+        ny += (cur.z - nxt.z) * (cur.x + nxt.x)
+        nz += (cur.x - nxt.x) * (cur.y + nxt.y)
+    return math.sqrt(nx * nx + ny * ny + nz * nz) * 0.5
+
 
 def _new_id() -> str:
     """Random uuid4 hex for element identity (free-form tagging, search)."""
@@ -276,6 +306,10 @@ class Vec:
     def copy(self) -> "Vec":
         """Return an independent copy."""
         return Vec(self.x, self.y, self.z)
+
+    def report(self) -> "VecReport":
+        """Immutable measure snapshot (norm + coordinates)."""
+        return VecReport(id=self.id, meta=dict(self.meta), length=abs(self), coords=self.to_tuple())
 
     # --- conversion ---------------------------------------------------------
 
@@ -563,6 +597,15 @@ class Plane:
             self.origin.copy(), self.x_axis.copy(), self.y_axis.copy(), id=self.id, meta=self.meta
         )
 
+    def report(self) -> "PlaneReport":
+        """Immutable snapshot (normal + origin; a frame has no measures)."""
+        return PlaneReport(
+            id=self.id,
+            meta=dict(self.meta),
+            normal=self.z_axis.to_tuple(),
+            origin=self.origin.to_tuple(),
+        )
+
     def __repr__(self) -> str:
         return f"Plane(origin={self.origin}, x={self.x_axis}, y={self.y_axis})"
 
@@ -650,6 +693,10 @@ class Line:
     def copy(self) -> "Line":
         """Return an independent copy (same identity)."""
         return Line(self.start.copy(), self.end.copy(), id=self.id, meta=self.meta)
+
+    def report(self) -> "LineReport":
+        """Immutable measure snapshot (length)."""
+        return LineReport(id=self.id, meta=dict(self.meta), length=self.length)
 
     @property
     def length(self) -> float:
@@ -828,6 +875,16 @@ class Arc:
             meta=self.meta,
         )
 
+    def report(self) -> "ArcReport":
+        """Immutable measure snapshot (length, radius, sweep angle in radians)."""
+        return ArcReport(
+            id=self.id,
+            meta=dict(self.meta),
+            length=self.length,
+            radius=self.radius,
+            angle=self.angle,
+        )
+
     def point_at(self, t: float) -> "Vec":
         """t=0 → start, t=1 → end."""
         radial = self.start - self.center
@@ -1004,3 +1061,107 @@ def _signed_area(points: "List[Vec]", normal: "Vec") -> float:
     for i in range(count):
         area = area + (points[i] ** points[(i + 1) % count])
     return (area @ normal) * 0.5
+
+
+# ---------------------------------------------------------------------------
+# Reports — immutable measure snapshots (to_dict() at the JSON boundary)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VecReport:
+    """Measure snapshot of a Vec (point): norm + coordinates."""
+
+    type: str = "vec"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    length: float = 0.0
+    coords: tuple = (0.0, 0.0, 0.0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "length": self.length,
+            "coords": list(self.coords),
+        }
+
+    def __str__(self) -> str:
+        return f"VecReport(id={_short_id(self.id)}, length={_fmt_num(self.length)})"
+
+
+@dataclass(frozen=True)
+class PlaneReport:
+    """Measure snapshot of a Plane: normal + origin (info, no measures)."""
+
+    type: str = "plane"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    normal: tuple = (0.0, 0.0, 1.0)
+    origin: tuple = (0.0, 0.0, 0.0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "normal": list(self.normal),
+            "origin": list(self.origin),
+        }
+
+    def __str__(self) -> str:
+        return f"PlaneReport(id={_short_id(self.id)})"
+
+
+@dataclass(frozen=True)
+class LineReport:
+    """Measure snapshot of a Line segment."""
+
+    type: str = "line"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    length: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "length": self.length,
+        }
+
+    def __str__(self) -> str:
+        return f"LineReport(id={_short_id(self.id)}, length={_fmt_num(self.length)})"
+
+
+@dataclass(frozen=True)
+class ArcReport:
+    """Measure snapshot of an Arc: length, radius, sweep angle (radians)."""
+
+    type: str = "arc"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    length: float = 0.0
+    radius: float = 0.0
+    angle: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "length": self.length,
+            "radius": self.radius,
+            "angle": self.angle,
+        }
+
+    def __str__(self) -> str:
+        return (
+            f"ArcReport(id={_short_id(self.id)}, length={_fmt_num(self.length)}, "
+            f"radius={_fmt_num(self.radius)})"
+        )
