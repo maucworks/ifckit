@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`
 
+## [0.3.2]
+
+### Fixed — Rhino 8 support
+
+- `fix(compat): support Python 3.9 and ifcopenshell 0.8.4` (Rhino 8
+  ships CPython 3.9; 0.8.4.post1 is the last release with 3.9 wheels).
+  `make_serializer()` handles the 0.8 serializer API via capability
+  detection; `require_version()` accepts `>=0.8.4,<0.10`;
+  `requires-python` back to `>=3.9`. Proven by the local matrix
+  (1714 passed on 3.9 + 0.8.4.post1).
+
 ## [0.3.1]
 
 ### Fixed — geom ownership
