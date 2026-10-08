@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`
 
+## [0.3.3]
+
+### Added — geometry reports and identity
+
+- `feat(geometry): id and free-form meta on Vec/Plane/Line/Arc/Curve/`
+  `Surface/Path` (uuid4 default, except value-semantic Vec). `to_dict`/
+  `from_dict` roundtrip both. Copies and rigid transforms preserve
+  identity; trim/tessellate/fillet/offset derive with `derived_from`.
+- `feat(geometry): homogeneous .report()` objects (immutable, `to_dict()`
+  at the JSON boundary, human `__str__`). New measures: `Path.area` and
+  `Curve.area` (closed only, Newell-projected), `Surface.area` (OCC
+  tessellation sum, `None` without OCC). `Path.find()` searches segments
+  and nested holes by id and metadata subset-match.
+
 ## [0.3.2]
 
 ### Fixed — Rhino 8 support
