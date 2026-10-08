@@ -10,11 +10,41 @@ No external dependencies beyond the standard library.
 from __future__ import annotations
 
 import math
+import uuid
 import warnings
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
     from ifckit.geometry.transform import Transform
+
+
+def _new_id() -> str:
+    """Random uuid4 hex for element identity (free-form tagging, search)."""
+    return uuid.uuid4().hex
+
+
+def _copy_with_fresh_meta(obj: Any) -> Any:
+    """``copy.copy`` with the same id but an independent meta dict.
+
+    Default shallow copy would share the caller's meta dict, so mutating
+    the copy's metadata would leak into the original. Identity (``id``)
+    is preserved — it names the same logical element.
+    """
+    cls = type(obj)
+    new = object.__new__(cls)
+    for klass in cls.__mro__:
+        slots = getattr(klass, "__slots__", ())
+        if isinstance(slots, str):
+            slots = (slots,)
+        for key in slots:
+            if key in ("__dict__", "__weakref__"):
+                continue
+            if hasattr(obj, key):
+                setattr(new, key, getattr(obj, key))
+    if hasattr(obj, "__dict__"):
+        new.__dict__.update(obj.__dict__)
+    new.meta = dict(obj.meta) if obj.meta else {}
+    return new
 
 
 class Vec:
@@ -37,12 +67,28 @@ class Vec:
         a.equals(b, tol) fuzzy equality
     """
 
-    __slots__ = ("x", "y", "z")
+    __slots__ = ("x", "y", "z", "id", "meta")
 
-    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
+    def __init__(
+        self,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self.x = float(x)
         self.y = float(y)
         self.z = float(z)
+        # Value semantics: points do NOT auto-mint an id (unlike Line/Arc/
+        # Curve/Surface/Path/Plane) — identity is attached on demand.
+        self.id = id
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
+
+    def __copy__(self) -> "Vec":
+        """Shallow copy: same id (usually None), independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     # --- constructors -------------------------------------------------------
 
@@ -237,14 +283,14 @@ class Vec:
         """Return as a tuple of three floats."""
         return (self.x, self.y, self.z)
 
-    def to_dict(self) -> Dict[str, float]:
-        """Serialise to a plain dict."""
-        return {"x": self.x, "y": self.y, "z": self.z}
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain dict (incl. identity, usually unset)."""
+        return {"x": self.x, "y": self.y, "z": self.z, "id": self.id, "meta": dict(self.meta)}
 
     @classmethod
-    def from_dict(cls, d: Dict[str, float]) -> "Vec":
-        """Deserialize from a dict."""
-        return cls(d["x"], d["y"], d["z"])
+    def from_dict(cls, d: Dict[str, Any]) -> "Vec":
+        """Deserialize from a dict (missing id/meta stay unset)."""
+        return cls(d["x"], d["y"], d["z"], id=d.get("id"), meta=d.get("meta"))
 
 
 # ---------------------------------------------------------------------------
@@ -261,9 +307,17 @@ class Plane:
     Useful as an IFC local placement and as a profile orientation.
     """
 
-    __slots__ = ("origin", "x_axis", "y_axis")
+    __slots__ = ("origin", "x_axis", "y_axis", "id", "meta")
 
-    def __init__(self, origin: "Vec", x_axis: "Vec", y_axis: "Vec") -> None:
+    def __init__(
+        self,
+        origin: "Vec",
+        x_axis: "Vec",
+        y_axis: "Vec",
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
         x_norm = x_axis.normalized()
         y_norm = y_axis.normalized()
         dot = x_norm @ y_norm
@@ -275,6 +329,12 @@ class Plane:
         self.origin = origin
         self.x_axis = x_norm
         self.y_axis = y_norm
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
+
+    def __copy__(self) -> "Plane":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     @property
     def z_axis(self) -> "Vec":
@@ -432,28 +492,34 @@ class Plane:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         return {
             "origin": self.origin.to_dict(),
             "x_axis": self.x_axis.to_dict(),
             "y_axis": self.y_axis.to_dict(),
+            "id": self.id,
+            "meta": dict(self.meta),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Plane":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         return cls(
             origin=Vec.from_dict(d["origin"]),
             x_axis=Vec.from_dict(d["x_axis"]),
             y_axis=Vec.from_dict(d["y_axis"]),
+            id=d.get("id"),
+            meta=d.get("meta"),
         )
 
     def transformed(self, t: "Transform") -> "Plane":
-        """Apply a 4×4 affine transform. Returns a new Plane."""
+        """Apply a 4×4 affine transform. Returns a new Plane (same identity)."""
         return Plane(
             t.apply(self.origin),
             t.apply_vector(self.x_axis),
             t.apply_vector(self.y_axis),
+            id=self.id,
+            meta=self.meta,
         )
 
     def mirrored(self, plane: "Plane") -> "Plane":
@@ -463,31 +529,39 @@ class Plane:
         return self.transformed(Transform.reflection(plane))
 
     def translated(self, delta: "Vec") -> "Plane":
-        """Translate by *delta* (axes unchanged). Returns a new Plane."""
-        return Plane(self.origin + delta, self.x_axis, self.y_axis)
+        """Translate by *delta* (axes unchanged). Returns a new Plane (same identity)."""
+        return Plane(self.origin + delta, self.x_axis, self.y_axis, id=self.id, meta=self.meta)
 
     def rotated(self, axis: "Vec", angle: float) -> "Plane":
-        """Rotate around *axis* by *angle* radians. Returns a new Plane."""
+        """Rotate around *axis* by *angle* radians. Returns a new Plane (same identity)."""
         from ifckit.geometry.transform import Transform
 
         t = Transform.rotation(axis, angle)
-        return Plane(t.apply(self.origin), t.apply_vector(self.x_axis), t.apply_vector(self.y_axis))
+        return Plane(
+            t.apply(self.origin),
+            t.apply_vector(self.x_axis),
+            t.apply_vector(self.y_axis),
+            id=self.id,
+            meta=self.meta,
+        )
 
     def flip_x(self) -> "Plane":
         """Negate x_axis. z_axis is also negated (x→-x ⇒ z→-z)."""
-        return Plane(self.origin, -self.x_axis, self.y_axis)
+        return Plane(self.origin, -self.x_axis, self.y_axis, id=self.id, meta=self.meta)
 
     def flip_y(self) -> "Plane":
         """Negate y_axis. z_axis is also negated (y→-y ⇒ z→-z)."""
-        return Plane(self.origin, self.x_axis, -self.y_axis)
+        return Plane(self.origin, self.x_axis, -self.y_axis, id=self.id, meta=self.meta)
 
     def flip_z(self) -> "Plane":
         """Negate z_axis (normal). Keeps x_axis, negates y_axis for right-handedness."""
-        return Plane(self.origin, self.x_axis, -self.y_axis)
+        return Plane(self.origin, self.x_axis, -self.y_axis, id=self.id, meta=self.meta)
 
     def copy(self) -> "Plane":
-        """Return an independent copy."""
-        return Plane(self.origin.copy(), self.x_axis.copy(), self.y_axis.copy())
+        """Return an independent copy (same identity)."""
+        return Plane(
+            self.origin.copy(), self.x_axis.copy(), self.y_axis.copy(), id=self.id, meta=self.meta
+        )
 
     def __repr__(self) -> str:
         return f"Plane(origin={self.origin}, x={self.x_axis}, y={self.y_axis})"
@@ -501,11 +575,24 @@ class Plane:
 class Line:
     """A finite line segment from start to end."""
 
-    __slots__ = ("start", "end")
+    __slots__ = ("start", "end", "id", "meta")
 
-    def __init__(self, start: "Vec", end: "Vec") -> None:
+    def __init__(
+        self,
+        start: "Vec",
+        end: "Vec",
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self.start = start
         self.end = end
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
+
+    def __copy__(self) -> "Line":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     @property
     def direction(self) -> "Vec":
@@ -525,12 +612,12 @@ class Line:
         return self.direction
 
     def reverse(self) -> "Line":
-        """Return a reversed copy of this line."""
-        return Line(self.end, self.start)
+        """Return a reversed copy of this line (same identity)."""
+        return Line(self.end, self.start, id=self.id, meta=self.meta)
 
     def transformed(self, t: "Transform") -> "Line":
-        """Apply a 4×4 affine transform. Returns a new Line."""
-        return Line(t.apply(self.start), t.apply(self.end))
+        """Apply a 4×4 affine transform. Returns a new Line (same identity)."""
+        return Line(t.apply(self.start), t.apply(self.end), id=self.id, meta=self.meta)
 
     def mirrored(self, plane: "Plane") -> "Line":
         """Mirror over an arbitrary plane. Returns a new Line."""
@@ -539,11 +626,11 @@ class Line:
         return self.transformed(Transform.reflection(plane))
 
     def translated(self, delta: "Vec") -> "Line":
-        """Translate by *delta*. Returns a new Line."""
-        return Line(self.start + delta, self.end + delta)
+        """Translate by *delta*. Returns a new Line (same identity)."""
+        return Line(self.start + delta, self.end + delta, id=self.id, meta=self.meta)
 
     def rotated(self, axis: "Vec", angle: float) -> "Line":
-        """Rotate around *axis* by *angle* radians. Returns a new Line."""
+        """Rotate around *axis* by *angle* radians. Returns a new Line (same identity)."""
         from ifckit.geometry.transform import Transform
 
         return self.transformed(Transform.rotation(axis, angle))
@@ -551,7 +638,7 @@ class Line:
     def scaled(
         self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
     ) -> "Line":
-        """Scale by *sx*, *sy*, *sz*. Returns a new Line."""
+        """Scale by *sx*, *sy*, *sz*. Returns a new Line (same identity)."""
         from ifckit.geometry.transform import Transform
 
         if sy is None:
@@ -561,8 +648,8 @@ class Line:
         return self.transformed(Transform.scaling(sx, sy, sz))
 
     def copy(self) -> "Line":
-        """Return an independent copy."""
-        return Line(self.start.copy(), self.end.copy())
+        """Return an independent copy (same identity)."""
+        return Line(self.start.copy(), self.end.copy(), id=self.id, meta=self.meta)
 
     @property
     def length(self) -> float:
@@ -583,13 +670,21 @@ class Line:
         return Polyline([self.start, self.end])
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
-        return {"type": "line", "start": self.start.to_dict(), "end": self.end.to_dict()}
+        """Serialise to a plain dict (incl. identity)."""
+        return {
+            "type": "line",
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+            "id": self.id,
+            "meta": dict(self.meta),
+        }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Line":
-        """Deserialize from a dict."""
-        return cls(Vec.from_dict(d["start"]), Vec.from_dict(d["end"]))
+        """Deserialize from a dict (missing id mints a new one)."""
+        return cls(
+            Vec.from_dict(d["start"]), Vec.from_dict(d["end"]), id=d.get("id"), meta=d.get("meta")
+        )
 
     def __repr__(self) -> str:
         return f"Line({self.start} → {self.end})"
@@ -614,7 +709,7 @@ class Arc:
     The end point is computed from center, radius, normal, and angle.
     """
 
-    __slots__ = ("center", "normal", "start", "angle")
+    __slots__ = ("center", "normal", "start", "angle", "id", "meta")
 
     def __init__(
         self,
@@ -622,11 +717,20 @@ class Arc:
         normal: "Vec",
         start: "Vec",
         angle: float,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.center = center
         self.normal = normal.normalized()
         self.start = start
         self.angle = angle  # radians, signed
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
+
+    def __copy__(self) -> "Arc":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     @property
     def radius(self) -> float:
@@ -650,8 +754,9 @@ class Arc:
 
         The reversed arc starts at self.end and ends at self.start,
         with angle negated to indicate opposite traversal direction.
+        Identity is preserved.
         """
-        return Arc(self.center, self.normal, self.end, -self.angle)
+        return Arc(self.center, self.normal, self.end, -self.angle, id=self.id, meta=self.meta)
 
     def transformed(self, t: "Transform") -> "Arc":
         """Apply a 4×4 affine transform.
@@ -659,6 +764,7 @@ class Arc:
         Under uniform transforms (rotation, translation, reflection, uniform
         scale) the arc stays a circular arc.  Under non-uniform scale the arc
         would become an ellipse — raises ValueError; use ``to_path()`` instead.
+        Identity is preserved.
         """
         if not t.is_uniform_scale():
             raise ValueError(
@@ -668,7 +774,7 @@ class Arc:
         new_center = t.apply(self.center)
         new_start = t.apply(self.start)
         new_normal = t.apply_vector(self.normal)
-        return Arc(new_center, new_normal, new_start, self.angle)
+        return Arc(new_center, new_normal, new_start, self.angle, id=self.id, meta=self.meta)
 
     def mirrored(self, plane: "Plane") -> "Arc":
         """Mirror over an arbitrary plane. Returns a new Arc."""
@@ -677,18 +783,25 @@ class Arc:
         return self.transformed(Transform.reflection(plane))
 
     def translated(self, delta: "Vec") -> "Arc":
-        """Translate by *delta*. Returns a new Arc."""
-        return Arc(self.center + delta, self.normal, self.start + delta, self.angle)
+        """Translate by *delta*. Returns a new Arc (same identity)."""
+        return Arc(
+            self.center + delta,
+            self.normal,
+            self.start + delta,
+            self.angle,
+            id=self.id,
+            meta=self.meta,
+        )
 
     def rotated(self, axis: "Vec", angle: float) -> "Arc":
-        """Rotate around *axis* by *angle* radians. Returns a new Arc."""
+        """Rotate around *axis* by *angle* radians. Returns a new Arc (same identity)."""
         from ifckit.geometry.transform import Transform
 
         r = Transform.rotation(axis, angle)
         c = r.apply(self.center)
         n = r.apply_vector(self.normal)
         s = r.apply(self.start)
-        return Arc(c, n, s, self.angle)
+        return Arc(c, n, s, self.angle, id=self.id, meta=self.meta)
 
     def scaled(
         self, sx: float, sy: "Optional[float]" = None, sz: "Optional[float]" = None
@@ -705,8 +818,15 @@ class Arc:
         return self.transformed(t)
 
     def copy(self) -> "Arc":
-        """Return an independent copy."""
-        return Arc(self.center.copy(), self.normal.copy(), self.start.copy(), self.angle)
+        """Return an independent copy (same identity)."""
+        return Arc(
+            self.center.copy(),
+            self.normal.copy(),
+            self.start.copy(),
+            self.angle,
+            id=self.id,
+            meta=self.meta,
+        )
 
     def point_at(self, t: float) -> "Vec":
         """t=0 → start, t=1 → end."""
@@ -746,23 +866,27 @@ class Arc:
         return (self.normal**radial) * sign
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         return {
             "type": "arc",
             "center": self.center.to_dict(),
             "normal": self.normal.to_dict(),
             "start": self.start.to_dict(),
             "angle": self.angle,
+            "id": self.id,
+            "meta": dict(self.meta),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Arc":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         return cls(
             Vec.from_dict(d["center"]),
             Vec.from_dict(d["normal"]),
             Vec.from_dict(d["start"]),
             d["angle"],
+            id=d.get("id"),
+            meta=d.get("meta"),
         )
 
     def __repr__(self) -> str:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
-from ifckit.geometry.primitives import Vec
+from ifckit.geometry.primitives import Vec, _copy_with_fresh_meta, _new_id
 from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
@@ -74,6 +74,9 @@ class Surface:
         weights: Optional[Sequence[Sequence[float]]] = None,
         uclosed: bool = False,
         vclosed: bool = False,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.control_points = [
             [Vec(*p) if not isinstance(p, Vec) else p for p in row] for row in control_points
@@ -87,8 +90,14 @@ class Surface:
         self._weights = [list(w) for w in weights] if weights is not None else None
         self.uclosed = uclosed
         self.vclosed = vclosed
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
         self._occ_face = None  # cached OCC TopoDS_Face for optimised MakeFilling
         self._occ_edge = None  # cached OCC TopoDS_Edge matching curve in _occ_face
+
+    def __copy__(self) -> "Surface":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     # ── properties ──────────────────────────────────────────────────
 
@@ -233,7 +242,7 @@ class Surface:
     # ── dict serialisation ─────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         d: Dict[str, Any] = {
             "udegree": self.udegree,
             "vdegree": self.vdegree,
@@ -244,6 +253,8 @@ class Surface:
             "vmults": self.vmults,
             "uclosed": self.uclosed,
             "vclosed": self.vclosed,
+            "id": self.id,
+            "meta": dict(self.meta),
         }
         if self._weights is not None:
             d["weights"] = self._weights
@@ -251,7 +262,7 @@ class Surface:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Surface":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         return cls(
             control_points=[[Vec.from_dict(v) for v in row] for row in d["control_points"]],
             uknots=d["uknots"],
@@ -263,6 +274,8 @@ class Surface:
             weights=d.get("weights"),
             uclosed=d.get("uclosed", False),
             vclosed=d.get("vclosed", False),
+            id=d.get("id"),
+            meta=d.get("meta"),
         )
 
     def __repr__(self) -> str:
@@ -290,6 +303,8 @@ class Surface:
             weights=weights,
             uclosed=self.uclosed,
             vclosed=self.vclosed,
+            id=self.id,
+            meta=self.meta,
         )
 
     def mirrored(self, plane: "Plane") -> "Surface":
@@ -315,7 +330,7 @@ class Surface:
         return self.transformed(Transform.scaling(sx, sy, sz))
 
     def copy(self) -> "Surface":
-        """Return an independent deep copy."""
+        """Return an independent deep copy (same identity)."""
         weights = None
         if self._weights is not None:
             weights = [[w for w in row] for row in self._weights]
@@ -330,6 +345,8 @@ class Surface:
             weights=weights,
             uclosed=self.uclosed,
             vclosed=self.vclosed,
+            id=self.id,
+            meta=self.meta,
         )
 
     # ── OCC bridge ─────────────────────────────────────────────────

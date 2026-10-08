@@ -9,6 +9,7 @@ support and path assembly helpers.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
@@ -21,6 +22,7 @@ from ifckit.geometry.primitives import (
     Plane,
     Polyline,
     Vec,
+    _new_id,
     _signed_area,
 )
 from ifckit.geometry.transform import Transform
@@ -80,11 +82,19 @@ class Path:
     Do NOT replace ``isinstance`` here with string-name checks.
     """
 
-    def __init__(self, plane: Optional["Plane"] = None) -> None:
+    def __init__(
+        self,
+        plane: Optional["Plane"] = None,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self._segments: List[Line | Arc] = []
         self._plane: Optional["Plane"] = plane
         self._holes: List["Path"] = []
         self._cached_points: Optional[List["Vec"]] = None
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
 
     def _invalidate_cache(self) -> None:
         self._cached_points = None
@@ -110,7 +120,10 @@ class Path:
         """
         import copy
 
-        new_path = Path(plane=self._plane)
+        new_path = Path(
+            plane=self._plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
         new_path._segments = [copy.copy(seg) for seg in self._segments]
         new_path._holes = list(self._holes) + [inner]
         return new_path
@@ -141,9 +154,20 @@ class Path:
             pts.append(seg.end)
         return pts
 
-    def add_line(self, start: "Vec", end: "Vec") -> "Path":
-        """Append a line segment to the path close to the current end."""
-        self._segments.append(Line(start, end))
+    def add_line(
+        self,
+        start: "Vec",
+        end: "Vec",
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> "Path":
+        """Append a line segment to the path close to the current end.
+
+        Optional *id*/*meta* tag the segment at creation (e.g. facade
+        role); without them a fresh uuid is minted.
+        """
+        self._segments.append(Line(start, end, id=id, meta=meta))
         self._invalidate_cache()
         return self
 
@@ -153,9 +177,12 @@ class Path:
         normal: "Vec",
         start: "Vec",
         angle: float,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> "Path":
-        """Append an arc segment to the path."""
-        self._segments.append(Arc(center, normal, start, angle))
+        """Append an arc segment to the path (optional *id*/*meta* tag)."""
+        self._segments.append(Arc(center, normal, start, angle, id=id, meta=meta))
         self._invalidate_cache()
         return self
 
@@ -339,42 +366,63 @@ class Path:
 
         import copy
 
-        new_path = Path(plane=self._plane)
+        def _trimmed(seg: "Line | Arc", make: Callable[[], "Line | Arc"]) -> "Line | Arc":
+            """New segment derived from *seg* (fresh id, derived_from set)."""
+            trimmed = make()
+            trimmed.meta["derived_from"] = seg.id
+            return trimmed
+
+        new_path = Path(
+            plane=self._plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
 
         if i0 == i1:
             seg = self._segments[i0]
             if isinstance(seg, Line):
-                new_path._segments.append(Line(seg.point_at(lt0), seg.point_at(lt1)))
+                new_path._segments.append(
+                    _trimmed(seg, lambda: Line(seg.point_at(lt0), seg.point_at(lt1)))
+                )
             else:
                 new_start = seg.point_at(lt0)
                 new_angle = seg.angle * (lt1 - lt0)
-                new_path._segments.append(Arc(seg.center, seg.normal, new_start, new_angle))
+                new_path._segments.append(
+                    _trimmed(seg, lambda: Arc(seg.center, seg.normal, new_start, new_angle))
+                )
             return new_path
 
         # First segment trimmed from lt0 to end
         seg0 = self._segments[i0]
         if isinstance(seg0, Line):
-            new_path._segments.append(Line(seg0.point_at(lt0), seg0.end))
+            new_path._segments.append(_trimmed(seg0, lambda: Line(seg0.point_at(lt0), seg0.end)))
         else:
             new_path._segments.append(
-                Arc(
-                    seg0.center,
-                    seg0.normal,
-                    seg0.point_at(lt0),
-                    seg0.angle * (1.0 - lt0),
+                _trimmed(
+                    seg0,
+                    lambda: Arc(
+                        seg0.center,
+                        seg0.normal,
+                        seg0.point_at(lt0),
+                        seg0.angle * (1.0 - lt0),
+                    ),
                 )
             )
 
-        # Full middle segments
+        # Full middle segments (same identity via copy)
         for i in range(i0 + 1, i1):
             new_path._segments.append(copy.copy(self._segments[i]))
 
         # Last segment trimmed from start to lt1
         seg1 = self._segments[i1]
         if isinstance(seg1, Line):
-            new_path._segments.append(Line(seg1.start, seg1.point_at(lt1)))
+            new_path._segments.append(_trimmed(seg1, lambda: Line(seg1.start, seg1.point_at(lt1))))
         else:
-            new_path._segments.append(Arc(seg1.center, seg1.normal, seg1.start, seg1.angle * lt1))
+            new_path._segments.append(
+                _trimmed(
+                    seg1,
+                    lambda: Arc(seg1.center, seg1.normal, seg1.start, seg1.angle * lt1),
+                )
+            )
 
         return new_path
 
@@ -418,16 +466,19 @@ class Path:
         """
         if not self._segments:
             raise ValueError("Path has no segments")
-        new = Path(plane=self._plane)
+        new = Path(
+            plane=self._plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
         if start_dist > 0:
             p = self.start_point()
             t = self.start_tangent()
             new.add_line(p - t * start_dist, p)
         for seg in self._segments:
             if isinstance(seg, Line):
-                new.add_line(seg.start, seg.end)
+                new.add_line(seg.start, seg.end, id=seg.id, meta=seg.meta)
             else:
-                new.add_arc(seg.center, seg.normal, seg.start, seg.angle)
+                new.add_arc(seg.center, seg.normal, seg.start, seg.angle, id=seg.id, meta=seg.meta)
         if end_dist > 0:
             p = self.end_point()
             t = self.end_tangent()
@@ -472,12 +523,29 @@ class Path:
         Returns:
             New ``Path`` with only ``Line`` segments.
         """
-        pts = self.sample(angle_step_deg).points
-        path = Path(plane=self._plane)
-        for i in range(len(pts) - 1):
-            path._segments.append(Line(pts[i], pts[i + 1]))
-        if self.is_closed and not pts[-1].equals(pts[0], tol=1e-9):
-            path._segments.append(Line(pts[-1], pts[0]))
+        path = Path(
+            plane=self._plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
+        for seg in self._segments:
+            if isinstance(seg, Line):
+                # Same logical segment, tessellated form: keep identity.
+                import copy
+
+                path._segments.append(copy.copy(seg))
+                continue
+            seg_pts = seg.sample(angle_step_deg)
+            for i in range(len(seg_pts) - 1):
+                line = Line(seg_pts[i], seg_pts[i + 1])
+                line.meta["derived_from"] = seg.id
+                path._segments.append(line)
+        if self.is_closed and path._segments:
+            first = path._segments[0].start
+            last = path._segments[-1].end
+            if not last.equals(first, tol=1e-9):
+                closing = Line(last, first)
+                closing.meta["derived_from"] = self._segments[-1].id
+                path._segments.append(closing)
         return path
 
     def to_mesh_dict(
@@ -960,11 +1028,15 @@ class Path:
         sweep = math.atan2(sin_sweep, cos_sweep)
 
         # ------------------------------------------------------------------
-        # Rebuild the three segments: shortened in, arc, shortened out
+        # Rebuild the three segments: shortened in, arc, shortened out.
+        # New geometry → fresh ids with derived_from to the consumed pair.
         # ------------------------------------------------------------------
         new_seg_in = Line(seg_in.start, tan_pt_in)
+        new_seg_in.meta["derived_from"] = seg_in.id
         arc_seg = Arc(center, arc_normal, tan_pt_in, sweep)
+        arc_seg.meta["derived_from"] = [seg_in.id, seg_out.id]
         new_seg_out = Line(tan_pt_out, seg_out.end)
+        new_seg_out.meta["derived_from"] = seg_out.id
 
         if index == 0:
             # Wrap-around corner: replace segs[-1] and segs[0] with the
@@ -980,13 +1052,15 @@ class Path:
         return self
 
     def reverse(self) -> "Path":
-        """Reverse the order and direction of all segments. Returns self."""
+        """Reverse the order and direction of all segments. Returns self (identity kept)."""
         reversed_segs: list[Line | Arc] = []
         for seg in reversed(self._segments):
             if isinstance(seg, Line):
-                reversed_segs.append(Line(seg.end, seg.start))
+                reversed_segs.append(Line(seg.end, seg.start, id=seg.id, meta=seg.meta))
             else:  # Arc
-                reversed_segs.append(Arc(seg.center, seg.normal, seg.end, -seg.angle))
+                reversed_segs.append(
+                    Arc(seg.center, seg.normal, seg.end, -seg.angle, id=seg.id, meta=seg.meta)
+                )
         self._segments = reversed_segs
         self._invalidate_cache()
         return self
@@ -996,13 +1070,28 @@ class Path:
         new_segs: list[Line | Arc] = []
         for seg in self._segments:
             if isinstance(seg, Line):
-                new_segs.append(Line(seg.start + delta, seg.end + delta))
+                new_segs.append(Line(seg.start + delta, seg.end + delta, id=seg.id, meta=seg.meta))
             else:
-                new_segs.append(Arc(seg.center + delta, seg.normal, seg.start + delta, seg.angle))
+                new_segs.append(
+                    Arc(
+                        seg.center + delta,
+                        seg.normal,
+                        seg.start + delta,
+                        seg.angle,
+                        id=seg.id,
+                        meta=seg.meta,
+                    )
+                )
         self._segments = new_segs
         self._invalidate_cache()
         if self._plane is not None:
-            self._plane = Plane(self._plane.origin + delta, self._plane.x_axis, self._plane.y_axis)
+            self._plane = Plane(
+                self._plane.origin + delta,
+                self._plane.x_axis,
+                self._plane.y_axis,
+                id=self._plane.id,
+                meta=self._plane.meta,
+            )
         return self
 
     def rotate(self, degrees: float, center: "Optional[Vec]" = None) -> "Path":
@@ -1027,6 +1116,8 @@ class Path:
                     Line(
                         (seg.start - ctr).rotate_around(axis, angle) + ctr,
                         (seg.end - ctr).rotate_around(axis, angle) + ctr,
+                        id=seg.id,
+                        meta=seg.meta,
                     )
                 )
             else:
@@ -1036,6 +1127,8 @@ class Path:
                         seg.normal,
                         (seg.start - ctr).rotate_around(axis, angle) + ctr,
                         seg.angle,
+                        id=seg.id,
+                        meta=seg.meta,
                     )
                 )
         self._segments = new_segs
@@ -1045,6 +1138,8 @@ class Path:
                 (self._plane.origin - ctr).rotate_around(axis, angle) + ctr,
                 self._plane.x_axis.rotate_around(axis, angle),
                 self._plane.y_axis.rotate_around(axis, angle),
+                id=self._plane.id,
+                meta=self._plane.meta,
             )
         return self
 
@@ -1065,7 +1160,7 @@ class Path:
             if isinstance(seg, Line):
                 new_start = target.closest_point(seg.start)
                 new_end = target.closest_point(seg.end)
-                new_segs.append(Line(new_start, new_end))
+                new_segs.append(Line(new_start, new_end, id=seg.id, meta=seg.meta))
             else:  # Arc
                 new_center = target.closest_point(seg.center)
                 new_start = target.closest_point(seg.start)
@@ -1073,7 +1168,16 @@ class Path:
                 # opposes target.z_axis, negate the angle so the arc still
                 # sweeps in the same rotational direction.
                 sign = 1.0 if (seg.normal @ target.z_axis) >= 0 else -1.0
-                new_segs.append(Arc(new_center, target.z_axis, new_start, seg.angle * sign))
+                new_segs.append(
+                    Arc(
+                        new_center,
+                        target.z_axis,
+                        new_start,
+                        seg.angle * sign,
+                        id=seg.id,
+                        meta=seg.meta,
+                    )
+                )
         self._segments = new_segs
         self._plane = target
         self._invalidate_cache()
@@ -1105,13 +1209,20 @@ class Path:
         return self
 
     def duplicate(self) -> "Path":
-        """Return a deep copy of this Path. Changes to the copy do not affect the original."""
+        """Return a deep copy of this Path. Changes to the copy do not affect the original.
+
+        Identity is preserved: same id, independent meta dict (holes duplicate recursively).
+        """
         import copy
 
-        new_path = Path(plane=self._plane)
+        new_path = Path(plane=self._plane, id=self.id, meta=self.meta)
         new_path._segments = [copy.copy(seg) for seg in self._segments]
         new_path._holes = [h.duplicate() for h in self._holes]
         return new_path
+
+    def __copy__(self) -> "Path":
+        """Shallow copy via duplicate (same identity)."""
+        return self.duplicate()
 
     # ------------------------------------------------------------------
     # Affine transforms  (return new Path)
@@ -1123,7 +1234,11 @@ class Path:
         Returns a new Path.  Under non-uniform scale, Arc segments are
         sampled to polylines (since arcs become ellipses).
         """
-        new_path = Path(plane=self._plane.transformed(t) if self._plane else None)
+        new_path = Path(
+            plane=self._plane.transformed(t) if self._plane else None,
+            id=self.id,
+            meta=self.meta,
+        )
         new_path._segments = []
         # Use self.segments (property) to trigger lazy building (e.g. Profile)
         for seg in self.segments:
@@ -1134,7 +1249,9 @@ class Path:
             else:
                 pts = seg.sample()
                 for i in range(len(pts) - 1):
-                    new_path._segments.append(Line(t.apply(pts[i]), t.apply(pts[i + 1])))
+                    line = Line(t.apply(pts[i]), t.apply(pts[i + 1]))
+                    line.meta["derived_from"] = seg.id
+                    new_path._segments.append(line)
         new_path._holes = [h.transformed(t) for h in self._holes]
         return new_path
 
@@ -1246,10 +1363,16 @@ class Path:
             pt = origin + x_axis * last_seg.end.x + y_axis * last_seg.end.y
             projected_pts.append(pt)
 
-        # Create new path with projected points
-        new_path = Path(plane=target_plane)
-        for i in range(len(projected_pts) - 1):
-            new_path._segments.append(Line(projected_pts[i], projected_pts[i + 1]))
+        # Create new path with projected points (1:1 per segment)
+        new_path = Path(
+            plane=target_plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
+        for i, seg in enumerate(self._segments):
+            if i < len(projected_pts) - 1:
+                projected = Line(projected_pts[i], projected_pts[i + 1])
+                projected.meta["derived_from"] = seg.id
+                new_path._segments.append(projected)
 
         # Handle holes the same way
         for hole in self._holes:
@@ -1285,7 +1408,10 @@ class Path:
             ValueError: If consecutive segments cannot be connected or
                 the path plane cannot be determined.
         """
-        result = Path(plane=self._plane)
+        result = Path(
+            plane=self._plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
         if not self._segments:
             return result
 
@@ -1298,9 +1424,18 @@ class Path:
                 seg_start = seg.start
                 if prev_end.distance_to(seg_start) <= tol:
                     if isinstance(seg, Line):
-                        snapped.append(Line(prev_end, seg.end))
+                        snapped.append(Line(prev_end, seg.end, id=seg.id, meta=seg.meta))
                     else:  # Arc
-                        snapped.append(Arc(seg.center, seg.normal, prev_end, seg.angle))
+                        snapped.append(
+                            Arc(
+                                seg.center,
+                                seg.normal,
+                                prev_end,
+                                seg.angle,
+                                id=seg.id,
+                                meta=seg.meta,
+                            )
+                        )
                 else:
                     snapped.append(seg)
             src = snapped
@@ -1320,7 +1455,14 @@ class Path:
             if not isinstance(seg, Arc) or plane_normal is None:
                 return seg
             if (seg.normal.normalized() @ plane_normal) < -tol:
-                return Arc(seg.center, seg.normal * -1, seg.start, -seg.angle)
+                return Arc(
+                    seg.center,
+                    seg.normal * -1,
+                    seg.start,
+                    -seg.angle,
+                    id=seg.id,
+                    meta=seg.meta,
+                )
             return seg
 
         result._segments = [_align_arc(src[0])]
@@ -1349,7 +1491,10 @@ class Path:
         Returns:
             A new ``Path`` with uniform arc normals.
         """
-        result = Path(plane=self._plane)
+        result = Path(
+            plane=self._plane,
+            meta={**self.meta, "derived_from": self.id},
+        )
         if not self._segments:
             return result
 
@@ -1436,10 +1581,13 @@ class Path:
         # plane normal (positive sweep = CCW = inward side is toward center).
         # ------------------------------------------------------------------
         def _offset_seg(seg: "Line | Arc") -> "Line | Arc":
+            out: "Line | Arc"
             if isinstance(seg, Line):
                 d = (seg.end - seg.start).normalized()
                 perp = (n**d).normalized() * dist
-                return Line(seg.start + perp, seg.end + perp)
+                out = Line(seg.start + perp, seg.end + perp)
+                out.meta["derived_from"] = seg.id
+                return out
 
             # Arc: offset radius.
             # The "inward" side of the arc depends on both the arc normal
@@ -1458,7 +1606,9 @@ class Path:
                 )
             radial = (seg.start - seg.center).normalized()
             new_start = seg.center + radial * new_radius
-            return Arc(seg.center, seg.normal, new_start, seg.angle)
+            out = Arc(seg.center, seg.normal, new_start, seg.angle)
+            out.meta["derived_from"] = seg.id
+            return out
 
         offset_segs = [_offset_seg(s) for s in segs]
 
@@ -1486,20 +1636,20 @@ class Path:
 
         def _set_start(seg: "Line | Arc", pt: "Vec") -> "Line | Arc":
             if isinstance(seg, Line):
-                return Line(pt, seg.end)
+                return Line(pt, seg.end, id=seg.id, meta=seg.meta)
             # radial = (pt - seg.center).normalized()
-            return Arc(seg.center, seg.normal, pt, seg.angle)
+            return Arc(seg.center, seg.normal, pt, seg.angle, id=seg.id, meta=seg.meta)
 
         def _set_end(seg: "Line | Arc", pt: "Vec") -> "Line | Arc":
             if isinstance(seg, Line):
-                return Line(seg.start, pt)
+                return Line(seg.start, pt, id=seg.id, meta=seg.meta)
             # Adjust angle so the arc ends at pt
             radial_start = (seg.start - seg.center).normalized()
             radial_end = (pt - seg.center).normalized()
             cos_a = max(-1.0, min(1.0, radial_start @ radial_end))
             sin_a = seg.normal @ (radial_start**radial_end)
             new_angle = math.atan2(sin_a, cos_a)
-            return Arc(seg.center, seg.normal, seg.start, new_angle)
+            return Arc(seg.center, seg.normal, seg.start, new_angle, id=seg.id, meta=seg.meta)
 
         n_segs = len(offset_segs)
         indices = range(n_segs) if self.is_closed else range(n_segs - 1)
@@ -1523,20 +1673,26 @@ class Path:
         # ------------------------------------------------------------------
         # Step 3 – assemble result path
         # ------------------------------------------------------------------
+        def _result() -> "Path":
+            return Path(
+                plane=self._plane,
+                meta={**self.meta, "derived_from": self.id},
+            )
+
         if self.is_closed:
-            result = Path(plane=self._plane)
+            result = _result()
             result._segments = list(offset_segs)
             return result
 
         # Open path
         if not cap:
-            result = Path(plane=self._plane)
+            result = _result()
             result._segments = list(offset_segs)
             return result
 
         # Cap: offset curve → end cap → original reversed → start cap
         orig_pts = self.points
-        result = Path(plane=self._plane)
+        result = _result()
         result._segments = list(offset_segs)
         result.add_line(offset_segs[-1].end, orig_pts[-1])
         for i in range(len(orig_pts) - 1, 0, -1):
@@ -2003,18 +2159,20 @@ class Path:
         return PolygonProfile(pts, name=name)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         return {
             "plane": self._plane.to_dict() if self._plane else None,
             "segments": [s.to_dict() for s in self._segments],
             "holes": [h.to_dict() for h in self._holes],
+            "id": self.id,
+            "meta": dict(self.meta),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Path":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         plane = Plane.from_dict(d["plane"]) if d.get("plane") else None
-        path = cls(plane=plane)
+        path = cls(plane=plane, id=d.get("id"), meta=d.get("meta"))
 
         for sd in d.get("segments", []):
             if sd["type"] == "line":
@@ -2256,9 +2414,9 @@ def assemble_path(
         seg = segs[start_idx]
 
         if isinstance(seg, Line):
-            path.add_line(seg.start, seg.end)
+            path.add_line(seg.start, seg.end, id=seg.id, meta=seg.meta)
         elif isinstance(seg, Arc):
-            path.add_arc(seg.center, seg.normal, seg.start, seg.angle)
+            path.add_arc(seg.center, seg.normal, seg.start, seg.angle, id=seg.id, meta=seg.meta)
 
         while True:
             added = False
@@ -2269,19 +2427,35 @@ def assemble_path(
                     added = True
                     unused.remove(i)
                     if isinstance(nxt, Line):
-                        path.add_line(nxt.start, nxt.end)
+                        path.add_line(nxt.start, nxt.end, id=nxt.id, meta=nxt.meta)
                     elif isinstance(nxt, Arc):
-                        path.add_arc(nxt.center, nxt.normal, nxt.start, nxt.angle)
+                        path.add_arc(
+                            nxt.center,
+                            nxt.normal,
+                            nxt.start,
+                            nxt.angle,
+                            id=nxt.id,
+                            meta=nxt.meta,
+                        )
                     break
                 elif rev:
                     added = True
                     unused.remove(i)
                     if isinstance(nxt, Line):
                         rev_line = nxt.reverse()
-                        path.add_line(rev_line.start, rev_line.end)
+                        path.add_line(
+                            rev_line.start, rev_line.end, id=rev_line.id, meta=rev_line.meta
+                        )
                     elif isinstance(nxt, Arc):
                         rev_arc = nxt.reverse()
-                        path.add_arc(rev_arc.center, rev_arc.normal, rev_arc.start, rev_arc.angle)
+                        path.add_arc(
+                            rev_arc.center,
+                            rev_arc.normal,
+                            rev_arc.start,
+                            rev_arc.angle,
+                            id=rev_arc.id,
+                            meta=rev_arc.meta,
+                        )
                     break
             if not added:
                 break

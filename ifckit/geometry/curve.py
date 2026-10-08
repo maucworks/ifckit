@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
-from ifckit.geometry.primitives import Arc, Line, Plane, Vec
+from ifckit.geometry.primitives import Arc, Line, Plane, Vec, _copy_with_fresh_meta, _new_id
 from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
@@ -145,6 +145,9 @@ class Curve:
         degree: int,
         weights: Optional[Sequence[float]] = None,
         closed: bool = False,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         ncpts = len(control_points)
         nknots = sum(multiplicities)
@@ -162,8 +165,14 @@ class Curve:
         self.multiplicities = list(multiplicities)
         self._weights = list(weights) if weights is not None else None
         self.closed = closed
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
 
         self._uknots = _build_full_knots(self.knots, self.multiplicities)
+
+    def __copy__(self) -> "Curve":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     # ── properties ──────────────────────────────────────────────────
 
@@ -369,6 +378,8 @@ class Curve:
             degree=self.degree,
             weights=new_weights,
             closed=self.closed,
+            id=self.id,
+            meta=self.meta,
         )
 
     # --- affine transforms (pure Python, no OCC needed) ------------------
@@ -387,6 +398,8 @@ class Curve:
             degree=self.degree,
             weights=list(self._weights) if self._weights else None,
             closed=self.closed,
+            id=self.id,
+            meta=self.meta,
         )
 
     def mirrored(self, plane: "Plane") -> "Curve":
@@ -412,7 +425,7 @@ class Curve:
         return self.transformed(Transform.scaling(sx, sy, sz))
 
     def copy(self) -> "Curve":
-        """Return an independent deep copy."""
+        """Return an independent deep copy (same identity)."""
         return Curve(
             control_points=[cp.copy() for cp in self.points],
             knots=list(self.knots),
@@ -420,6 +433,8 @@ class Curve:
             degree=self.degree,
             weights=list(self._weights) if self._weights else None,
             closed=self.closed,
+            id=self.id,
+            meta=self.meta,
         )
 
     def to_mesh_dict(
@@ -577,13 +592,15 @@ class Curve:
     # ── serialisation ──────────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         d: Dict[str, Any] = {
             "degree": self.degree,
             "control_points": [v.to_dict() for v in self.points],
             "knots": self.knots,
             "multiplicities": self.multiplicities,
             "closed": self.closed,
+            "id": self.id,
+            "meta": dict(self.meta),
         }
         if self._weights is not None:
             d["weights"] = self._weights
@@ -591,7 +608,7 @@ class Curve:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Curve":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         return cls(
             control_points=[Vec.from_dict(v) for v in d["control_points"]],
             knots=d["knots"],
@@ -599,6 +616,8 @@ class Curve:
             degree=d["degree"],
             weights=d.get("weights"),
             closed=d.get("closed", False),
+            id=d.get("id"),
+            meta=d.get("meta"),
         )
 
     def __repr__(self) -> str:
