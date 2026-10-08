@@ -116,8 +116,8 @@ on CI to catch formatting issues.
 - Run the existing test suite before submitting: `pytest tests/`
 - No CI: prove dependency lines locally instead —
   `tools/test-matrix.sh` runs the suite in one venv per ifcopenshell spec
-  (default: pinned version + `latest`). Only the pinned spec fails the script;
-  `latest` is signal-only (green = band may move, red = band stays).
+  (default: both band edges + `latest`). A red band edge fails the script;
+  `latest` is signal-only (green = max may move at release, red = max stays).
 
 ## Architecture Quick Reference
 
@@ -162,8 +162,10 @@ version is never excluded. In specifiers this is written as `< next-line`,
 which includes the current line. A fresh upstream release never flows in
 silently: `tools/test-matrix.sh` proves the new line first (no CI — local
 matrix), then the band moves.
-Deliberate exceptions with a lower cap only on proven breakage:
-`ifcopenshell==0.9.0` stays exact until point releases prove a band
-(`geom_backend.require_version()` enforces `>=0.8.4,<0.10` in code —
-floor is the Rhino 8 line, proven by the local matrix);
+ifcopenshell rides the full principle: `>=0.8.4.post1,<=0.9.0` — min is
+the proven Rhino 8 line, max is the current version at release time. The
+max moves only at release time, after the matrix (`tools/test-matrix.sh`,
+spec `latest`) proved the new version green. (`geom_backend.require_version()`
+enforces the structural line `>=0.8.4,<0.10` in code; packaging enforces
+the proven points.)
 `pythonocc-core<8` until the 8.x wrapper breaks are assessed.

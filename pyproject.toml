@@ -28,16 +28,16 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Pin policy (see AGENTS.md): never open-ended; >= min-proven, <= current-proven
-# (written as < next-line, so the current version is included).
-ifc = ["ifcopenshell==0.9.0"]
+# Pin policy (see AGENTS.md): never open-ended; >= min-proven, <= current-at-release.
+# The max moves only at release time, after the matrix proved the new version.
+ifc = ["ifcopenshell>=0.8.4.post1,<=0.9.0"]
 dev = [
     "pytest>=7,<10",
     "pytest-cov>=7,<8",
-    "ifcopenshell==0.9.0",
+    "ifcopenshell>=0.8.4.post1,<=0.9.0",
     "httpx>=0.27,<0.29",
     "ruff>=0.15,<0.16",
-    "mypy>=2.1,<3",
+    "mypy>=2.1,<3; python_version >= '3.10'",
     "pdoc>=15,<17; python_version >= '3.10'",
 ]
 api = [
@@ -45,12 +45,12 @@ api = [
     "uvicorn[standard]>=0.29,<0.47",
 ]
 occ = ["pythonocc-core>=7.4,<8",
-    "ifcopenshell==0.9.0"
+    "ifcopenshell>=0.8.4.post1,<=0.9.0"
 ]
 # NOTE: no `occ` here — pythonocc-core has no PyPI distribution
 # (conda-forge only), so it would break `pip install ifckit[all]`.
 all = [
-    "ifcopenshell==0.9.0",
+    "ifcopenshell>=0.8.4.post1,<=0.9.0",
     "fastapi>=0.111,<0.137",
     "uvicorn[standard]>=0.29,<0.47",
 ]

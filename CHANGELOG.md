@@ -13,6 +13,10 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   detection; `require_version()` accepts `>=0.8.4,<0.10`;
   `requires-python` back to `>=3.9`. Proven by the local matrix
   (1714 passed on 3.9 + 0.8.4.post1).
+- `fix(packaging): ifcopenshell band >=0.8.4.post1,<=0.9.0` (was exact
+  `==0.9.0`). Min is the proven Rhino line, max the current version at
+  release; resolvers pick 0.8.4.post1 on 3.9 and 0.9.0 on 3.10+
+  automatically. Max moves only after matrix proof at release time.
 
 ## [0.3.1]
 
