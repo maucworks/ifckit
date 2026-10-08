@@ -33,7 +33,7 @@ pip install ifckit[ifc]    # with ifcopenshell (full functionality)
 pip install ifckit         # without ifcopenshell (JSON/schema tools only)
 ```
 
-Requires Python 3.10+.
+Requires Python 3.9+ (Rhino 8 ships CPython 3.9; needs `ifcopenshell==0.8.4.post1`, see below).
 
 ## Quick start: building
 
@@ -113,16 +113,23 @@ inside the Rhino ScriptEditor with Grasshopper open.
 
 ### Installing ifckit in Rhino 8
 
-Rhino 8 ships with its own CPython 3.9 environment. Install ifckit into it
-from the **Rhino ScriptEditor** (`EditPythonScript`) or a Script component:
+Rhino 8 ships with its own CPython 3.9 environment. That pins the
+ifcopenshell line: **0.8.4.post1 is the last release with Python 3.9
+wheels**, so install it explicitly — the `[ifc]` extra would pull 0.9.0,
+which requires Python 3.10+. From the **Rhino ScriptEditor**
+(`EditPythonScript`) or a Script component:
 
 ```python
 import subprocess, sys
-subprocess.run([sys.executable, "-m", "pip", "install", "ifckit[ifc]"], check=True)
+subprocess.run(
+    [sys.executable, "-m", "pip", "install",
+     "ifckit", "ifcopenshell==0.8.4.post1"],
+    check=True,
+)
 ```
 
-`ifcopenshell` is bundled with Rhino 8, so the `[ifc]` extra will install it
-only if it is not already present.
+ifckit detects the 0.8 serializer API automatically (see
+`ifckit.geom_backend`); all build/save/export paths work on both lines.
 
 To install a local development checkout instead:
 

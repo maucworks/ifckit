@@ -39,15 +39,24 @@ def _wall_with_opening_model():
 
 
 class TestVersion:
-    def test_get_version(self):
-        assert geom_backend.get_version().startswith("0.9")
+    def test_get_version_supported_line(self):
+        parts = geom_backend._version_tuple(geom_backend.get_version())
+        assert (0, 8, 4) <= parts < (0, 10)
 
     def test_require_version_ok(self):
-        assert geom_backend.require_version().startswith("0.9")
+        geom_backend.require_version()
+
+    def test_require_version_accepts_rhino_line(self, monkeypatch):
+        monkeypatch.setattr(geom_backend, "get_version", lambda: "0.8.4.post1")
+        assert geom_backend.require_version() == "0.8.4.post1"
+
+    def test_require_version_accepts_dev_suffix(self, monkeypatch):
+        monkeypatch.setattr(geom_backend, "get_version", lambda: "0.9.0-dev")
+        assert geom_backend.require_version() == "0.9.0-dev"
 
     def test_require_version_rejects_old(self, monkeypatch):
-        monkeypatch.setattr(geom_backend, "get_version", lambda: "0.8.5")
-        with pytest.raises(ImportError, match=">= 0.9"):
+        monkeypatch.setattr(geom_backend, "get_version", lambda: "0.8.3")
+        with pytest.raises(ImportError, match=">= 0.8.4"):
             geom_backend.require_version()
 
     def test_require_version_rejects_next_line(self, monkeypatch):

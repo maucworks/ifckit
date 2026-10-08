@@ -25,10 +25,13 @@ from typing import Any, Collection, Iterator, NamedTuple, Optional, Union
 DEFAULT_LINEAR_DEFLECTION = 0.05
 DEFAULT_ANGULAR_DEFLECTION = 0.8
 
-#: Supported ifcopenshell line (merged settings/serializer API).
-#: Floor is the proven point (packaging pins it exactly); ceiling is the
-#: next line — a newer minor gets a clean ImportError, never silent breakage.
-MIN_VERSION = (0, 9, 0)
+#: Supported ifcopenshell lines, oldest first.
+#: Floor is 0.8.4: the last line with Python 3.9 wheels (Rhino 8) and the
+#: oldest proven point. The 0.8 serializer API (separate serializer_settings)
+#: is handled via capability detection in make_serializer, not version
+#: sniffing. Ceiling is the next line — a newer minor gets a clean
+#: ImportError, never silent breakage.
+MIN_VERSION = (0, 8, 4)
 MAX_VERSION = (0, 10)
 
 #: Entity types skipped with ``skip_openings=True``.
@@ -54,24 +57,30 @@ def get_version() -> str:
         return "?"
 
 
+def _version_tuple(version: str) -> tuple:
+    """Parse ``(major, minor, patch)``; tolerates suffixes like ``-dev``."""
+    import re
+
+    match = re.match(r"(\d+)\.(\d+)(?:\.(\d+))?", version)
+    if not match:
+        return (0, 0, 0)
+    return tuple(int(group) if group is not None else 0 for group in match.groups())
+
+
 def require_version() -> str:
-    """Return the ifcopenshell version, raising outside the 0.9 line.
+    """Return the ifcopenshell version, raising outside the 0.8.4–0.9 lines.
 
     Raises:
-        ImportError: If ifcopenshell is missing, older than 0.9.0, or
+        ImportError: If ifcopenshell is missing, older than 0.8.4, or
             0.10+ (untested line — pin or band must move first).
     """
     version = get_version()
-    try:
-        parts = tuple(int(p) for p in version.split(".")[:3])
-    except ValueError:
-        parts = (0, 0, 0)
-    if len(parts) < 3:
-        parts = parts + (0,) * (3 - len(parts))
+    parts = _version_tuple(version)
     if not (MIN_VERSION <= parts < MAX_VERSION):
         raise ImportError(
-            f"ifckit requires ifcopenshell >= 0.9, < 0.10, found {version}. "
-            "Install a supported line: pip install 'ifcopenshell==0.9.0'"
+            f"ifckit requires ifcopenshell >= 0.8.4, < 0.10, found {version}. "
+            "Install a supported line: pip install 'ifcopenshell==0.9.0' "
+            "(or 'ifcopenshell==0.8.4.post1' on Python 3.9 / Rhino 8)"
         )
     return version
 
@@ -101,22 +110,34 @@ def make_serializer(path: Union[str, os.PathLike], settings: Any) -> Any:
 
     The ``.obj`` serializer gets a ``.mtl`` sidecar next to ``path``.
 
+    Supports both serializer APIs via capability detection: ifcopenshell
+    0.8 takes a separate ``serializer_settings`` object (extra factory
+    argument), 0.9+ merged those options into ``settings``.
+
     Raises:
         ValueError:  If the extension is not recognised.
         ImportError: If the serializer is unavailable in this build.
     """
     import ifcopenshell.geom as _geom
 
-    require_version()
     path_str = os.fspath(path)
     try:
         factory = _geom.serializers.guess_from_extension(path_str)
     except ValueError as exc:
         raise ValueError(str(exc)) from exc
+    require_version()
     if factory is None:  # pragma: no cover - defensive, guess raises instead
         raise ImportError(f"No serializer available for {path_str!r}.")
     try:
-        if os.path.splitext(path_str)[1].lower() == ".obj":
+        is_obj = os.path.splitext(path_str)[1].lower() == ".obj"
+        if hasattr(_geom, "serializer_settings"):
+            # ifcopenshell 0.8 (e.g. Rhino 8 line): separate settings object.
+            s_settings = _geom.serializer_settings()
+            if is_obj:
+                mtl_path = os.path.splitext(path_str)[0] + ".mtl"
+                return factory(path_str, mtl_path, settings, s_settings)
+            return factory(path_str, settings, s_settings)
+        if is_obj:
             mtl_path = os.path.splitext(path_str)[0] + ".mtl"
             return factory(path_str, mtl_path, settings)
         return factory(path_str, settings)

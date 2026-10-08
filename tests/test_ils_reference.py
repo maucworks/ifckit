@@ -1,6 +1,8 @@
 # This file was generated with the assistance of an AI coding tool.
 """Validatie tegen MiniBIM referentie-IFCs (specs/minibim/*.ifc)."""
 
+from __future__ import annotations
+
 # Referentie-IFCs wonen in de meta-repo (196-ifckit-admin/specs/minibim), niet in
 # deze lib. Kandidaatlocaties: repo-root/specs, ../specs, $IFCKIT_SPEC_DIR.
 import os
