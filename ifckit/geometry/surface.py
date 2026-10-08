@@ -9,9 +9,10 @@ OCC (``pythonocc-core``) evaluation.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
-from ifckit.geometry.primitives import Vec
+from ifckit.geometry.primitives import Vec, _copy_with_fresh_meta, _fmt_num, _new_id, _short_id
 from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
@@ -55,6 +56,33 @@ def require_occ():
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class SurfaceReport:
+    """Immutable measure snapshot of a Surface.
+
+    ``area`` sums ``occ_tessellate`` triangles (deflection 0.01) and is
+    ``None`` without ``pythonocc-core`` — consistent with
+    ``Surface.to_mesh_dict``, which also requires OCC.
+    """
+
+    type: str = "surface"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    area: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "area": self.area,
+        }
+
+    def __str__(self) -> str:
+        return f"SurfaceReport(id={_short_id(self.id)}, area={_fmt_num(self.area)})"
+
+
 class Surface:
     """A NURBS / BSpline surface (tensor product).
 
@@ -74,6 +102,9 @@ class Surface:
         weights: Optional[Sequence[Sequence[float]]] = None,
         uclosed: bool = False,
         vclosed: bool = False,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.control_points = [
             [Vec(*p) if not isinstance(p, Vec) else p for p in row] for row in control_points
@@ -87,8 +118,14 @@ class Surface:
         self._weights = [list(w) for w in weights] if weights is not None else None
         self.uclosed = uclosed
         self.vclosed = vclosed
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
         self._occ_face = None  # cached OCC TopoDS_Face for optimised MakeFilling
         self._occ_edge = None  # cached OCC TopoDS_Edge matching curve in _occ_face
+
+    def __copy__(self) -> "Surface":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     # ── properties ──────────────────────────────────────────────────
 
@@ -106,6 +143,29 @@ class Surface:
     def nv(self) -> int:
         """Number of control points in the V direction."""
         return len(self.control_points[0]) if self.control_points else 0
+
+    @property
+    def area(self) -> Optional[float]:
+        """Surface area via OCC tessellation, else ``None`` without OCC.
+
+        Sums ``occ_tessellate`` triangles (deflection 0.01). Requires
+        ``pythonocc-core`` — returns ``None`` when it is missing instead
+        of raising, so reports stay usable in OCC-less environments.
+        """
+        try:
+            verts, tris = occ_tessellate(self)
+        except ImportError:
+            # require_occ() inside occ_tessellate: no pythonocc-core.
+            return None
+        total = 0.0
+        for a, b, c in tris:
+            pa, pb, pc = (Vec(*verts[i - 1]) for i in (a, b, c))
+            total += abs((pb - pa) ** (pc - pa)) * 0.5
+        return total
+
+    def report(self) -> "SurfaceReport":
+        """Immutable measure snapshot (area)."""
+        return SurfaceReport(id=self.id, meta=dict(self.meta), area=self.area)
 
     # ── evaluation (via OCC) ───────────────────────────────────────
 
@@ -233,7 +293,7 @@ class Surface:
     # ── dict serialisation ─────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         d: Dict[str, Any] = {
             "udegree": self.udegree,
             "vdegree": self.vdegree,
@@ -244,6 +304,8 @@ class Surface:
             "vmults": self.vmults,
             "uclosed": self.uclosed,
             "vclosed": self.vclosed,
+            "id": self.id,
+            "meta": dict(self.meta),
         }
         if self._weights is not None:
             d["weights"] = self._weights
@@ -251,7 +313,7 @@ class Surface:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Surface":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         return cls(
             control_points=[[Vec.from_dict(v) for v in row] for row in d["control_points"]],
             uknots=d["uknots"],
@@ -263,6 +325,8 @@ class Surface:
             weights=d.get("weights"),
             uclosed=d.get("uclosed", False),
             vclosed=d.get("vclosed", False),
+            id=d.get("id"),
+            meta=d.get("meta"),
         )
 
     def __repr__(self) -> str:
@@ -290,6 +354,8 @@ class Surface:
             weights=weights,
             uclosed=self.uclosed,
             vclosed=self.vclosed,
+            id=self.id,
+            meta=self.meta,
         )
 
     def mirrored(self, plane: "Plane") -> "Surface":
@@ -315,7 +381,7 @@ class Surface:
         return self.transformed(Transform.scaling(sx, sy, sz))
 
     def copy(self) -> "Surface":
-        """Return an independent deep copy."""
+        """Return an independent deep copy (same identity)."""
         weights = None
         if self._weights is not None:
             weights = [[w for w in row] for row in self._weights]
@@ -330,6 +396,8 @@ class Surface:
             weights=weights,
             uclosed=self.uclosed,
             vclosed=self.vclosed,
+            id=self.id,
+            meta=self.meta,
         )
 
     # ── OCC bridge ─────────────────────────────────────────────────

@@ -8,9 +8,20 @@ Curve — a NURBS/BSpline curve with evaluation (De Boor) and IFC serialisation.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
-from ifckit.geometry.primitives import Arc, Line, Plane, Vec
+from ifckit.geometry.primitives import (
+    Arc,
+    Line,
+    Plane,
+    Vec,
+    _copy_with_fresh_meta,
+    _fmt_num,
+    _new_id,
+    _projected_area,
+    _short_id,
+)
 from ifckit.geometry.transform import Transform
 
 if TYPE_CHECKING:
@@ -120,6 +131,38 @@ def _eval_homo(p: int, uknots: List[float], pts: List[_Homo4D], u: float) -> _Ho
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class CurveReport:
+    """Immutable measure snapshot of a Curve.
+
+    ``length`` is the chord-length approximation (see ``Curve.length``).
+    ``area`` is the projected (Newell) area over 50 samples when closed,
+    else ``None``.
+    """
+
+    type: str = "curve"
+    id: Optional[str] = None
+    meta: Dict[str, Any] = field(default_factory=dict)
+    length: float = 0.0
+    area: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise to a plain (JSON-safe) dict."""
+        return {
+            "type": self.type,
+            "id": self.id,
+            "meta": dict(self.meta),
+            "length": self.length,
+            "area": self.area,
+        }
+
+    def __str__(self) -> str:
+        return (
+            f"CurveReport(id={_short_id(self.id)}, length={_fmt_num(self.length)}, "
+            f"area={_fmt_num(self.area)})"
+        )
+
+
 class Curve:
     """A NURBS / BSpline curve evaluated via the De Boor algorithm.
 
@@ -145,6 +188,9 @@ class Curve:
         degree: int,
         weights: Optional[Sequence[float]] = None,
         closed: bool = False,
+        *,
+        id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         ncpts = len(control_points)
         nknots = sum(multiplicities)
@@ -162,8 +208,14 @@ class Curve:
         self.multiplicities = list(multiplicities)
         self._weights = list(weights) if weights is not None else None
         self.closed = closed
+        self.id = id if id is not None else _new_id()
+        self.meta: Dict[str, Any] = dict(meta) if meta else {}
 
         self._uknots = _build_full_knots(self.knots, self.multiplicities)
+
+    def __copy__(self) -> "Curve":
+        """Shallow copy: same id, independent meta dict."""
+        return _copy_with_fresh_meta(self)
 
     # ── properties ──────────────────────────────────────────────────
 
@@ -343,6 +395,22 @@ class Curve:
         pts = self.sample(n)
         return sum((pts[i + 1] - pts[i]).length() for i in range(len(pts) - 1))
 
+    @property
+    def area(self) -> Optional[float]:
+        """Enclosed area for closed curves, else ``None``.
+
+        Projected (Newell) area over ``sample()`` points — exact for
+        polylines, approximate for curved spans. Non-planar loops report
+        their projected area.
+        """
+        if not self.closed:
+            return None
+        return _projected_area(self.sample())
+
+    def report(self) -> "CurveReport":
+        """Immutable measure snapshot (length, area)."""
+        return CurveReport(id=self.id, meta=dict(self.meta), length=self.length, area=self.area)
+
     def sample(self, n: int = 50) -> List[Vec]:
         """Sample *n* evenly‑spaced points in parameter space ``[0, 1]``."""
         return [self.point_at(i / max(n - 1, 1)) for i in range(n)]
@@ -369,6 +437,8 @@ class Curve:
             degree=self.degree,
             weights=new_weights,
             closed=self.closed,
+            id=self.id,
+            meta=self.meta,
         )
 
     # --- affine transforms (pure Python, no OCC needed) ------------------
@@ -387,6 +457,8 @@ class Curve:
             degree=self.degree,
             weights=list(self._weights) if self._weights else None,
             closed=self.closed,
+            id=self.id,
+            meta=self.meta,
         )
 
     def mirrored(self, plane: "Plane") -> "Curve":
@@ -412,7 +484,7 @@ class Curve:
         return self.transformed(Transform.scaling(sx, sy, sz))
 
     def copy(self) -> "Curve":
-        """Return an independent deep copy."""
+        """Return an independent deep copy (same identity)."""
         return Curve(
             control_points=[cp.copy() for cp in self.points],
             knots=list(self.knots),
@@ -420,6 +492,8 @@ class Curve:
             degree=self.degree,
             weights=list(self._weights) if self._weights else None,
             closed=self.closed,
+            id=self.id,
+            meta=self.meta,
         )
 
     def to_mesh_dict(
@@ -577,13 +651,15 @@ class Curve:
     # ── serialisation ──────────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise to a plain dict."""
+        """Serialise to a plain dict (incl. identity)."""
         d: Dict[str, Any] = {
             "degree": self.degree,
             "control_points": [v.to_dict() for v in self.points],
             "knots": self.knots,
             "multiplicities": self.multiplicities,
             "closed": self.closed,
+            "id": self.id,
+            "meta": dict(self.meta),
         }
         if self._weights is not None:
             d["weights"] = self._weights
@@ -591,7 +667,7 @@ class Curve:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Curve":
-        """Deserialize from a dict."""
+        """Deserialize from a dict (missing id mints a new one)."""
         return cls(
             control_points=[Vec.from_dict(v) for v in d["control_points"]],
             knots=d["knots"],
@@ -599,6 +675,8 @@ class Curve:
             degree=d["degree"],
             weights=d.get("weights"),
             closed=d.get("closed", False),
+            id=d.get("id"),
+            meta=d.get("meta"),
         )
 
     def __repr__(self) -> str:
