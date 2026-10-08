@@ -145,7 +145,13 @@ on CI to catch formatting issues.
 - **OCC** (`pythonocc-core`, NURBS/intersection paths): conda-forge only —
   no PyPI distribution exists, so `occ` is deliberately *not* part of the
   `all` extra (keeps `pip install ifckit[all]` resolvable)
-- **Python**: >= 3.9
+- **Python**: >= 3.9 (floor exists for Rhino 8, which ships CPython 3.9;
+  ruff `target-version` is `py39` to keep 3.10+ syntax out)
+- **Rhino 8**: supported line is `ifcopenshell==0.8.4.post1` (last release
+  with 3.9 wheels). `geom_backend` handles the 0.8 serializer API via
+  capability detection (`hasattr(serializer_settings)`), never version
+  sniffing — so one codebase serves both the 0.8.4 (Rhino) and 0.9.0
+  (main) lines
 
 ### Version pins (principle)
 
@@ -158,6 +164,6 @@ silently: `tools/test-matrix.sh` proves the new line first (no CI — local
 matrix), then the band moves.
 Deliberate exceptions with a lower cap only on proven breakage:
 `ifcopenshell==0.9.0` stays exact until point releases prove a band
-(`geom_backend.require_version()` enforces the 0.9 line in code:
-`>=0.9,<0.10`);
+(`geom_backend.require_version()` enforces `>=0.8.4,<0.10` in code —
+floor is the Rhino 8 line, proven by the local matrix);
 `pythonocc-core<8` until the 8.x wrapper breaks are assessed.
