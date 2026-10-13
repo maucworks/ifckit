@@ -62,6 +62,11 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   positionally) and `iter_mesh_dicts/to_mesh_dicts(preset=...)`; explicit
   dict keys win. Opening booleans dominate cost (~48x a bare wall), curves
   gain most from coarse (~44 ms → ~0.6 ms on a 270° beam).
+- `feat(geom_backend): shapes_to_chunks` + `IfcModel.iter_chunks/to_chunks`
+  serialise the same shapes as float32/uint32 bytes with a
+  translation-invariant `profile_key` (sha1 of offset-normalised positions)
+  and `offset`, so viewers can instance identical products and diff by
+  `guid`. Binary payload is smaller than the JSON mesh dicts.
 
 ### Fixed — ifcopenshell 0.9
 

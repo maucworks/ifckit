@@ -316,18 +316,7 @@ def shapes_to_mesh_dicts(
     Z-up to Y-up conversion ``(x, z, -y)``.
     """
     for shape in shapes:
-        if y_up:
-            positions = [
-                c
-                for i in range(0, len(shape.verts), 3)
-                for c in (
-                    shape.verts[i],
-                    shape.verts[i + 2],
-                    -shape.verts[i + 1],
-                )
-            ]
-        else:
-            positions = list(shape.verts)
+        positions = _convert_positions(shape.verts, y_up=y_up)
         label = shape.entity_type if label_from == "type" else shape.guid
         yield {
             "primitive": "triangles",
@@ -335,4 +324,55 @@ def shapes_to_mesh_dicts(
             "indices": list(shape.faces),
             "label": label or shape.guid,
             "guid": shape.guid,
+        }
+
+
+def _convert_positions(verts: list, *, y_up: bool) -> list:
+    """Flatten shape verts, optionally converting Z-up to Y-up ``(x, z, -y)``."""
+    if y_up:
+        return [c for i in range(0, len(verts), 3) for c in (verts[i], verts[i + 2], -verts[i + 1])]
+    return list(verts)
+
+
+def shapes_to_chunks(
+    shapes: Iterator[IterShape],
+    *,
+    y_up: bool = True,
+) -> Iterator[dict]:
+    """Convert shapes to compact binary chunks for instancing viewers.
+
+    A second serialization of the same shapes (no new geometry): per
+    product ``{"guid", "label", "profile_key", "offset", "positions",
+    "index", "vertex_count", "index_count"}``. ``positions``/``index``
+    are little-endian float32/uint32 bytes (a viewer wraps them in
+    ``Float32Array``/``Uint32Array`` directly); positions are
+    translation-normalized, add ``offset`` to restore world coords.
+    ``profile_key`` is the sha1 of the normalized positions, so identically
+    shaped products at different translations share a key and the viewer
+    can instance them. Translation-only: rotated copies hash differently.
+    """
+    import hashlib
+    from array import array
+
+    for mesh in shapes_to_mesh_dicts(shapes, y_up=y_up):
+        positions = mesh["positions"]
+        if positions:
+            offset = [
+                min(positions[0::3]),
+                min(positions[1::3]),
+                min(positions[2::3]),
+            ]
+        else:
+            offset = [0.0, 0.0, 0.0]
+        normalized = [c - offset[i % 3] for i, c in enumerate(positions)]
+        pos_bytes = array("f", normalized).tobytes()
+        yield {
+            "guid": mesh["guid"],
+            "label": mesh["label"],
+            "profile_key": hashlib.sha1(pos_bytes).hexdigest(),
+            "offset": offset,
+            "positions": pos_bytes,
+            "index": array("I", mesh["indices"]).tobytes(),
+            "vertex_count": len(positions) // 3,
+            "index_count": len(mesh["indices"]),
         }

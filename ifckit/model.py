@@ -1363,6 +1363,60 @@ class IfcModel:
             )
         )
 
+    def iter_chunks(
+        self,
+        tessellation: Optional[dict] = None,
+        *,
+        skip_openings: bool = True,
+        y_up: bool = True,
+        include_guids: Optional[Collection[str]] = None,
+        preset: str = "final",
+    ) -> Iterator[dict]:
+        """Stream compact binary mesh chunks (see ``geom_backend.shapes_to_chunks``).
+
+        Same tessellation as :meth:`iter_mesh_dicts` (same ``guid``\\ s, same
+        shapes), but as float32/uint32 bytes with a translation-invariant
+        ``profile_key`` per product, so viewers can instance and diff.
+
+        Args:
+            tessellation: Optional ``{"linear_deflection": ..., ...}`` overrides.
+            skip_openings: Skip ``IfcOpeningElement`` shapes (default True).
+            y_up: Convert Z-up to Y-up ``(x, z, -y)`` (default True).
+            include_guids: Only yield these GUIDs (selective re-tessellation).
+            preset: Tessellation preset, ``"final"`` (default) or
+                ``"interactive"`` (coarse preview).
+        """
+        from ifckit import geom_backend
+
+        settings = geom_backend.make_settings(tessellation, preset=preset)
+        shapes = geom_backend.iter_shapes(
+            self._file,
+            settings,
+            skip_openings=skip_openings,
+            include_guids=include_guids,
+        )
+        yield from geom_backend.shapes_to_chunks(shapes, y_up=y_up)
+
+    def to_chunks(
+        self,
+        tessellation: Optional[dict] = None,
+        *,
+        skip_openings: bool = True,
+        y_up: bool = True,
+        include_guids: Optional[Collection[str]] = None,
+        preset: str = "final",
+    ) -> list:
+        """Return all binary mesh chunks as a list (see :meth:`iter_chunks`)."""
+        return list(
+            self.iter_chunks(
+                tessellation,
+                skip_openings=skip_openings,
+                y_up=y_up,
+                include_guids=include_guids,
+                preset=preset,
+            )
+        )
+
     # ------------------------------------------------------------------
     # Incremental patch API (PLAN-interactive-preview, I-1)
     # ------------------------------------------------------------------

@@ -256,3 +256,85 @@ class TestShapesToMeshDicts:
             geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
         )[0]
         assert dicts[0]["positions"] == pytest.approx(list(shape.verts))
+
+
+def _two_beam_model():
+    """Two identical beams 10 m apart, plus a third with a larger profile."""
+    m = IfcModel(name="ChunkTest", schema=IfcSchema.IFC4)
+    floor = m.add_site("S").add_building("B").add_storey("GF")
+    big = [Vec(-0.2, -0.2), Vec(0.2, -0.2), Vec(0.2, 0.2), Vec(-0.2, 0.2)]
+    floor.add(PendingBeam(Line(Vec(0, 0, 0), Vec(5, 0, 0)), _SQUARE_PROFILE, name="B1"))
+    floor.add(
+        PendingBeam(Line(Vec(10, 0, 0), Vec(15, 0, 0)), _SQUARE_PROFILE, name="B2")
+    )
+    floor.add(PendingBeam(Line(Vec(20, 0, 0), Vec(25, 0, 0)), big, name="B3"))
+    return m
+
+
+def _decode_floats(raw: bytes):
+    from array import array
+
+    return list(array("f", raw))
+
+
+def _decode_uints(raw: bytes):
+    from array import array
+
+    return list(array("I", raw))
+
+
+class TestShapesToChunks:
+    def test_same_shapes_as_mesh_dicts(self):
+        m = _beam_model()
+        (chunk,) = geom_backend.shapes_to_chunks(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        (mesh,) = geom_backend.shapes_to_mesh_dicts(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        assert chunk["guid"] == mesh["guid"]
+        assert chunk["label"] == mesh["label"]
+        assert chunk["vertex_count"] == len(mesh["positions"]) // 3
+        assert chunk["index_count"] == len(mesh["indices"])
+        assert _decode_uints(chunk["index"]) == mesh["indices"]
+        restored = [
+            c + chunk["offset"][i % 3]
+            for i, c in enumerate(_decode_floats(chunk["positions"]))
+        ]
+        assert restored == pytest.approx(mesh["positions"])
+
+    def test_compact_payload(self):
+        import json
+
+        m = _beam_model()
+        (chunk,) = geom_backend.shapes_to_chunks(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        (mesh,) = geom_backend.shapes_to_mesh_dicts(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        binary = len(chunk["positions"]) + len(chunk["index"])
+        assert binary < len(json.dumps(mesh, default=str))
+
+    def test_profile_key_groups_identical_products(self):
+        m = _two_beam_model()
+        chunks = list(
+            geom_backend.shapes_to_chunks(
+                geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+            )
+        )
+        assert len(chunks) == 3
+        labels = [c["label"] for c in chunks]
+        assert labels == ["IfcBeam"] * 3
+        b1, b2, b3 = chunks
+        assert b1["profile_key"] == b2["profile_key"]
+        assert b1["offset"] != b2["offset"]
+        assert b3["profile_key"] != b1["profile_key"]
+
+    def test_model_iter_chunks_selective(self):
+        m = _two_beam_model()
+        guids = [c["guid"] for c in m.to_chunks()]
+        assert len(guids) == 3
+        (only,) = m.to_chunks(include_guids=[guids[0]])
+        assert only["guid"] == guids[0]
+        assert m.to_chunks(include_guids=[]) == []
