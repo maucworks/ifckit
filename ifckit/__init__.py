@@ -62,6 +62,7 @@ from ifckit.geometry import (
 )
 from ifckit.json_build import build, build_from_json, validate_json
 from ifckit.model import IfcModel
+from ifckit.session import ModelSession
 
 
 def __getattr__(name):
@@ -133,6 +134,7 @@ __all__ = [
     "LengthUnit",
     "TessellationDetail",
     "IfcModel",
+    "ModelSession",
     "PendingWall",
     "PendingSlab",
     "PendingOpening",

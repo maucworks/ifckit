@@ -76,6 +76,10 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   cProfile on a 20-wall rebuild tick: 56602 → 56137 calls, 17.0 → 16.7 ms —
   validation is a small share of a tick; the switch trims object churn,
   tessellation still dominates.
+- `feat(model): ModelSession` holds one model and bundles `apply_delta`
+  with selective tessellation per tick (`tick()` returns changed GUIDs +
+  chunks/dicts, `full=True` for everything), caching geometry settings.
+  `examples/preview_session.py` drives 3 ticks on one session.
 
 ### Fixed — ifcopenshell 0.9
 
