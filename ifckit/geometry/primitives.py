@@ -332,6 +332,102 @@ class Vec:
 # ---------------------------------------------------------------------------
 
 
+def _quat_from_matrix(m: Tuple[Tuple[float, ...], ...]) -> Tuple[float, float, float, float]:
+    """Rotation matrix (rows) -> unit quaternion ``(x, y, z, w)`` (Shepperd)."""
+    t = m[0][0] + m[1][1] + m[2][2]
+    if t > 0.0:
+        s = 0.5 / math.sqrt(t + 1.0)
+        return (
+            (m[2][1] - m[1][2]) * s,
+            (m[0][2] - m[2][0]) * s,
+            (m[1][0] - m[0][1]) * s,
+            0.25 / s,
+        )
+    if m[0][0] > m[1][1] and m[0][0] > m[2][2]:
+        s = 2.0 * math.sqrt(1.0 + m[0][0] - m[1][1] - m[2][2])
+        return (
+            0.25 * s,
+            (m[0][1] + m[1][0]) / s,
+            (m[0][2] + m[2][0]) / s,
+            (m[2][1] - m[1][2]) / s,
+        )
+    if m[1][1] > m[2][2]:
+        s = 2.0 * math.sqrt(1.0 + m[1][1] - m[0][0] - m[2][2])
+        return (
+            (m[0][1] + m[1][0]) / s,
+            0.25 * s,
+            (m[1][2] + m[2][1]) / s,
+            (m[0][2] - m[2][0]) / s,
+        )
+    s = 2.0 * math.sqrt(1.0 + m[2][2] - m[0][0] - m[1][1])
+    return (
+        (m[0][2] + m[2][0]) / s,
+        (m[1][2] + m[2][1]) / s,
+        0.25 * s,
+        (m[1][0] - m[0][1]) / s,
+    )
+
+
+def _quat_from_frame(plane: "Plane") -> Tuple[float, float, float, float]:
+    """Unit quaternion ``(x, y, z, w)`` of a frame's world orientation."""
+    x, y = plane.x_axis, plane.y_axis
+    z = x**y
+    return _quat_from_matrix(
+        (
+            (x.x, y.x, z.x),
+            (x.y, y.y, z.y),
+            (x.z, y.z, z.z),
+        )
+    )
+
+
+def _quat_slerp(
+    q0: Tuple[float, float, float, float],
+    q1: Tuple[float, float, float, float],
+    t: float,
+) -> Tuple[float, float, float, float]:
+    """Spherical interpolation between unit quaternions (shortest arc).
+
+    ``|q0 · q1| = cos(θ / 2)`` with θ the relative rotation angle, so the
+    arc is ambiguous exactly when the dot vanishes (θ = 180°).
+    """
+    raw = sum(a * b for a, b in zip(q0, q1))
+    if abs(raw) < 1e-9:
+        raise ValueError(
+            "Cannot interpolate 180°-apart orientations: the shortest rotation arc is undefined."
+        )
+    if raw < 0.0:
+        q1 = tuple(-c for c in q1)
+        raw = -raw
+    if raw > 1.0 - 1e-12:
+        out = tuple(a + (b - a) * t for a, b in zip(q0, q1))
+    else:
+        angle = math.acos(raw)
+        s = math.sin(angle)
+        a0 = math.sin((1.0 - t) * angle) / s
+        a1 = math.sin(t * angle) / s
+        out = tuple(a0 * a + a1 * b for a, b in zip(q0, q1))
+    inv = 1.0 / math.sqrt(sum(c * c for c in out))
+    return tuple(c * inv for c in out)  # type: ignore[return-value]
+
+
+def _frame_axes_from_quat(q: Tuple[float, float, float, float]) -> Tuple["Vec", "Vec"]:
+    """X/Y world axes of the frame encoded by unit quaternion ``(x, y, z, w)``."""
+    x, y, z, w = q
+    return (
+        Vec(
+            1.0 - 2.0 * (y * y + z * z),
+            2.0 * (x * y + z * w),
+            2.0 * (x * z - y * w),
+        ),
+        Vec(
+            2.0 * (x * y - z * w),
+            1.0 - 2.0 * (x * x + z * z),
+            2.0 * (y * z + x * w),
+        ),
+    )
+
+
 class Plane:
     """
     A right-handed coordinate frame in 3D space.
@@ -494,6 +590,41 @@ class Plane:
             up = Vec(0, 1, 0)
         y = (up - t * (t @ up)).normalized()
         return cls(origin, t, y)
+
+    @staticmethod
+    def tween(plane0: "Plane", plane1: "Plane", num: int) -> List["Plane"]:
+        """Interpolate *num* planes strictly between *plane0* and *plane1*.
+
+        Origins interpolate linearly; orientations follow the shortest
+        rotation arc between the two frames (quaternion slerp), so normals
+        *and* in-plane twist tween smoothly.
+
+        Args:
+            plane0: Start frame (excluded from the result).
+            plane1: End frame (excluded from the result).
+            num: Number of intermediate planes (``t = i / (num + 1)``).
+
+        Returns:
+            ``num`` new right-handed planes strictly between the inputs.
+
+        Raises:
+            ValueError: If *num* < 1, or if the frames are exactly 180°
+                apart — then the shortest arc is undefined. Note this is a
+                condition on the relative *rotation*, not on the normal dot
+                product: perpendicular normals tween fine, while some
+                normal-perpendicular pairs are exactly 180° apart.
+        """
+        if not isinstance(num, int) or num < 1:
+            raise ValueError(f"tween needs a positive integer num, got {num!r}.")
+        q0 = _quat_from_frame(plane0)
+        q1 = _quat_from_frame(plane1)
+        planes = []
+        for i in range(1, num + 1):
+            t = i / (num + 1)
+            origin = plane0.origin.lerp(plane1.origin, t)
+            x, y = _frame_axes_from_quat(_quat_slerp(q0, q1, t))
+            planes.append(Plane(origin, x, y))
+        return planes
 
     def transform_point(self, local: "Vec") -> "Vec":
         """Transform a point from local frame coordinates to world coordinates."""

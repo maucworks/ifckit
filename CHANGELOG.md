@@ -83,6 +83,13 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   End-to-end tick (5 walls, 1 changed, interactive): apply 1.2 ms +
   tessellate 1.9 ms + JSON-serialise ~0.0 ms; 354 B JSON vs 240 B chunks.
 
+### Added — plane tweening
+
+- `feat(geometry): Plane.tween(plane0, plane1, num)` interpolates `num`
+  right-handed frames strictly between two frames (origins lerped,
+  orientations quaternion-slerped along the shortest arc). Raises on
+  exactly 180°-apart frames (undefined shortest arc) and on `num` < 1.
+
 ### Fixed — ifcopenshell 0.9
 
 - `fix(model): export via geom_backend op ifcopenshell 0.9 serializer-API`.
