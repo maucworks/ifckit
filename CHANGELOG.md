@@ -80,6 +80,8 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   with selective tessellation per tick (`tick()` returns changed GUIDs +
   chunks/dicts, `full=True` for everything), caching geometry settings.
   `examples/preview_session.py` drives 3 ticks on one session.
+  End-to-end tick (5 walls, 1 changed, interactive): apply 1.2 ms +
+  tessellate 1.9 ms + JSON-serialise ~0.0 ms; 354 B JSON vs 240 B chunks.
 
 ### Fixed — ifcopenshell 0.9
 
