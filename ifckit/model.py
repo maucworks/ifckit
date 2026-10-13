@@ -308,6 +308,8 @@ class IfcModel:
         self,
         pending: "PendingElement",
         container: "Union[StoreyHandle, BridgePartHandle, EntityHandle]",
+        *,
+        validate: bool = True,
     ) -> "EntityHandle":
         """
         Validate and build a pending element, placing it in *container*.
@@ -322,6 +324,10 @@ class IfcModel:
             container: The spatial container — a ``StoreyHandle`` (IFC4 building),
                        a ``BridgePartHandle`` (IFC4X3 bridge), or an
                        ``EntityHandle`` wrapping a wall/slab host (Model B only).
+            validate:  Run ``validator.validate`` before building (default True).
+                       Pass False on interactive preview ticks where the data
+                       was already validated — cProfile shows validation is a
+                       small share of a tick, so this only trims object churn.
 
         Returns:
             ``EntityHandle`` wrapping the created IFC entity.
@@ -347,7 +353,8 @@ class IfcModel:
                 f"got {type(container).__name__}"
             )
 
-        self._validate_or_raise(pending)
+        if validate:
+            self._validate_or_raise(pending)
 
         try:
             builder = self._registry.get(pending.element_type)
@@ -1414,7 +1421,7 @@ class IfcModel:
     # Incremental patch API (PLAN-interactive-preview, I-1)
     # ------------------------------------------------------------------
 
-    def apply_delta(self, elements: list, *, storey=None) -> list:
+    def apply_delta(self, elements: list, *, storey=None, validate: bool = True) -> list:
         """Patch products in-place from element dicts; return changed GUIDs.
 
         The same ``IfcFile`` is mutated: new elements are built into it,
@@ -1447,6 +1454,8 @@ class IfcModel:
             storey:   Optional ``StoreyHandle`` (or ``IfcBuildingStorey``
                       entity) receiving newly created storey-placed
                       elements. Defaults to the first storey in the file.
+            validate:  Validate rebuilt storey-placed elements (default True).
+                       Pass False on preview ticks with pre-validated data.
 
         Returns:
             Changed ``GlobalId`` strings, in input order. Unchanged
@@ -1547,7 +1556,7 @@ class IfcModel:
                     storey_entity = default_storey
                 else:
                     storey_entity = default_storey
-                new_handle = self.add(pending, StoreyHandle(storey_entity, self))
+                new_handle = self.add(pending, StoreyHandle(storey_entity, self), validate=validate)
 
             if new_handle.entity.GlobalId != target_guid:
                 occupant = self._by_guid_safe(target_guid)
