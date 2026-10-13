@@ -692,6 +692,12 @@ class TestIterMeshDicts:
         both = m.to_mesh_dicts(include_guids=[d["guid"] for d in full])
         assert both == full
 
+    def test_interactive_preset_keeps_guids(self):
+        m = self._model_with_beam_and_slab()
+        coarse = m.to_mesh_dicts(preset="interactive")
+        assert [d["guid"] for d in coarse] == [d["guid"] for d in m.to_mesh_dicts()]
+        assert all(d["primitive"] == "triangles" for d in coarse)
+
     def test_export_glb_skips_openings(self, tmp_path):
         from ifckit import PendingWall
         from ifckit.elements.opening import PendingOpening

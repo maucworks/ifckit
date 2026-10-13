@@ -57,6 +57,11 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
 - `feat(model): iter_mesh_dicts(include_guids=...)` diff-contract —
   selective tessellation yields dicts identical to a full pass for those
   GUIDs, so callers can splice by `guid` (regression-tested).
+- `feat(geom_backend): tessellation presets "final" (0.05/0.8, status quo)`
+  and `"interactive" (0.5/1.5)` via `make_settings(preset=...)` (or
+  positionally) and `iter_mesh_dicts/to_mesh_dicts(preset=...)`; explicit
+  dict keys win. Opening booleans dominate cost (~48x a bare wall), curves
+  gain most from coarse (~44 ms → ~0.6 ms on a 270° beam).
 
 ### Fixed — ifcopenshell 0.9
 

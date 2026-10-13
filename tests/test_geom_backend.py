@@ -79,6 +79,30 @@ class TestMakeSettings:
         assert s.get("mesher-linear-deflection") == pytest.approx(0.01)
         assert s.get("mesher-angular-deflection") == pytest.approx(0.5)
 
+    def test_interactive_preset(self):
+        s = geom_backend.make_settings(preset="interactive")
+        assert s.get("mesher-linear-deflection") == pytest.approx(0.5)
+        assert s.get("mesher-angular-deflection") == pytest.approx(1.5)
+        assert s.get("use-world-coords") is True
+
+    def test_preset_positional_name(self):
+        s = geom_backend.make_settings("interactive")
+        assert s.get("mesher-linear-deflection") == pytest.approx(0.5)
+
+    def test_unknown_preset_raises(self):
+        with pytest.raises(ValueError, match="Unknown tessellation preset"):
+            geom_backend.make_settings(preset="ultra")
+        with pytest.raises(ValueError, match="Unknown tessellation preset"):
+            geom_backend.make_settings("ultra")
+
+    def test_explicit_dict_wins_over_preset(self):
+        s = geom_backend.make_settings({"linear_deflection": 0.01}, preset="interactive")
+        assert s.get("mesher-linear-deflection") == pytest.approx(0.01)
+        assert s.get("mesher-angular-deflection") == pytest.approx(1.5)
+
+    def test_presets_documented(self):
+        assert set(geom_backend.PRESETS) == {"final", "interactive"}
+
 
 class TestMakeSerializer:
     def test_glb(self, tmp_path):

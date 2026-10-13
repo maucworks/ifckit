@@ -25,6 +25,21 @@ from typing import Any, Collection, Iterator, NamedTuple, Optional, Union
 DEFAULT_LINEAR_DEFLECTION = 0.05
 DEFAULT_ANGULAR_DEFLECTION = 0.8
 
+#: Tessellation presets (PLAN-interactive-preview, I-3). ``final`` is the
+#: status-quo default; ``interactive`` is coarse for preview ticks.
+#: Measured on this machine (ifcopenshell 0.9.0): a 270° revolved beam
+#: tessellates in ~44 ms / 128 tris (final) vs ~0.6 ms / 60 tris
+#: (interactive); 3 walls with boolean openings in ~53 ms vs ~9.5 ms.
+#: Opening booleans dominate: the same 3 walls without openings cost
+#: ~1.1 ms at either preset.
+PRESETS = {
+    "final": {
+        "linear_deflection": DEFAULT_LINEAR_DEFLECTION,
+        "angular_deflection": DEFAULT_ANGULAR_DEFLECTION,
+    },
+    "interactive": {"linear_deflection": 0.5, "angular_deflection": 1.5},
+}
+
 #: Supported ifcopenshell lines, oldest first.
 #: Floor is 0.8.4: the last line with Python 3.9 wheels (Rhino 8) and the
 #: oldest proven point. The 0.8 serializer API (separate serializer_settings)
@@ -85,22 +100,35 @@ def require_version() -> str:
     return version
 
 
-def make_settings(tessellation: Optional[dict] = None) -> Any:
+def make_settings(tessellation: Optional[Union[dict, str]] = None, *, preset: str = "final") -> Any:
     """Create geometry settings with world coordinates and tessellation.
 
     Args:
         tessellation: Optional overrides, e.g.
             ``{"linear_deflection": 0.01, "angular_deflection": 0.5}``.
-            Defaults: 0.05 / 0.8 (ifcopenshell behaviour).
+            A preset name (``"interactive"``) may be passed positionally
+            instead, overriding *preset*.
+        preset: ``"final"`` (default, 0.05 / 0.8) or ``"interactive"``
+            (coarse, 0.5 / 1.5) — see :data:`PRESETS`. Explicit
+            *tessellation* keys win over the preset base.
+
+    Raises:
+        ValueError: If *preset* (or a positional preset name) is unknown.
     """
     import ifcopenshell.geom as _geom
 
+    if isinstance(tessellation, str):
+        preset, tessellation = tessellation, None
+    try:
+        base = PRESETS[preset]
+    except KeyError:
+        raise ValueError(
+            f"Unknown tessellation preset {preset!r}. Available: {sorted(PRESETS)}."
+        ) from None
+    merged = {**base, **(tessellation or {})}
     settings = _geom.settings()
-    tessellation = tessellation or {}
-    linear = float(tessellation.get("linear_deflection", DEFAULT_LINEAR_DEFLECTION))
-    angular = float(tessellation.get("angular_deflection", DEFAULT_ANGULAR_DEFLECTION))
-    settings.set("mesher-linear-deflection", linear)
-    settings.set("mesher-angular-deflection", angular)
+    settings.set("mesher-linear-deflection", float(merged["linear_deflection"]))
+    settings.set("mesher-angular-deflection", float(merged["angular_deflection"]))
     settings.set("use-world-coords", True)
     return settings
 
