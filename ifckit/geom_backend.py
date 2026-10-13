@@ -352,7 +352,7 @@ def shapes_to_chunks(
     can instance them. Translation-only: rotated copies hash differently.
     """
     import hashlib
-    from array import array
+    import struct
 
     for mesh in shapes_to_mesh_dicts(shapes, y_up=y_up):
         positions = mesh["positions"]
@@ -365,14 +365,15 @@ def shapes_to_chunks(
         else:
             offset = [0.0, 0.0, 0.0]
         normalized = [c - offset[i % 3] for i, c in enumerate(positions)]
-        pos_bytes = array("f", normalized).tobytes()
+        indices = mesh["indices"]
+        pos_bytes = struct.pack("<%df" % len(normalized), *normalized)
         yield {
             "guid": mesh["guid"],
             "label": mesh["label"],
             "profile_key": hashlib.sha1(pos_bytes).hexdigest(),
             "offset": offset,
             "positions": pos_bytes,
-            "index": array("I", mesh["indices"]).tobytes(),
+            "index": struct.pack("<%dI" % len(indices), *indices),
             "vertex_count": len(positions) // 3,
-            "index_count": len(mesh["indices"]),
+            "index_count": len(indices),
         }

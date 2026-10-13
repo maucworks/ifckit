@@ -227,6 +227,20 @@ class TestSerializeSkipOpenings:
 
         assert os.path.getsize(out) > 0
 
+    def test_path_source(self, tmp_path):
+        """serialize_to_file also accepts an .ifc path (file-export route)."""
+        import os
+
+        m = _beam_model()
+        src = str(tmp_path / "in.ifc")
+        out = str(tmp_path / "out.obj")
+        m.ifc_file.write(src)
+        try:
+            geom_backend.serialize_to_file(src, out, geom_backend.make_settings())
+        except ImportError:
+            pytest.skip("OBJ serializer not in this ifcopenshell build")
+        assert os.path.getsize(out) > 0
+
 
 class TestShapesToMeshDicts:
     def test_format_and_y_up(self):
@@ -272,15 +286,15 @@ def _two_beam_model():
 
 
 def _decode_floats(raw: bytes):
-    from array import array
+    import struct
 
-    return list(array("f", raw))
+    return list(struct.unpack("<%df" % (len(raw) // 4), raw)) if raw else []
 
 
 def _decode_uints(raw: bytes):
-    from array import array
+    import struct
 
-    return list(array("I", raw))
+    return list(struct.unpack("<%dI" % (len(raw) // 4), raw)) if raw else []
 
 
 class TestShapesToChunks:
@@ -338,3 +352,13 @@ class TestShapesToChunks:
         (only,) = m.to_chunks(include_guids=[guids[0]])
         assert only["guid"] == guids[0]
         assert m.to_chunks(include_guids=[]) == []
+
+    def test_empty_shape(self):
+        (chunk,) = geom_backend.shapes_to_chunks(
+            iter([geom_backend.IterShape(guid="x" * 22, entity_type="IfcBeam", verts=[], faces=[])])
+        )
+        assert chunk["vertex_count"] == 0
+        assert chunk["index_count"] == 0
+        assert chunk["positions"] == b""
+        assert chunk["index"] == b""
+        assert chunk["offset"] == [0.0, 0.0, 0.0]

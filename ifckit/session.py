@@ -31,8 +31,8 @@ class ModelSession:
         schema: IFC schema for a fresh model.
         preset: Default tessellation preset (``"interactive"`` coarse for
                 ticks, ``"final"`` for exact output).
-        validate: Validate rebuilt elements (default False — preview data
-                  is pre-validated; full validation runs at save/export).
+        validate: Validate rebuilt elements (default False for preview
+                speed — set True when the input is untrusted).
     """
 
     def __init__(

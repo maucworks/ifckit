@@ -1421,7 +1421,13 @@ class IfcModel:
     # Incremental patch API (PLAN-interactive-preview, I-1)
     # ------------------------------------------------------------------
 
-    def apply_delta(self, elements: list, *, storey=None, validate: bool = True) -> list:
+    def apply_delta(
+        self,
+        elements: list,
+        *,
+        storey: Optional[Union[StoreyHandle, "ifcopenshell.entity_instance"]] = None,
+        validate: bool = True,
+    ) -> list:
         """Patch products in-place from element dicts; return changed GUIDs.
 
         The same ``IfcFile`` is mutated: new elements are built into it,
@@ -1444,6 +1450,9 @@ class IfcModel:
           (Model B); the opening + fill are regenerated from the preset.
         - remaining keys (or a nested ``data`` dict): the ``from_dict``
           body of the pending element (same convention as ``json_build``).
+          Bodies must be plain JSON data (no live ``Vec``/``Plane``
+          objects — their minted identity ids would defeat change
+          detection).
 
         Replacing a host also removes its openings + fills — resend them
         in the same delta to rebuild them under stable GUIDs.
@@ -1459,7 +1468,8 @@ class IfcModel:
 
         Returns:
             Changed ``GlobalId`` strings, in input order. Unchanged
-            elements are absent.
+            elements are absent. On error, earlier items stay applied —
+            retry with full state (only successful items are cached).
         """
         from ifckit.elements.registry import ElementRegistry
 
@@ -1520,10 +1530,6 @@ class IfcModel:
                 from ifckit.geom_backend import guid_for_id
 
                 target_guid = guid_for_id(str(sid))
-            if old_entity is None and target_guid is not None:
-                occupant = self._by_guid_safe(target_guid)
-                if occupant is not None:
-                    old_entity, old_guid = occupant, target_guid
 
             host_id = elem.get("host_id")
             if host_id is None:
@@ -1559,12 +1565,6 @@ class IfcModel:
                 new_handle = self.add(pending, StoreyHandle(storey_entity, self), validate=validate)
 
             if new_handle.entity.GlobalId != target_guid:
-                occupant = self._by_guid_safe(target_guid)
-                if occupant is not None:
-                    raise ValueError(
-                        f"apply_delta: global_id {target_guid!r} for {key!r} "
-                        "is already used by another entity."
-                    )
                 new_handle.entity.GlobalId = target_guid
             self._delta_guids[key] = target_guid
             self._delta_sigs[key] = sig
@@ -1573,10 +1573,8 @@ class IfcModel:
             changed.append(target_guid)
         return changed
 
-    def _by_guid_safe(self, guid) -> Optional["ifcopenshell.entity_instance"]:
+    def _by_guid_safe(self, guid: str) -> Optional["ifcopenshell.entity_instance"]:
         """Look up an entity by GlobalId, returning None on miss."""
-        if not guid:
-            return None
         try:
             return self._file.by_guid(guid)
         except RuntimeError:
@@ -1608,7 +1606,12 @@ class IfcModel:
             return found[0]
         if isinstance(storey, StoreyHandle):
             return storey.entity
-        return storey
+        if hasattr(storey, "is_a") and storey.is_a("IfcBuildingStorey"):
+            return storey
+        raise TypeError(
+            "apply_delta: storey must be a StoreyHandle or IfcBuildingStorey, "
+            f"got {type(storey).__name__}."
+        )
 
     def _container_of(self, entity):
         """Return the IfcBuildingStorey containing *entity* (delta rebuilds)."""
@@ -1807,7 +1810,8 @@ class IfcModel:
         bridge parts).
 
         Traverses the full spatial hierarchy under IfcProject and removes every
-        product found in a ``ContainsElements`` relationship.
+        product found in a ``ContainsElements`` relationship. Also resets the
+        ``apply_delta`` patch state (stable keys, signatures, handles).
 
         Returns:
             The number of products removed.
@@ -1828,6 +1832,11 @@ class IfcModel:
         for rel in getattr(self._project, "IsDecomposedBy", None) or []:
             for child in rel.RelatedObjects:
                 _remove_from(child)
+
+        self._delta_guids = {}
+        self._delta_sigs = {}
+        self._delta_hosts = {}
+        self._delta_handles = {}
 
         return removed
 

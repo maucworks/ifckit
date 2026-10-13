@@ -117,6 +117,16 @@ class TestApplyDeltaGuidPolicy:
         with pytest.raises(ValueError, match="'id' or 'global_id'"):
             empty_model.apply_delta([_wall_body()])
 
+    def test_non_dict_raises(self, empty_model):
+        with pytest.raises(TypeError, match="must be a dict"):
+            empty_model.apply_delta(["w1"])
+
+    def test_nested_data_id(self, empty_model):
+        m = empty_model
+        changed = m.apply_delta([{"data": {**_wall_body(), "id": "w1"}}])
+        assert changed == [geom_backend.guid_for_id("w1")]
+        assert m.apply_delta([{"data": {**_wall_body(), "id": "w1"}}]) == []
+
     def test_unknown_type_raises(self, empty_model):
         with pytest.raises(ValueError, match="unknown element type"):
             empty_model.apply_delta([{"id": "x", "element_type": "nope"}])
@@ -214,3 +224,68 @@ class TestApplyDeltaValidation:
             m.add(pending, storey)
         handle = m.add(pending, storey, validate=False)
         assert handle.entity.is_a("IfcWall")
+
+
+class TestApplyDeltaStorey:
+    def test_no_storey_raises(self):
+        m = IfcModel("Bare", schema=IfcSchema.IFC4)
+        with pytest.raises(ValueError, match="no IfcBuildingStorey"):
+            m.apply_delta([{**_wall_body(), "id": "w1"}])
+
+    def test_explicit_storey(self, empty_model):
+        from ifckit.handles import StoreyHandle
+
+        m = empty_model
+        storey = StoreyHandle(m.ifc_file.by_type("IfcBuildingStorey")[0], m)
+        assert m.apply_delta([{**_wall_body(), "id": "w1"}], storey=storey) == [
+            geom_backend.guid_for_id("w1")
+        ]
+        assert m.apply_delta([{**_wall_body(), "id": "w2"}], storey=storey.entity) == [
+            geom_backend.guid_for_id("w2")
+        ]
+        with pytest.raises(TypeError, match="StoreyHandle or IfcBuildingStorey"):
+            m.apply_delta([{**_wall_body(), "id": "w3"}], storey="GF")
+
+    def test_bridge_product_replace_unsupported(self):
+        m = IfcModel("Bridge", schema=IfcSchema.IFC4X3)
+        site = m.add_site("S")
+        bridge = m.add_bridge(site, "Brug")
+        part = m.add_bridge_part(bridge, "Deck", part_type="DECK")
+        beam = m.add_element_to_part(part, "IfcBeam", name="B1")
+        from ifckit.elements.structural import PendingBeam
+        from ifckit.geometry import Line
+
+        body = PendingBeam(
+            Line(Vec(0, 0, 0), Vec(5, 0, 0)),
+            [Vec(-0.1, -0.1), Vec(0.1, -0.1), Vec(0.1, 0.1), Vec(-0.1, 0.1)],
+            name="B1",
+        ).to_dict()
+        with pytest.raises(ValueError, match="non-storey-contained"):
+            m.apply_delta([{**body, "global_id": beam.entity.GlobalId}])
+
+    def test_remove_unconnected_fill(self, empty_model):
+        from ifckit.elements.structural import PendingBeam
+        from ifckit.geometry import Line
+        from ifckit.handles import StoreyHandle
+
+        m = empty_model
+        storey = StoreyHandle(m.ifc_file.by_type("IfcBuildingStorey")[0], m)
+        handle = storey.add(
+            PendingBeam(
+                Line(Vec(0, 0, 0), Vec(5, 0, 0)),
+                [Vec(-0.1, -0.1), Vec(0.1, -0.1), Vec(0.1, 0.1), Vec(-0.1, -0.1)],
+                name="B1",
+            )
+        )
+        guid = handle.entity.GlobalId
+        m._remove_fill(handle.entity)
+        with pytest.raises(RuntimeError):
+            m.ifc_file.by_guid(guid)
+
+    def test_clear_resets_patch_state(self, empty_model):
+        m = empty_model
+        elem = {**_wall_body(), "id": "w1"}
+        assert m.apply_delta([elem]) != []
+        assert m.apply_delta([elem]) == []
+        assert m.clear() == 1
+        assert m.apply_delta([elem]) == [geom_backend.guid_for_id("w1")]
