@@ -46,6 +46,18 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
 
 ## [Unreleased]
 
+### Added — interactive preview (patch API, selective tessellation)
+
+- `feat(model): IfcModel.apply_delta(elements)` mutates the same `IfcFile`
+  in place: new elements are built, changed ones rebuilt with preserved
+  `GlobalId` (`global_id` wins, else `guid_for_id(id)`), unchanged ones
+  skipped via signature cache. Returns changed GUIDs for selective
+  re-tessellation. Host replacement cascades to openings/fills (resend
+  them in the same delta).
+- `feat(model): iter_mesh_dicts(include_guids=...)` diff-contract —
+  selective tessellation yields dicts identical to a full pass for those
+  GUIDs, so callers can splice by `guid` (regression-tested).
+
 ### Fixed — ifcopenshell 0.9
 
 - `fix(model): export via geom_backend op ifcopenshell 0.9 serializer-API`.

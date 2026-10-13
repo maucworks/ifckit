@@ -1317,6 +1317,11 @@ class IfcModel:
         carrying the element ``guid`` so callers can diff and selectively
         update meshes instead of re-tessellating everything.
 
+        Diff-contract: with the same settings, ``include_guids=[...]``
+        yields dicts identical to what a full pass yields for those GUIDs
+        (same order, same positions/indices) — preview callers can splice
+        them into the previous full result by ``guid``.
+
         Args:
             tessellation: Optional ``{"linear_deflection": ..., ...}`` overrides.
             skip_openings: Skip ``IfcOpeningElement`` shapes (default True).

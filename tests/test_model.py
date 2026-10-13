@@ -677,6 +677,21 @@ class TestIterMeshDicts:
         assert [d["guid"] for d in filtered] == [wanted]
         assert m.to_mesh_dicts(include_guids=[]) == []
 
+    def test_include_guids_matches_full(self):
+        """Diff-contract: selective tessellation is identical to full.
+
+        Preview callers diff on ``guid`` and only re-tessellate changed
+        GUIDs; those dicts must equal what a full pass yields.
+        """
+        m = self._model_with_beam_and_slab()
+        full = m.to_mesh_dicts()
+        assert len(full) == 2
+        for wanted in (full[0]["guid"], full[1]["guid"]):
+            (selective,) = m.to_mesh_dicts(include_guids=[wanted])
+            assert selective == next(d for d in full if d["guid"] == wanted)
+        both = m.to_mesh_dicts(include_guids=[d["guid"] for d in full])
+        assert both == full
+
     def test_export_glb_skips_openings(self, tmp_path):
         from ifckit import PendingWall
         from ifckit.elements.opening import PendingOpening
