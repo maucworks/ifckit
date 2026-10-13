@@ -89,6 +89,12 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   right-handed frames strictly between two frames (origins lerped,
   orientations quaternion-slerped along the shortest arc). Raises on
   exactly 180°-apart frames (undefined shortest arc) and on `num` < 1.
+- `feat(geometry): Path.tween(path0, path1, num)` interpolates `num`
+  paths strictly between two identically structured paths (same segment
+  count/types/order, open/closed, hole count and hole structure —
+  else `ValueError`). Lines lerp endpoints, arcs lerp start/mid/end
+  and are re-fit through those points (shared vertices stay exactly
+  shared); full circles use parameter fallback. Holes tween pairwise.
 
 ### Fixed — ifcopenshell 0.9
 
