@@ -9,6 +9,8 @@ Supports IFC2X3 (legacy buildings), IFC4 (buildings) and IFC4X3 (bridges / infra
 
 from __future__ import annotations
 
+import hashlib as _hashlib
+import json as _json
 import warnings as _warnings
 from typing import TYPE_CHECKING, Collection, Iterator, Optional, Union
 
@@ -33,6 +35,31 @@ _UNIT_PREFIX: dict = {
     LengthUnit.METRE: None,
     LengthUnit.MILLIMETRE: "MILLI",
 }
+
+
+def _delta_signature(elem: dict) -> str:
+    """Change hash for an apply_delta element dict.
+
+    Ignores ``global_id`` (an identity override, not a change) and nested
+    ``"id"`` keys: geometry objects (``Vec``/``Plane``/…) mint a random
+    identity per instance, so two semantically identical dicts would
+    otherwise never compare equal. The top-level ``"id"``/``"host_id"``
+    keys are stable caller keys and stay in the hash.
+    """
+
+    def _strip(node, top: bool):
+        if isinstance(node, dict):
+            return {
+                key: _strip(value, False)
+                for key, value in node.items()
+                if (top or key != "id") and key != "global_id"
+            }
+        if isinstance(node, (list, tuple)):
+            return [_strip(value, False) for value in node]
+        return node
+
+    canonical = _json.dumps(_strip(elem, True), sort_keys=True, default=str)
+    return _hashlib.md5(canonical.encode()).hexdigest()
 
 
 class IfcModel:
@@ -160,6 +187,13 @@ class IfcModel:
         obj._registry = default_registry()
         obj._type_cache = {}
 
+        # Incremental patch state (apply_delta): stable key -> GlobalId,
+        # signature, host key and handle. Empty for wrapped files.
+        obj._delta_guids = {}
+        obj._delta_sigs = {}
+        obj._delta_hosts = {}
+        obj._delta_handles = {}
+
         return obj
 
     def __init__(
@@ -245,6 +279,13 @@ class IfcModel:
 
         self._registry = default_registry()
         self._type_cache: dict = {}
+
+        # Incremental patch state (apply_delta): stable key -> GlobalId,
+        # signature, host key and handle.
+        self._delta_guids: dict = {}
+        self._delta_sigs: dict = {}
+        self._delta_hosts: dict = {}
+        self._delta_handles: dict = {}
 
     # ------------------------------------------------------------------
     # High-level element API
@@ -1310,6 +1351,274 @@ class IfcModel:
                 include_guids=include_guids,
             )
         )
+
+    # ------------------------------------------------------------------
+    # Incremental patch API (PLAN-interactive-preview, I-1)
+    # ------------------------------------------------------------------
+
+    def apply_delta(self, elements: list, *, storey=None) -> list:
+        """Patch products in-place from element dicts; return changed GUIDs.
+
+        The same ``IfcFile`` is mutated: new elements are built into it,
+        changed ones are rebuilt with their ``GlobalId`` preserved, and
+        unchanged ones are skipped via a signature cache. Callers can then
+        re-tessellate only the returned GUIDs (see :meth:`iter_mesh_dicts`
+        with ``include_guids``).
+
+        Each element dict carries:
+
+        - ``id``: stable caller-side key (preferred). Without ``global_id``
+          the GUID stays stable as long as ``id`` is stable (derived via
+          ``geom_backend.guid_for_id``). Either ``id`` or ``global_id``
+          is required.
+        - ``global_id``: explicit IFC ``GlobalId``. Always wins when given
+          and is adopted into the stable mapping.
+        - ``element_type`` (or ``type``): registry key, e.g. ``basic_wall``.
+        - ``host_id``: stable ``id`` of the host element. Only supported
+          for ``PendingWindow``/``PendingDoor`` with ``component_graph``
+          (Model B); the opening + fill are regenerated from the preset.
+        - remaining keys (or a nested ``data`` dict): the ``from_dict``
+          body of the pending element (same convention as ``json_build``).
+
+        Replacing a host also removes its openings + fills — resend them
+        in the same delta to rebuild them under stable GUIDs.
+
+        Args:
+            elements: Element dicts (full state per tick; order hosts
+                      before their fills).
+            storey:   Optional ``StoreyHandle`` (or ``IfcBuildingStorey``
+                      entity) receiving newly created storey-placed
+                      elements. Defaults to the first storey in the file.
+
+        Returns:
+            Changed ``GlobalId`` strings, in input order. Unchanged
+            elements are absent.
+        """
+        from ifckit.elements.registry import ElementRegistry
+
+        changed: list = []
+        default_storey = None
+        for elem in elements:
+            if not isinstance(elem, dict):
+                raise TypeError(
+                    f"apply_delta: each element must be a dict, got {type(elem).__name__}"
+                )
+            sid = elem.get("id")
+            given = elem.get("global_id")
+            data = elem.get("data")
+            if sid is None and isinstance(data, dict):
+                sid = data.get("id")
+            if sid is None and not given:
+                raise ValueError("apply_delta: each element needs 'id' or 'global_id'.")
+            if given is not None and not (isinstance(given, str) and len(given) == 22):
+                raise ValueError(
+                    f"apply_delta: 'global_id' must be a 22-char IFC GlobalId, got {given!r}."
+                )
+            key = str(sid) if sid is not None else f"@guid:{given}"
+
+            sig = _delta_signature(elem)
+            mapped_guid = self._delta_guids.get(key)
+            if self._delta_sigs.get(key) == sig and (not given or given == mapped_guid):
+                continue
+
+            element_type = elem.get("element_type") or elem.get("type")
+            if isinstance(data, dict):
+                body = dict(data)
+                element_type = element_type or body.get("element_type") or body.get("type")
+            else:
+                body = {k: v for k, v in elem.items() if k not in ("id", "host_id", "global_id")}
+            if not element_type:
+                raise ValueError(f"apply_delta: element {key!r} misses 'element_type'/'type'.")
+            try:
+                cls = ElementRegistry.get(element_type)
+            except KeyError:
+                raise ValueError(
+                    f"apply_delta: unknown element type {element_type!r} for {key!r}."
+                ) from None
+            pending = cls.from_dict(body)
+
+            old_guid = self._delta_guids.get(key)
+            old_entity = self._by_guid_safe(old_guid) if old_guid else None
+            if old_entity is None:
+                old_entity, old_guid = self._adopt_entity(sid, given)
+            if old_entity is not None and old_guid is not None:
+                owner = next((k for k, g in self._delta_guids.items() if g == old_guid), None)
+                if owner is not None and owner != key:
+                    raise ValueError(
+                        f"apply_delta: global_id {old_guid!r} for {key!r} "
+                        f"is already used by {owner!r}."
+                    )
+            target_guid = given or old_guid
+            if target_guid is None and sid is not None:
+                from ifckit.geom_backend import guid_for_id
+
+                target_guid = guid_for_id(str(sid))
+            if old_entity is None and target_guid is not None:
+                occupant = self._by_guid_safe(target_guid)
+                if occupant is not None:
+                    old_entity, old_guid = occupant, target_guid
+
+            host_id = elem.get("host_id")
+            if host_id is None:
+                host_id = self._delta_hosts.get(key)
+            if host_id is not None:
+                host_handle = self._delta_handles.get(str(host_id))
+                if host_handle is None:
+                    raise ValueError(
+                        f"apply_delta: host_id {host_id!r} for {key!r} not found — "
+                        "send the host in the same (or an earlier) delta."
+                    )
+                from ifckit.elements.opening import PendingDoor, PendingWindow
+
+                if not isinstance(pending, (PendingWindow, PendingDoor)) or not getattr(
+                    pending, "component_graph", None
+                ):
+                    raise ValueError(
+                        f"apply_delta: host_id for {key!r} needs PendingWindow/"
+                        "PendingDoor with component_graph (Model B)."
+                    )
+                if old_entity is not None:
+                    self._remove_fill(old_entity)
+                new_handle = host_handle.add(pending)
+            else:
+                if old_entity is not None:
+                    storey_entity = self._container_of(old_entity)
+                    self._remove_product(old_entity)
+                elif default_storey is None:
+                    default_storey = self._resolve_delta_storey(storey)
+                    storey_entity = default_storey
+                else:
+                    storey_entity = default_storey
+                new_handle = self.add(pending, StoreyHandle(storey_entity, self))
+
+            if new_handle.entity.GlobalId != target_guid:
+                occupant = self._by_guid_safe(target_guid)
+                if occupant is not None:
+                    raise ValueError(
+                        f"apply_delta: global_id {target_guid!r} for {key!r} "
+                        "is already used by another entity."
+                    )
+                new_handle.entity.GlobalId = target_guid
+            self._delta_guids[key] = target_guid
+            self._delta_sigs[key] = sig
+            self._delta_hosts[key] = host_id
+            self._delta_handles[key] = new_handle
+            changed.append(target_guid)
+        return changed
+
+    def _by_guid_safe(self, guid) -> Optional["ifcopenshell.entity_instance"]:
+        """Look up an entity by GlobalId, returning None on miss."""
+        if not guid:
+            return None
+        try:
+            return self._file.by_guid(guid)
+        except RuntimeError:
+            return None
+
+    def _adopt_entity(self, sid, given):
+        """Adopt an entity built outside apply_delta (same GUID, no map yet)."""
+        if isinstance(given, str) and given:
+            found = self._by_guid_safe(given)
+            if found is not None:
+                return found, given
+        if sid is not None:
+            from ifckit.geom_backend import guid_for_id
+
+            found = self._by_guid_safe(guid_for_id(str(sid)))
+            if found is not None:
+                return found, found.GlobalId
+        return None, None
+
+    def _resolve_delta_storey(self, storey):
+        """Resolve the receiving storey for newly created delta elements."""
+        if storey is None:
+            found = self._file.by_type("IfcBuildingStorey")
+            if not found:
+                raise ValueError(
+                    "apply_delta: new element but no IfcBuildingStorey in the file — "
+                    "create the spatial hierarchy first or pass storey=."
+                )
+            return found[0]
+        if isinstance(storey, StoreyHandle):
+            return storey.entity
+        return storey
+
+    def _container_of(self, entity):
+        """Return the IfcBuildingStorey containing *entity* (delta rebuilds)."""
+        try:
+            return self._find_containing_storey(entity)
+        except ValueError:
+            raise ValueError(
+                "apply_delta: replacing non-storey-contained products "
+                f"({entity.is_a()}) is not supported."
+            ) from None
+
+    def _try_remove(self, entity) -> None:
+        """Remove *entity*, tolerating prior removal."""
+        try:
+            self._file.remove(entity)
+        except RuntimeError:
+            pass
+
+    def _strip_product(self, entity) -> None:
+        """Detach representation, placement and containment of *entity*."""
+        if getattr(entity, "Representation", None):
+            for rep in list(entity.Representation.Representations or []):
+                for item in list(rep.Items or []):
+                    self._try_remove(item)
+                self._try_remove(rep)
+            self._try_remove(entity.Representation)
+            entity.Representation = None
+        if getattr(entity, "ObjectPlacement", None):
+            placement = entity.ObjectPlacement
+            entity.ObjectPlacement = None
+            self._try_remove(placement)
+        for rel in list(self._file.by_type("IfcRelContainedInSpatialStructure")):
+            related = list(rel.RelatedElements or [])
+            if entity in related:
+                related.remove(entity)
+                if related:
+                    rel.RelatedElements = related
+                else:
+                    self._try_remove(rel)
+
+    def _invalidate_dependents(self, guid) -> None:
+        """Drop signature/handle cache for the delta key mapped to *guid*."""
+        for key, mapped in list(self._delta_guids.items()):
+            if mapped == guid:
+                self._delta_sigs.pop(key, None)
+                self._delta_handles.pop(key, None)
+
+    def _remove_opening_tree(self, opening) -> None:
+        """Remove an opening plus its fills, rels and cached delta keys."""
+        for fills in list(getattr(opening, "HasFillings", None) or []):
+            fill = fills.RelatedBuildingElement
+            fill_guid = fill.GlobalId
+            self._strip_product(fill)
+            self._try_remove(fills)
+            self._try_remove(fill)
+            self._invalidate_dependents(fill_guid)
+        self._strip_product(opening)
+        self._try_remove(opening)
+
+    def _remove_product(self, entity) -> None:
+        """Remove a storey-placed product with its openings/fills (cascade)."""
+        for voids in list(getattr(entity, "HasOpenings", None) or []):
+            self._remove_opening_tree(voids.RelatedOpeningElement)
+            self._try_remove(voids)
+        self._strip_product(entity)
+        self._try_remove(entity)
+
+    def _remove_fill(self, entity) -> None:
+        """Remove a fill plus the opening it fills (regenerated on rebuild)."""
+        for fills in list(getattr(entity, "FillsVoids", None) or []):
+            opening = fills.RelatingOpeningElement
+            for voids in list(getattr(opening, "VoidsElements", None) or []):
+                self._try_remove(voids)
+            self._remove_opening_tree(opening)
+            self._try_remove(fills)
+        self._strip_product(entity)
+        self._try_remove(entity)
 
     def export_step(self, output_path: str) -> None:
         """Export the model to an ISO 10303 STEP file via ``ifcconvert``.
