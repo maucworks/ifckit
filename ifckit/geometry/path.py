@@ -102,6 +102,101 @@ class PathReport:
         )
 
 
+def _slerp_dir(v0: "Vec", v1: "Vec", t: float) -> "Vec":
+    """Spherical interpolation between directions (shortest arc)."""
+    a = v0.normalized()
+    b = v1.normalized()
+    d = max(-1.0, min(1.0, a @ b))
+    if d < -1.0 + 1e-9:
+        raise ValueError(
+            "Cannot interpolate 180°-apart directions: the shortest rotation arc is undefined."
+        )
+    if d > 1.0 - 1e-12:
+        return a.lerp(b, t).normalized()
+    angle = math.acos(d)
+    s = math.sin(angle)
+    out = a * (math.sin((1.0 - t) * angle) / s) + b * (math.sin(t * angle) / s)
+    return out.normalized()
+
+
+def _circumcenter(p0: "Vec", p1: "Vec", p2: "Vec") -> Optional["Vec"]:
+    """Circumcenter of three points, or None when degenerate.
+
+    Returns None for coincident points (e.g. full-circle start ≈ end)
+    and (near-)collinear points.
+    """
+    u = p1 - p0
+    v = p2 - p0
+    if u @ u < 1e-18 or v @ v < 1e-18:
+        return None
+    n = u**v
+    denom = 2.0 * (n @ n)
+    if denom < 1e-24:
+        return None
+    return p0 + ((v**n) * (u @ u) + (n**u) * (v @ v)) / denom
+
+
+def _signed_angle(a: "Vec", b: "Vec", normal: "Vec") -> float:
+    """Signed angle from *a* to *b* about *normal* (-pi..pi)."""
+    return math.atan2((a**b) @ normal, a @ b)
+
+
+def _morph_arc(a0: "Arc", a1: "Arc", t: float) -> "Arc":
+    """Interpolate two arcs at parameter *t*, preserving arc-ness.
+
+    Lerps start/mid/end points and re-fits the circle through them, so
+    shared vertices stay exactly shared. Falls back to direct parameter
+    interpolation (center, radius, normal, angle) for degenerate cases
+    such as full circles, where start ≈ end leaves the fit undefined.
+    """
+    start = a0.start.lerp(a1.start, t)
+    mid = a0.midpoint.lerp(a1.midpoint, t)
+    end = a0.end.lerp(a1.end, t)
+    center = _circumcenter(start, mid, end)
+    if center is not None:
+        normal = _slerp_dir(a0.normal, a1.normal, t)
+        fit = (mid - start) ** (end - start)
+        if fit @ normal < 0.0:
+            fit = -fit
+        normal = fit.normalized()
+        return Arc(center, normal, start, _signed_angle(start - center, end - center, normal))
+    middle = a0.center.lerp(a1.center, t)
+    normal = _slerp_dir(a0.normal, a1.normal, t)
+    radius = a0.radius + (a1.radius - a0.radius) * t
+    angle = a0.angle + (a1.angle - a0.angle) * t
+    d0 = a0.start - a0.center
+    d1 = a1.start - a1.center
+    if abs(d0) < 1e-12 or abs(d1) < 1e-12:
+        raise ValueError("tween: cannot morph a zero-radius arc.")
+    direction = _slerp_dir(d0, d1, t)
+    return Arc(middle, normal, middle + direction * radius, angle)
+
+
+def _path_structure(path: "Path") -> tuple:
+    """Hashable structural signature: segment types, closed flag, holes."""
+    return (
+        tuple("arc" if isinstance(seg, Arc) else "line" for seg in path.segments),
+        path.is_closed,
+        tuple(_path_structure(hole) for hole in path.holes),
+    )
+
+
+def _tween_single(path0: "Path", path1: "Path", t: float, plane: Optional["Plane"]) -> "Path":
+    """One interpolated path at parameter *t* (structures pre-checked)."""
+    for hole in (*path0.holes, *path1.holes):
+        if hole._plane is not None:
+            raise ValueError("tween: paths with planes on holes are not supported.")
+    out = Path(plane=plane)
+    for s0, s1 in zip(path0.segments, path1.segments):
+        if isinstance(s0, Arc):
+            out._segments.append(_morph_arc(s0, s1, t))
+        else:
+            out._segments.append(Line(s0.start.lerp(s1.start, t), s0.end.lerp(s1.end, t)))
+    for h0, h1 in zip(path0.holes, path1.holes):
+        out._holes.append(_tween_single(h0, h1, t, None))
+    return out
+
+
 class Path:
     """
     A G1-continuous path made of Line3 and Arc3 segments.
@@ -168,6 +263,45 @@ class Path:
         new_path._segments = [copy.copy(seg) for seg in self._segments]
         new_path._holes = list(self._holes) + [inner]
         return new_path
+
+    @staticmethod
+    def tween(path0: "Path", path1: "Path", num: int) -> List["Path"]:
+        """Interpolate *num* paths strictly between *path0* and *path1*.
+
+        Lines lerp their endpoints; arcs lerp start/mid/end and are
+        re-fit through those points, so shared vertices stay exactly
+        shared and closed paths stay closed. Holes are tweened pairwise
+        in order. Stored planes (``_plane``) are tweened via
+        ``Plane.tween`` when both paths carry one.
+
+        Args:
+            path0: Start path (excluded from the result).
+            path1: End path (excluded from the result).
+            num: Number of intermediate paths (``t = i / (num + 1)``).
+
+        Returns:
+            ``num`` new paths strictly between the inputs.
+
+        Raises:
+            ValueError: If *num* < 1, if the structures differ (segment
+                count/types/order, open vs closed, hole count or hole
+                structure), on mixed plane presence, on planes or arc
+                normals 180° apart, or on holes carrying planes.
+        """
+        if not isinstance(num, int) or num < 1:
+            raise ValueError(f"tween needs a positive integer num, got {num!r}.")
+        struct0, struct1 = _path_structure(path0), _path_structure(path1)
+        if struct0 != struct1:
+            raise ValueError(
+                f"tween needs identical path structures, got {struct0!r} vs {struct1!r}."
+            )
+        if (path0._plane is None) != (path1._plane is None):
+            raise ValueError("tween needs both paths either with or without a plane.")
+        if path0._plane is not None and path1._plane is not None:
+            planes: List[Optional["Plane"]] = Plane.tween(path0._plane, path1._plane, num)
+        else:
+            planes = [None] * num
+        return [_tween_single(path0, path1, (i + 1) / (num + 1), planes[i]) for i in range(num)]
 
     @property
     def segments(self) -> List[Line | Arc]:

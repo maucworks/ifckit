@@ -59,6 +59,94 @@ def test_from_3_pts_raises_on_p1_equals_p0():
         Plane.from_3_pts(Vec(1, 2, 3), Vec(1, 2, 3), Vec(4, 5, 6))
 
 
+# ---------------------------------------------------------------------------
+# Plane.tween
+# ---------------------------------------------------------------------------
+
+
+def _rotated_about_y():
+    """world_xy slerped 90° about Y: normal +Z -> +X, origin shifted."""
+    return Plane(Vec(10, 0, 0), Vec(0, 0, -1), Vec(0, 1, 0))
+
+
+def test_tween_count_and_spacing():
+    p0 = Plane.world_xy()
+    p1 = Plane(Vec(10, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+    mids = Plane.tween(p0, p1, 3)
+    assert len(mids) == 3
+    assert [m.origin.x for m in mids] == pytest.approx([2.5, 5.0, 7.5])
+    # Endpoints excluded, axes unchanged for pure translation.
+    assert all(m.x_axis.equals(Vec(1, 0, 0)) for m in mids)
+
+
+def test_tween_slews_normal():
+    """Perpendicular normals (dot == 0) tween fine — no dot threshold."""
+    p0 = Plane.world_xy()
+    mids = Plane.tween(p0, _rotated_about_y(), 1)
+    assert len(mids) == 1
+    (mid,) = mids
+    assert (p0.z_axis @ _rotated_about_y().z_axis) == pytest.approx(0.0)
+    assert mid.z_axis.equals(Vec(0.707106781, 0, 0.707106781))
+    assert mid.origin.equals(Vec(5, 0, 0))
+    assert (mid.x_axis**mid.y_axis).equals(mid.z_axis)
+
+
+def test_tween_twist_about_normal():
+    """90° in-plane twist interpolates through 45°."""
+    p0 = Plane.world_xy()
+    p1 = Plane(Vec(0, 0, 0), Vec(0, 1, 0), Vec(-1, 0, 0))
+    (mid,) = Plane.tween(p0, p1, 1)
+    assert mid.z_axis.equals(Vec(0, 0, 1))
+    assert mid.x_axis.equals(Vec(0.707106781, 0.707106781, 0))
+
+
+def test_tween_identical_frames():
+    p0 = Plane.world_xy()
+    same = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0))
+    mids = Plane.tween(p0, same, 2)
+    assert len(mids) == 2
+    assert all(m.z_axis.equals(Vec(0, 0, 1)) for m in mids)
+
+
+def test_tween_antipodal_normals_raise():
+    p0 = Plane.world_xy()
+    flipped = Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, -1, 0))
+    assert (p0.z_axis @ flipped.z_axis) == pytest.approx(-1.0)
+    with pytest.raises(ValueError, match="180"):
+        Plane.tween(p0, flipped, 1)
+
+
+def test_tween_180_apart_with_perpendicular_normals_raise():
+    """Relative angle 180° with dot(normals) == 0: still undefined.
+
+    Frame below is world_xy rotated 180° about (1, 0, 1)/√2
+    (R = 2·a·aᵀ − I maps z -> x).
+    """
+    p0 = Plane.world_xy()
+    other = Plane(Vec(0, 0, 0), Vec(0, 0, 1), Vec(0, -1, 0))
+    assert other.z_axis.equals(Vec(1, 0, 0))
+    assert (p0.z_axis @ other.z_axis) == pytest.approx(0.0, abs=1e-9)
+    with pytest.raises(ValueError, match="180"):
+        Plane.tween(p0, other, 1)
+
+
+def test_tween_180_twist_about_normal_raises():
+    """Opposite in-plane orientation is a 180° rotation — no shortest arc."""
+    p0 = Plane.world_xy()
+    twisted = Plane(Vec(0, 0, 0), Vec(-1, 0, 0), Vec(0, -1, 0))
+    assert (p0.z_axis @ twisted.z_axis) == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="180"):
+        Plane.tween(p0, twisted, 3)
+
+
+def test_tween_num_must_be_positive():
+    p0 = Plane.world_xy()
+    with pytest.raises(ValueError, match="positive integer"):
+        Plane.tween(p0, p0, 0)
+    with pytest.raises(ValueError, match="positive integer"):
+        Plane.tween(p0, p0, -2)
+
+
 def test_from_3_pts_raises_on_collinear():
     with pytest.raises(ValueError, match="collinear"):
         Plane.from_3_pts(Vec(0, 0, 0), Vec(1, 0, 0), Vec(3, 0, 0))
