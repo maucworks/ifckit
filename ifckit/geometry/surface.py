@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 _HAS_OCC = False
 try:
     from OCC.Core.Geom import Geom_BSplineSurface
-    from OCC.Core.gp import gp_Dir, gp_Pln, gp_Pnt
+    from OCC.Core.gp import gp_Dir, gp_Pln, gp_Pnt, gp_Vec
     from OCC.Core.TColgp import TColgp_Array2OfPnt
     from OCC.Core.TColStd import (
         TColStd_Array1OfInteger,
@@ -1034,8 +1034,114 @@ def occ_eval_tangents(surf: Surface, u: float, v: float) -> "tuple[Vec, Vec]":
     """Evaluate tangents at specified parameters using OCC."""
     require_occ()
     occ = _build_occ_surface(surf)
-    _, d1u, d1v = occ.D1(u, v)
+    d1u, d1v = gp_Vec(), gp_Vec()
+    occ.D1(u, v, gp_Pnt(), d1u, d1v)
     return Vec(d1u.X(), d1u.Y(), d1u.Z()), Vec(d1v.X(), d1v.Y(), d1v.Z())
+
+
+def occ_normal_at(surf: Surface, u: float, v: float) -> Vec:
+    """Exact surface normal at ``(u, v)`` from OCC first derivatives.
+
+    Orientation follows the parametrisation (not forced z-up) — callers
+    orient explicitly where a convention applies. Requires ``pythonocc-core``.
+    """
+    tu, tv = occ_eval_tangents(surf, u, v)
+    return (tu**tv).normalized()
+
+
+def occ_project_point(surf: Surface, pt: Vec) -> "tuple[Vec, tuple[float, float]]":
+    """Closest point on the surface + its ``(u, v)`` parameters.
+
+    Uses OCC ``GeomAPI_ProjectPointOnSurf`` on the mathematical surface
+    (exact up to OCC precision, independent of any tessellation).
+    Requires ``pythonocc-core``.
+
+    Args:
+        surf: Surface to project onto.
+        pt:   World point to project.
+
+    Returns:
+        ``(projected Vec, (u, v))``. Raises ``ValueError`` when no
+        projection exists.
+    """
+    require_occ()
+    from OCC.Core.GeomAPI import GeomAPI_ProjectPointOnSurf
+
+    proj = GeomAPI_ProjectPointOnSurf(gp_Pnt(pt.x, pt.y, pt.z), _build_occ_surface(surf))
+    if proj.NbPoints() < 1:
+        raise ValueError("No projection of point onto surface found")
+    q = proj.NearestPoint()
+    u, v = proj.LowerDistanceParameters()
+    return Vec(q.X(), q.Y(), q.Z()), (u, v)
+
+
+def occ_face_bounds(surf: Surface) -> "tuple[float, float, float, float]":
+    """``(Umin, Umax, Vmin, Vmax)`` of the trimmed face.
+
+    Uses the cached OCC face (``Surface.fill``/``patch`` keep it); falls back
+    to the native knot range when there is no face or no ``pythonocc-core``.
+    """
+    face = getattr(surf, "_occ_face", None)
+    if face is not None and _HAS_OCC:
+        import warnings
+
+        from OCC.Core.BRepTools import breptools_UVBounds
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # deprecated in pythonocc-core ≥ 7.7
+            try:
+                return tuple(breptools_UVBounds(face))
+            except Exception:
+                pass
+    return (surf.uknots[0], surf.uknots[-1], surf.vknots[0], surf.vknots[-1])
+
+
+def occ_trim_loops(surf: Surface, samples: int = 64) -> "List[List[tuple[float, float]]]":
+    """Trim loops of the face as UV polylines.
+
+    Reads each edge p-curve (``BRep_Tool.CurveOnSurface``) from the cached OCC
+    face; edges without a p-curve are skipped. Without a cached face (or
+    without ``pythonocc-core``) falls back to the four native boundary
+    edges as separate loops (south, east, north, west).
+    Loop orientation is OCC edge order — callers must not rely on it
+    (see ``field._classify`` for position-based identification).
+
+    Args:
+        surf:    Surface whose face trim to read.
+        samples: Points per edge (excluding closure duplication).
+
+    Returns:
+        List of loops; each loop a list of ``(u, v)`` tuples.
+    """
+    u0, u1, v0, v1 = surf.uknots[0], surf.uknots[-1], surf.vknots[0], surf.vknots[-1]
+    fallback = [
+        [(u0, v0), (u1, v0)],
+        [(u1, v0), (u1, v1)],
+        [(u1, v1), (u0, v1)],
+        [(u0, v1), (u0, v0)],
+    ]
+    face = getattr(surf, "_occ_face", None)
+    if face is None or not _HAS_OCC:
+        return fallback
+    from OCC.Core.BRep import BRep_Tool
+    from OCC.Core.TopAbs import TopAbs_EDGE
+    from OCC.Core.TopExp import TopExp_Explorer
+
+    loops: "List[List[tuple[float, float]]]" = []
+    exp = TopExp_Explorer(face, TopAbs_EDGE)
+    while exp.More():
+        try:
+            h, first, last = BRep_Tool.CurveOnSurface(exp.Current(), face)
+        except Exception:
+            exp.Next()
+            continue
+        loop = []
+        for k in range(samples + 1):
+            p = h.Value(first + (last - first) * k / samples)
+            loop.append((p.X(), p.Y()))
+        loops.append(loop)
+        exp.Next()
+    return loops or fallback
 
 
 def occ_intersect_plane(surf: Surface, plane: "Plane") -> List["Curve"]:

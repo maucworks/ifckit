@@ -79,6 +79,30 @@ class TestMakeSettings:
         assert s.get("mesher-linear-deflection") == pytest.approx(0.01)
         assert s.get("mesher-angular-deflection") == pytest.approx(0.5)
 
+    def test_interactive_preset(self):
+        s = geom_backend.make_settings(preset="interactive")
+        assert s.get("mesher-linear-deflection") == pytest.approx(0.5)
+        assert s.get("mesher-angular-deflection") == pytest.approx(1.5)
+        assert s.get("use-world-coords") is True
+
+    def test_preset_positional_name(self):
+        s = geom_backend.make_settings("interactive")
+        assert s.get("mesher-linear-deflection") == pytest.approx(0.5)
+
+    def test_unknown_preset_raises(self):
+        with pytest.raises(ValueError, match="Unknown tessellation preset"):
+            geom_backend.make_settings(preset="ultra")
+        with pytest.raises(ValueError, match="Unknown tessellation preset"):
+            geom_backend.make_settings("ultra")
+
+    def test_explicit_dict_wins_over_preset(self):
+        s = geom_backend.make_settings({"linear_deflection": 0.01}, preset="interactive")
+        assert s.get("mesher-linear-deflection") == pytest.approx(0.01)
+        assert s.get("mesher-angular-deflection") == pytest.approx(1.5)
+
+    def test_presets_documented(self):
+        assert set(geom_backend.PRESETS) == {"final", "interactive"}
+
 
 class TestMakeSerializer:
     def test_glb(self, tmp_path):
@@ -203,6 +227,20 @@ class TestSerializeSkipOpenings:
 
         assert os.path.getsize(out) > 0
 
+    def test_path_source(self, tmp_path):
+        """serialize_to_file also accepts an .ifc path (file-export route)."""
+        import os
+
+        m = _beam_model()
+        src = str(tmp_path / "in.ifc")
+        out = str(tmp_path / "out.obj")
+        m.ifc_file.write(src)
+        try:
+            geom_backend.serialize_to_file(src, out, geom_backend.make_settings())
+        except ImportError:
+            pytest.skip("OBJ serializer not in this ifcopenshell build")
+        assert os.path.getsize(out) > 0
+
 
 class TestShapesToMeshDicts:
     def test_format_and_y_up(self):
@@ -232,3 +270,95 @@ class TestShapesToMeshDicts:
             geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
         )[0]
         assert dicts[0]["positions"] == pytest.approx(list(shape.verts))
+
+
+def _two_beam_model():
+    """Two identical beams 10 m apart, plus a third with a larger profile."""
+    m = IfcModel(name="ChunkTest", schema=IfcSchema.IFC4)
+    floor = m.add_site("S").add_building("B").add_storey("GF")
+    big = [Vec(-0.2, -0.2), Vec(0.2, -0.2), Vec(0.2, 0.2), Vec(-0.2, 0.2)]
+    floor.add(PendingBeam(Line(Vec(0, 0, 0), Vec(5, 0, 0)), _SQUARE_PROFILE, name="B1"))
+    floor.add(
+        PendingBeam(Line(Vec(10, 0, 0), Vec(15, 0, 0)), _SQUARE_PROFILE, name="B2")
+    )
+    floor.add(PendingBeam(Line(Vec(20, 0, 0), Vec(25, 0, 0)), big, name="B3"))
+    return m
+
+
+def _decode_floats(raw: bytes):
+    import struct
+
+    return list(struct.unpack("<%df" % (len(raw) // 4), raw)) if raw else []
+
+
+def _decode_uints(raw: bytes):
+    import struct
+
+    return list(struct.unpack("<%dI" % (len(raw) // 4), raw)) if raw else []
+
+
+class TestShapesToChunks:
+    def test_same_shapes_as_mesh_dicts(self):
+        m = _beam_model()
+        (chunk,) = geom_backend.shapes_to_chunks(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        (mesh,) = geom_backend.shapes_to_mesh_dicts(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        assert chunk["guid"] == mesh["guid"]
+        assert chunk["label"] == mesh["label"]
+        assert chunk["vertex_count"] == len(mesh["positions"]) // 3
+        assert chunk["index_count"] == len(mesh["indices"])
+        assert _decode_uints(chunk["index"]) == mesh["indices"]
+        restored = [
+            c + chunk["offset"][i % 3]
+            for i, c in enumerate(_decode_floats(chunk["positions"]))
+        ]
+        assert restored == pytest.approx(mesh["positions"])
+
+    def test_compact_payload(self):
+        import json
+
+        m = _beam_model()
+        (chunk,) = geom_backend.shapes_to_chunks(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        (mesh,) = geom_backend.shapes_to_mesh_dicts(
+            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+        )
+        binary = len(chunk["positions"]) + len(chunk["index"])
+        assert binary < len(json.dumps(mesh, default=str))
+
+    def test_profile_key_groups_identical_products(self):
+        m = _two_beam_model()
+        chunks = list(
+            geom_backend.shapes_to_chunks(
+                geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
+            )
+        )
+        assert len(chunks) == 3
+        labels = [c["label"] for c in chunks]
+        assert labels == ["IfcBeam"] * 3
+        b1, b2, b3 = chunks
+        assert b1["profile_key"] == b2["profile_key"]
+        assert b1["offset"] != b2["offset"]
+        assert b3["profile_key"] != b1["profile_key"]
+
+    def test_model_iter_chunks_selective(self):
+        m = _two_beam_model()
+        guids = [c["guid"] for c in m.to_chunks()]
+        assert len(guids) == 3
+        (only,) = m.to_chunks(include_guids=[guids[0]])
+        assert only["guid"] == guids[0]
+        assert m.to_chunks(include_guids=[]) == []
+
+    def test_empty_shape(self):
+        (chunk,) = geom_backend.shapes_to_chunks(
+            iter([geom_backend.IterShape(guid="x" * 22, entity_type="IfcBeam", verts=[], faces=[])])
+        )
+        assert chunk["vertex_count"] == 0
+        assert chunk["index_count"] == 0
+        assert chunk["positions"] == b""
+        assert chunk["index"] == b""
+        assert chunk["offset"] == [0.0, 0.0, 0.0]

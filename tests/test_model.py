@@ -590,6 +590,25 @@ class TestModelExport:
         f = ifcopenshell.open(out)
         assert len(f.by_type("IfcBeam")) == 1
 
+    def test_export_and_preview_use_no_temp_files(self, tmp_path, monkeypatch):
+        """Preview/export hot path performs no scratch-file I/O."""
+        import tempfile
+
+        def _forbidden(*args, **kwargs):
+            raise AssertionError("temp file I/O in hot path")
+
+        monkeypatch.setattr(tempfile, "NamedTemporaryFile", _forbidden)
+        m = self._model_with_beam()
+        assert len(m.to_mesh_dicts()) == 1
+        assert len(m.to_chunks()) == 1
+        try:
+            m.export(str(tmp_path / "out.glb"))
+        except ImportError:
+            pytest.skip("glTF serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(str(tmp_path / "out.glb")) > 0
+
     def test_export_unknown_extension_raises(self, tmp_path):
         m = self._model_with_beam()
         with pytest.raises((ValueError, ImportError)):
@@ -676,6 +695,27 @@ class TestIterMeshDicts:
         filtered = m.to_mesh_dicts(include_guids=[wanted])
         assert [d["guid"] for d in filtered] == [wanted]
         assert m.to_mesh_dicts(include_guids=[]) == []
+
+    def test_include_guids_matches_full(self):
+        """Diff-contract: selective tessellation is identical to full.
+
+        Preview callers diff on ``guid`` and only re-tessellate changed
+        GUIDs; those dicts must equal what a full pass yields.
+        """
+        m = self._model_with_beam_and_slab()
+        full = m.to_mesh_dicts()
+        assert len(full) == 2
+        for wanted in (full[0]["guid"], full[1]["guid"]):
+            (selective,) = m.to_mesh_dicts(include_guids=[wanted])
+            assert selective == next(d for d in full if d["guid"] == wanted)
+        both = m.to_mesh_dicts(include_guids=[d["guid"] for d in full])
+        assert both == full
+
+    def test_interactive_preset_keeps_guids(self):
+        m = self._model_with_beam_and_slab()
+        coarse = m.to_mesh_dicts(preset="interactive")
+        assert [d["guid"] for d in coarse] == [d["guid"] for d in m.to_mesh_dicts()]
+        assert all(d["primitive"] == "triangles" for d in coarse)
 
     def test_export_glb_skips_openings(self, tmp_path):
         from ifckit import PendingWall

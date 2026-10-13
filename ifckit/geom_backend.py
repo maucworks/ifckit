@@ -25,6 +25,21 @@ from typing import Any, Collection, Iterator, NamedTuple, Optional, Union
 DEFAULT_LINEAR_DEFLECTION = 0.05
 DEFAULT_ANGULAR_DEFLECTION = 0.8
 
+#: Tessellation presets (PLAN-interactive-preview, I-3). ``final`` is the
+#: status-quo default; ``interactive`` is coarse for preview ticks.
+#: Measured on this machine (ifcopenshell 0.9.0): a 270° revolved beam
+#: tessellates in ~44 ms / 128 tris (final) vs ~0.6 ms / 60 tris
+#: (interactive); 3 walls with boolean openings in ~53 ms vs ~9.5 ms.
+#: Opening booleans dominate: the same 3 walls without openings cost
+#: ~1.1 ms at either preset.
+PRESETS = {
+    "final": {
+        "linear_deflection": DEFAULT_LINEAR_DEFLECTION,
+        "angular_deflection": DEFAULT_ANGULAR_DEFLECTION,
+    },
+    "interactive": {"linear_deflection": 0.5, "angular_deflection": 1.5},
+}
+
 #: Supported ifcopenshell lines, oldest first.
 #: Floor is 0.8.4: the last line with Python 3.9 wheels (Rhino 8) and the
 #: oldest proven point. The 0.8 serializer API (separate serializer_settings)
@@ -85,22 +100,35 @@ def require_version() -> str:
     return version
 
 
-def make_settings(tessellation: Optional[dict] = None) -> Any:
+def make_settings(tessellation: Optional[Union[dict, str]] = None, *, preset: str = "final") -> Any:
     """Create geometry settings with world coordinates and tessellation.
 
     Args:
         tessellation: Optional overrides, e.g.
             ``{"linear_deflection": 0.01, "angular_deflection": 0.5}``.
-            Defaults: 0.05 / 0.8 (ifcopenshell behaviour).
+            A preset name (``"interactive"``) may be passed positionally
+            instead, overriding *preset*.
+        preset: ``"final"`` (default, 0.05 / 0.8) or ``"interactive"``
+            (coarse, 0.5 / 1.5) — see :data:`PRESETS`. Explicit
+            *tessellation* keys win over the preset base.
+
+    Raises:
+        ValueError: If *preset* (or a positional preset name) is unknown.
     """
     import ifcopenshell.geom as _geom
 
+    if isinstance(tessellation, str):
+        preset, tessellation = tessellation, None
+    try:
+        base = PRESETS[preset]
+    except KeyError:
+        raise ValueError(
+            f"Unknown tessellation preset {preset!r}. Available: {sorted(PRESETS)}."
+        ) from None
+    merged = {**base, **(tessellation or {})}
     settings = _geom.settings()
-    tessellation = tessellation or {}
-    linear = float(tessellation.get("linear_deflection", DEFAULT_LINEAR_DEFLECTION))
-    angular = float(tessellation.get("angular_deflection", DEFAULT_ANGULAR_DEFLECTION))
-    settings.set("mesher-linear-deflection", linear)
-    settings.set("mesher-angular-deflection", angular)
+    settings.set("mesher-linear-deflection", float(merged["linear_deflection"]))
+    settings.set("mesher-angular-deflection", float(merged["angular_deflection"]))
     settings.set("use-world-coords", True)
     return settings
 
@@ -288,18 +316,7 @@ def shapes_to_mesh_dicts(
     Z-up to Y-up conversion ``(x, z, -y)``.
     """
     for shape in shapes:
-        if y_up:
-            positions = [
-                c
-                for i in range(0, len(shape.verts), 3)
-                for c in (
-                    shape.verts[i],
-                    shape.verts[i + 2],
-                    -shape.verts[i + 1],
-                )
-            ]
-        else:
-            positions = list(shape.verts)
+        positions = _convert_positions(shape.verts, y_up=y_up)
         label = shape.entity_type if label_from == "type" else shape.guid
         yield {
             "primitive": "triangles",
@@ -307,4 +324,56 @@ def shapes_to_mesh_dicts(
             "indices": list(shape.faces),
             "label": label or shape.guid,
             "guid": shape.guid,
+        }
+
+
+def _convert_positions(verts: list, *, y_up: bool) -> list:
+    """Flatten shape verts, optionally converting Z-up to Y-up ``(x, z, -y)``."""
+    if y_up:
+        return [c for i in range(0, len(verts), 3) for c in (verts[i], verts[i + 2], -verts[i + 1])]
+    return list(verts)
+
+
+def shapes_to_chunks(
+    shapes: Iterator[IterShape],
+    *,
+    y_up: bool = True,
+) -> Iterator[dict]:
+    """Convert shapes to compact binary chunks for instancing viewers.
+
+    A second serialization of the same shapes (no new geometry): per
+    product ``{"guid", "label", "profile_key", "offset", "positions",
+    "index", "vertex_count", "index_count"}``. ``positions``/``index``
+    are little-endian float32/uint32 bytes (a viewer wraps them in
+    ``Float32Array``/``Uint32Array`` directly); positions are
+    translation-normalized, add ``offset`` to restore world coords.
+    ``profile_key`` is the sha1 of the normalized positions, so identically
+    shaped products at different translations share a key and the viewer
+    can instance them. Translation-only: rotated copies hash differently.
+    """
+    import hashlib
+    import struct
+
+    for mesh in shapes_to_mesh_dicts(shapes, y_up=y_up):
+        positions = mesh["positions"]
+        if positions:
+            offset = [
+                min(positions[0::3]),
+                min(positions[1::3]),
+                min(positions[2::3]),
+            ]
+        else:
+            offset = [0.0, 0.0, 0.0]
+        normalized = [c - offset[i % 3] for i, c in enumerate(positions)]
+        indices = mesh["indices"]
+        pos_bytes = struct.pack("<%df" % len(normalized), *normalized)
+        yield {
+            "guid": mesh["guid"],
+            "label": mesh["label"],
+            "profile_key": hashlib.sha1(pos_bytes).hexdigest(),
+            "offset": offset,
+            "positions": pos_bytes,
+            "index": struct.pack("<%dI" % len(indices), *indices),
+            "vertex_count": len(positions) // 3,
+            "index_count": len(indices),
         }

@@ -46,6 +46,43 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
 
 ## [Unreleased]
 
+### Added — interactive preview (patch API, selective tessellation)
+
+- `feat(model): IfcModel.apply_delta(elements)` mutates the same `IfcFile`
+  in place: new elements are built, changed ones rebuilt with preserved
+  `GlobalId` (`global_id` wins, else `guid_for_id(id)`), unchanged ones
+  skipped via signature cache. Returns changed GUIDs for selective
+  re-tessellation. Host replacement cascades to openings/fills (resend
+  them in the same delta).
+- `feat(model): iter_mesh_dicts(include_guids=...)` diff-contract —
+  selective tessellation yields dicts identical to a full pass for those
+  GUIDs, so callers can splice by `guid` (regression-tested).
+- `feat(geom_backend): tessellation presets "final" (0.05/0.8, status quo)`
+  and `"interactive" (0.5/1.5)` via `make_settings(preset=...)` (or
+  positionally) and `iter_mesh_dicts/to_mesh_dicts(preset=...)`; explicit
+  dict keys win. Opening booleans dominate cost (~48x a bare wall), curves
+  gain most from coarse (~44 ms → ~0.6 ms on a 270° beam).
+- `feat(geom_backend): shapes_to_chunks` + `IfcModel.iter_chunks/to_chunks`
+  serialise the same shapes as float32/uint32 bytes with a
+  translation-invariant `profile_key` (sha1 of offset-normalised positions)
+  and `offset`, so viewers can instance identical products and diff by
+  `guid`. Binary payload is smaller than the JSON mesh dicts.
+- `fix(model): export serialises the in-memory file directly`
+  (`serialize_to_file` already accepted file objects); the
+  write-temp-`.ifc`-and-reread roundtrip is gone, so preview/export ticks
+  perform no scratch-file I/O (regression-tested).
+- `feat(model): add(validate=False)` / `apply_delta(validate=False)` skip
+  rebuild-time validation for pre-validated preview ticks (default True).
+  cProfile on a 20-wall rebuild tick: 56602 → 56137 calls, 17.0 → 16.7 ms —
+  validation is a small share of a tick; the switch trims object churn,
+  tessellation still dominates.
+- `feat(model): ModelSession` holds one model and bundles `apply_delta`
+  with selective tessellation per tick (`tick()` returns changed GUIDs +
+  chunks/dicts, `full=True` for everything), caching geometry settings.
+  `examples/preview_session.py` drives 3 ticks on one session.
+  End-to-end tick (5 walls, 1 changed, interactive): apply 1.2 ms +
+  tessellate 1.9 ms + JSON-serialise ~0.0 ms; 354 B JSON vs 240 B chunks.
+
 ### Fixed — ifcopenshell 0.9
 
 - `fix(model): export via geom_backend op ifcopenshell 0.9 serializer-API`.
