@@ -1677,15 +1677,23 @@ class IfcModel:
         self._try_remove(entity)
 
     def _remove_fill(self, entity) -> None:
-        """Remove a fill plus the opening it fills (regenerated on rebuild)."""
-        for fills in list(getattr(entity, "FillsVoids", None) or []):
+        """Remove a fill plus the opening it fills (regenerated on rebuild).
+
+        The opening tree already removes the fill itself — touching it
+        afterwards segfaults older ifcopenshell wrappers, so only strip
+        unconnected fills here.
+        """
+        fills_rels = list(getattr(entity, "FillsVoids", None) or [])
+        if not fills_rels:
+            self._strip_product(entity)
+            self._try_remove(entity)
+            return
+        for fills in fills_rels:
             opening = fills.RelatingOpeningElement
             for voids in list(getattr(opening, "VoidsElements", None) or []):
                 self._try_remove(voids)
             self._remove_opening_tree(opening)
             self._try_remove(fills)
-        self._strip_product(entity)
-        self._try_remove(entity)
 
     def export_step(self, output_path: str) -> None:
         """Export the model to an ISO 10303 STEP file via ``ifcconvert``.
