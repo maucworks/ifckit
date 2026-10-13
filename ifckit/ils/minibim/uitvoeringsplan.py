@@ -19,7 +19,7 @@ def _raw() -> dict:
 
 
 def load_raw() -> dict:
-    """Ruwe boolean matrix zoals uit deel B geëxtraheerd (headers deels incompleet in openpyxl)."""
+    """Raw boolean matrix as extracted from part B (partially incomplete in openpyxl)."""
     return _raw()
 
 
@@ -28,16 +28,16 @@ def headers() -> dict:
 
 
 def rows() -> list[dict]:
-    """Lijst van rijen met Onderdeel/Type_Soort en booleans per kolom-index."""
+    """List of rows with Onderdeel/Type_Soort and booleans per column index."""
     return _raw().get("rows", [])
 
 
 def get_row(type_soort: str, onderdeel: str = "") -> dict | None:
-    """Zoek rij op type_soort (en optioneel onderdeel)."""
+    """Look up a row by type_soort (and optionally onderdeel)."""
     for r in rows():
         if r.get("type_soort") == type_soort:
             if not onderdeel or r.get("onderdeel") == onderdeel or not r.get("onderdeel"):
-                # bij lege onderdeel-rijen (de meeste) match op type alleen
+                # empty onderdeel rows (the majority) match on type only
                 if r.get("type_soort") == type_soort:
                     return r
     return None
@@ -45,20 +45,20 @@ def get_row(type_soort: str, onderdeel: str = "") -> dict | None:
 
 def is_required(onderdeel: str, type_soort: str, col: int) -> bool | None:
     """
-    Vraag of een cel True is. *col* is kolom-index (25-41, overeenkomend met
-    openpyxl kolommen Y-AO). Mapping naar fase/property vereist handmatige
-    verificatie uit PDF — zie uitvoeringsplan_raw.json opmerking.
+    Query whether a cell is True. *col* is the column index (25-41,
+    matching openpyxl columns Y-AO). Mapping to phase/property requires
+    manual PDF verification — see the note in uitvoeringsplan_raw.json.
     """
     row = get_row(type_soort, onderdeel)
     if row is None:
         return None
     bools = row.get("bools", {})
-    # JSON keys zijn strings
+    # JSON keys are strings
     return bools.get(str(col), bools.get(col))  # type: ignore[arg-type]
 
 
 def required_cols(type_soort: str, onderdeel: str = "") -> list[int]:
-    """Lijst van kolom-indices waar de cel True is voor dit type."""
+    """List of column indices where the cell is True for this type."""
     row = get_row(type_soort, onderdeel)
     if not row:
         return []

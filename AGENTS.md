@@ -105,6 +105,17 @@ Follow the rules in [`STYLE.md`](STYLE.md). Key points:
 Run linters and formatters **before submitting** your pull request. Do not rely
 on CI to catch formatting issues.
 
+## Language
+
+All written content in this repo — docstrings, code comments, names of new
+modules/classes/docs — is in **English**. Exceptions:
+
+- ILS domain data (`ifckit/ils/*/data/*.json`, quoted rule texts from the
+  MiniBIM/BIM Basis specs, vocabulary values) keeps its source language:
+  these mirror Dutch standards and stay Dutch.
+- IFC property keys and pset identifiers (e.g. the MiniBIM pset names
+  `EenheidNummer`, `BouwwerkNummer`) are schema names — never renamed.
+
 ## Testing
 
 - Pull requests with test coverage are **much more likely to be merged**.

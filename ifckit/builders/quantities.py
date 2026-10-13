@@ -15,11 +15,12 @@ def write_quantities(
     quantities: dict[str, float],
 ) -> None:
     """
-    Schrijf een Qto quantity set (bv. Qto_SpaceBaseQuantities).
+    Write a Qto quantity set (e.g. Qto_SpaceBaseQuantities).
 
-    quantities: naam -> waarde (bv. {"NetFloorArea": 42.0, "NetVolume": 120.0})
-    Waarden worden als IfcQuantityArea / IfcQuantityVolume / IfcQuantityLength
-    geschreven afhankelijk van de naam (heuristiek).
+    quantities: name -> value (e.g.
+    {"NetFloorArea": 42.0, "NetVolume": 120.0}). Values are written as
+    IfcQuantityArea / IfcQuantityVolume / IfcQuantityLength depending on
+    the name (heuristic).
     """
     if not quantities:
         return

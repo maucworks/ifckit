@@ -161,7 +161,7 @@ class TestFind:
 
     def test_find_no_match(self):
         assert self._tagged_path().find(functie="dak") == []
-        assert self._tagged_path().find(id="bestaat-niet") == []
+        assert self._tagged_path().find(id="does-not-exist") == []
 
     def test_find_in_holes(self):
         outer = _rect_path()

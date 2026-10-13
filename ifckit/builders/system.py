@@ -1,8 +1,9 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.builders.system — IfcSystem / IfcDistributionSystem groepering.
+"""ifckit.builders.system — IfcSystem / IfcDistributionSystem grouping.
 
-BIM Basis ILS tegel 4.2: groepeer installatietechnische objecten per systeem.
-Proof-implementatie voor één van de drie gaps (IfcSystem, IfcMaterial, Pset_*Common).
+BIM Basis ILS tile 4.2: group building-service objects per system.
+Proof implementation for one of the three gaps
+(IfcSystem, IfcMaterial, Pset_*Common).
 """
 
 from __future__ import annotations
@@ -22,18 +23,19 @@ def add_system(
     predefined_type: str | None = None,
 ) -> Any:
     """
-    Maak een IfcSystem en koppel *products* eraan.
+    Create an IfcSystem and assign *products* to it.
 
     Args:
         ifc_file: ifcopenshell file.
-        name: systeemnaam (bv. "Verwarming").
-        products: optionele lijst van elementen (IfcFlowSegment, IfcDistributionElement...).
-        description: optionele beschrijving.
-        predefined_type: subtype indien gewenst (wordt genegeerd — altijd IfcSystem).
+        name: system name (e.g. "Heating").
+        products: optional list of elements (IfcFlowSegment,
+            IfcDistributionElement...).
+        description: optional description.
+        predefined_type: subtype if desired (ignored — always IfcSystem).
 
-    Retourneert de IfcSystem entiteit.
+    Returns the IfcSystem entity.
     """
-    # IfcSystem is subtype van IfcGroup → IfcRelAssignsToGroup voor members
+    # IfcSystem is a subtype of IfcGroup → IfcRelAssignsToGroup for members
     system = ifc_file.create_entity(
         "IfcSystem",
         GlobalId=ifcopenshell.guid.new(),
@@ -59,9 +61,9 @@ def add_distribution_system(
     long_name: str | None = None,
 ) -> Any:
     """
-    Maak een IfcDistributionSystem (subtype van IfcSystem).
+    Create an IfcDistributionSystem (subtype of IfcSystem).
 
-    Voorbeeld: ventilatie, sanitair, elektra.
+    Example: ventilation, sanitary plumbing, electrical.
     """
     system = ifc_file.create_entity(
         "IfcDistributionSystem",
