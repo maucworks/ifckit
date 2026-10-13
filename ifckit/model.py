@@ -1282,7 +1282,6 @@ class IfcModel:
             model.export("output/bridge.svg")      # SVG floor plan
         """
         import os
-        import tempfile
 
         ext = os.path.splitext(path)[1].lower().lstrip(".")
 
@@ -1292,15 +1291,9 @@ class IfcModel:
 
         from ifckit import geom_backend
 
-        with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            self._file.write(tmp_path)
-            geom_backend.serialize_to_file(
-                tmp_path, path, geom_backend.make_settings(), skip_openings=skip_openings
-            )
-        finally:
-            os.unlink(tmp_path)
+        geom_backend.serialize_to_file(
+            self._file, path, geom_backend.make_settings(), skip_openings=skip_openings
+        )
 
     def iter_mesh_dicts(
         self,

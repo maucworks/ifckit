@@ -590,6 +590,25 @@ class TestModelExport:
         f = ifcopenshell.open(out)
         assert len(f.by_type("IfcBeam")) == 1
 
+    def test_export_and_preview_use_no_temp_files(self, tmp_path, monkeypatch):
+        """Preview/export hot path performs no scratch-file I/O."""
+        import tempfile
+
+        def _forbidden(*args, **kwargs):
+            raise AssertionError("temp file I/O in hot path")
+
+        monkeypatch.setattr(tempfile, "NamedTemporaryFile", _forbidden)
+        m = self._model_with_beam()
+        assert len(m.to_mesh_dicts()) == 1
+        assert len(m.to_chunks()) == 1
+        try:
+            m.export(str(tmp_path / "out.glb"))
+        except ImportError:
+            pytest.skip("glTF serializer not in this ifcopenshell build")
+        import os
+
+        assert os.path.getsize(str(tmp_path / "out.glb")) > 0
+
     def test_export_unknown_extension_raises(self, tmp_path):
         m = self._model_with_beam()
         with pytest.raises((ValueError, ImportError)):

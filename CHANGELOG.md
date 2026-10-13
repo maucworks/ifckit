@@ -67,6 +67,10 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   translation-invariant `profile_key` (sha1 of offset-normalised positions)
   and `offset`, so viewers can instance identical products and diff by
   `guid`. Binary payload is smaller than the JSON mesh dicts.
+- `fix(model): export serialises the in-memory file directly`
+  (`serialize_to_file` already accepted file objects); the
+  write-temp-`.ifc`-and-reread roundtrip is gone, so preview/export ticks
+  perform no scratch-file I/O (regression-tested).
 
 ### Fixed — ifcopenshell 0.9
 
