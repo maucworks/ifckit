@@ -1,5 +1,5 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.builders.classification — NL-SfB en andere classificaties."""
+"""ifckit.builders.classification — NL-SfB and other classifications."""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ def add_classification(
     source: Optional[str] = None,
 ) -> ifcopenshell.entity_instance:
     """
-    Voeg een classificatiesysteem toe (bv. NL-SfB).
+    Add a classification system (e.g. NL-SfB).
 
-    Wrapper om ``ifcopenshell.api.classification.add_classification`` met
-    extra metadata (edition/source) waar mogelijk.
+    Wrapper around ``ifcopenshell.api.classification.add_classification``
+    with extra metadata (edition/source) where possible.
     """
     cls = ifcopenshell.api.classification.add_classification(ifc_file, classification=name)
     # Edition is IFC-version dependent; set if provided and not already set
@@ -45,9 +45,9 @@ def assign_classification(
     name: str,
 ) -> ifcopenshell.entity_instance:
     """
-    Ken een classificatiereferentie toe (bv. NL-SfB 21.12).
+    Assign a classification reference (e.g. NL-SfB 21.12).
 
-    Wrapper om ``add_reference``.
+    Wrapper around ``add_reference``.
     """
     return ifcopenshell.api.classification.add_reference(
         ifc_file,

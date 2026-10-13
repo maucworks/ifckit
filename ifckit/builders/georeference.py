@@ -13,15 +13,15 @@ def set_georeference(
     coordinate_operation: dict | None = None,
 ) -> None:
     """
-    Stel georeferentie in (IfcProjectedCRS + IfcMapConversion).
+    Set georeferencing (IfcProjectedCRS + IfcMapConversion).
 
-    Voorbeeld RD New (EPSG:28992) op een false origin::
+    Example: RD New (EPSG:28992) on a false origin::
 
         set_georeference(ifc_file,
             projected_crs={"Name": "EPSG:28992"},
             coordinate_operation={"Eastings": 100000, "Northings": 400000, "OrthogonalHeight": 0})
 
-    Wrapper om ``add_georeferencing`` + ``edit_georeferencing``.
+    Wrapper around ``add_georeferencing`` + ``edit_georeferencing``.
     """
     ifcopenshell.api.georeference.add_georeferencing(ifc_file)
     ifcopenshell.api.georeference.edit_georeferencing(

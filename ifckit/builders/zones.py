@@ -1,5 +1,5 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.builders.zones — IfcZone groepering."""
+"""ifckit.builders.zones — IfcZone grouping."""
 
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ def add_zone(
     description: str | None = None,
 ) -> ifcopenshell.entity_instance:
     """
-    Maak een IfcZone en koppel *spaces* eraan.
+    Create an IfcZone and assign *spaces* to it.
 
-    Generiek — te gebruiken voor MiniBIM EenheidNummer/BouwwerkNummer
-    of elke andere groepering.
+    Generic — usable for MiniBIM EenheidNummer/BouwwerkNummer or any
+    other grouping.
     """
     zone = ifc_file.create_entity(
         "IfcZone",
@@ -44,18 +44,18 @@ def group_spaces_by_property(
     prop_name: str,
 ) -> list[ifcopenshell.entity_instance]:
     """
-    Groepeer IfcSpace-objecten op een property-waarde.
+    Group IfcSpace objects by a property value.
 
-    Zoekt alle IfcSpace met een pset *pset_name* die *prop_name* bevat,
-    en maakt per unieke waarde een IfcZone.
+    Finds every IfcSpace carrying pset *pset_name* that contains
+    *prop_name*, and creates one IfcZone per unique value.
     """
-    # Bouw mapping waarde -> spaces
+    # Build mapping value -> spaces
     from collections import defaultdict
 
     groups: dict[str, list] = defaultdict(list)
 
     for space in ifc_file.by_type("IfcSpace"):
-        # zoek pset
+        # find pset
         for rel in getattr(space, "IsDefinedBy", []) or []:
             pset = getattr(rel, "RelatingPropertyDefinition", None)
             if not pset or pset.Name != pset_name:

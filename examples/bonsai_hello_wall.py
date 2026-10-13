@@ -1,6 +1,6 @@
 """
-bonsai_hello_wall.py — voeg een ifckit hello_wall toe aan een lopend Bonsai project
-=====================================================================================
+bonsai_hello_wall.py — add an ifckit hello_wall to a running Bonsai project
+===========================================================================
 Run this in Blender's Scripting workspace while a Bonsai IFC project is open.
 
 Uses IfcModel.from_file() to wrap the active Bonsai IFC file, then builds

@@ -1,5 +1,5 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.ils.minibim — MiniBIM ILS v3.1 domeinlaag."""
+"""ifckit.ils.minibim — MiniBIM ILS v3.1 domain layer."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def _codes(name: str) -> list[str]:
     return [x["code"] for x in d.get("items", [])]
 
 
-# Vocabularies (voor validatie / import door gebruikers)
+# Vocabularies (for validation / consumption by users)
 TERREIN_TYPES = _codes("terrein_types.json")
 BOUWWERK_TYPES = _codes("bouwwerk_types.json")
 GEBIED_SOORTEN = _codes("gebied_soorten.json")
@@ -39,20 +39,20 @@ SEGMENTEN = _codes("segmenten.json")
 PROGRAMMAS = _codes("programmas.json")
 WONING_TYPES = _codes("woning_types.json")
 
-# Re-export common waar MiniBIM op steunt (via common, maar hier voor gemak)
+# Re-export from common (what MiniBIM relies on) — here for convenience
 try:
     from ifckit.ils.common import (  # type: ignore
         BEPALINGSMETHODEN,
         GEBRUIKSBESTEMMINGEN,
         ORIENTATIES,
     )
-except Exception:  # common nog niet geïnstalleerd in editable zonder src
+except Exception:  # common not yet installed in editable without src
     BEPALINGSMETHODEN: list[str] = []
     ORIENTATIES: list[str] = []
     GEBRUIKSBESTEMMINGEN: list[str] = []
 
 
-# Validatie-helpers
+# Validation helpers
 def is_valid_ruimte_type(code: str) -> bool:
     return code in RUIMTE_TYPES
 
@@ -65,19 +65,19 @@ def is_valid_bouwwerk_type(code: str) -> bool:
     return code in BOUWWERK_TYPES
 
 
-# Pset helper (alleen publieke core-API)
+# Pset helper (public core API only)
 def apply_minibim_pset(element: Any, ifc_file: Any, **props: Any) -> None:
     """
-    Schrijf MiniBIM ILS pset op *element*.
+    Write the MiniBIM ILS pset to *element*.
 
-    Voorbeeld::
+    Example::
 
         from ifckit.ils.minibim import apply_minibim_pset
         apply_minibim_pset(space_entity, ifc_file, RuimteType="Slaapkamer", Bepalingsmethode="NVO")
     """
     from ifckit.builders.psets import write_named_pset
 
-    # Filter alleen bekende MiniBIM-params (voorkom typo-psets)
+    # Keep only known MiniBIM params (prevents typo psets)
     filtered = {k: v for k, v in props.items() if v not in (None, "")}
     if not filtered:
         return
@@ -85,7 +85,7 @@ def apply_minibim_pset(element: Any, ifc_file: Any, **props: Any) -> None:
 
 
 class MiniBimSpec:
-    """Toegang tot MiniBIM vocabularies en validatie."""
+    """Access to MiniBIM vocabularies and validation."""
 
     version = ILS_VERSION
     name = ILS_NAME
@@ -101,7 +101,7 @@ class MiniBimSpec:
 
 
 def group_zones(model_or_file: Any, by: str = "EenheidNummer") -> list:
-    """Groepeer IfcSpace op een MiniBIM ILS property (bv. EenheidNummer) via IfcZone."""
+    """Group IfcSpace by a MiniBIM ILS property (e.g. EenheidNummer) into IfcZones."""
     from .zones import group_zones as _gz
 
     return _gz(model_or_file, by=by)

@@ -1,5 +1,5 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.ils.minibim.zones — groeperen op EenheidNummer / BouwwerkNummer."""
+"""ifckit.ils.minibim.zones — group by EenheidNummer / BouwwerkNummer."""
 
 from __future__ import annotations
 
@@ -9,18 +9,18 @@ from ._version import ILS_NAME
 
 
 def _file_of(model_or_file: Any) -> Any:
-    """Accepteer IfcModel of een rauw ifcopenshell file-object."""
+    """Accept an IfcModel or a raw ifcopenshell file object."""
     return getattr(model_or_file, "_file", model_or_file)
 
 
 def group_zones(model_or_file: Any, by: str = "EenheidNummer") -> list:
     """
-    Groepeer alle IfcSpace met een MiniBIM ILS pset op property *by*.
+    Group every IfcSpace carrying a MiniBIM ILS pset by property *by*.
 
-    Schrijft per unieke waarde een IfcZone (via core
+    Writes one IfcZone per unique value (via the core
     ``ifckit.builders.zones.group_spaces_by_property``).
 
-    Voorbeeld::
+    Example::
 
         group_zones(model, by="EenheidNummer")
     """
@@ -30,10 +30,10 @@ def group_zones(model_or_file: Any, by: str = "EenheidNummer") -> list:
 
 
 def group_by_eenheid(model_or_file: Any) -> list:
-    """Groepeer op EenheidNummer."""
+    """Group by EenheidNummer."""
     return group_zones(model_or_file, by="EenheidNummer")
 
 
 def group_by_bouwwerk(model_or_file: Any) -> list:
-    """Groepeer op BouwwerkNummer."""
+    """Group by BouwwerkNummer."""
     return group_zones(model_or_file, by="BouwwerkNummer")

@@ -419,13 +419,13 @@ def crossing_grid(
             # Same geometric row, own native UV: transfer seam stations
             # by exact projection (parametrisations differ per face).
             south = [_project_uv(face, _eval_xyz(faces[prev], uv)) for uv in divs[prev]["seam_row"]]
-            # West/oost-onder exact op de gedeelde naadhoeken zetten.
+            # Pin west/east bottom exactly on the shared seam corners.
             west[0], east[0] = south[0], south[-1]
         nodes = _crossing_nodes(face, south, north, west, east, nu, nv)
         for (k, r), uv in nodes.items():
             key = (k, row_off + r)
             if key in field.lattice:
-                continue  # gedeelde naadrij is al van de vorige face
+                continue  # shared seam row already owned by the previous face
             field.lattice[key] = len(field.points)
             field.points.append(_node_at(face, uv, face_id=fi))
         # Cells within this face (local rows 0..nv, mapped to lattice rows).

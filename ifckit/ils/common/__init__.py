@@ -1,5 +1,5 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.ils.common — gedeelde NL-vocabularies (ILS-neutraal)."""
+"""ifckit.ils.common — shared NL vocabularies (ILS-neutral)."""
 
 from __future__ import annotations
 
@@ -25,16 +25,17 @@ def _codes(name: str) -> list[str]:
     return [x["code"] for x in d.get("items", [])]
 
 
-# Publieke vocabularies
+# Public vocabularies
 BEPALINGSMETHODEN: list[str] = _codes("bepalingsmethoden.json")
 ORIENTATIES: list[str] = _codes("orientaties.json")
 GEBRUIKSBESTEMMINGEN: list[str] = _codes("gebruiksbestemmingen.json")
 NLSFB: list[str] = _codes("nlsfb.json")
 NAAKT: list[str] = _codes("naakt.json")
 
-# Laag-niveau helper voor andere ILS'en
+
+# Low-level helper for other ILS layers
 def load_data(name: str) -> dict:
-    """Laad een data-bestand uit ils/common/data (bv. 'bepalingsmethoden.json')."""
+    """Load a data file from ils/common/data (e.g. 'bepalingsmethoden.json')."""
     return _load(name)
 
 

@@ -1,9 +1,9 @@
 # This file was generated with the assistance of an AI coding tool.
-"""ifckit.ils.minibim.demarcatie — demarcatie Bouwwerk en Gebruiksbestemming.
+"""ifckit.ils.minibim.demarcatie — Bouwwerk and Gebruiksbestemming demarcation.
 
-Regels uit MiniBIM ILS v3.1 deel A §9.3 en §9.4. Tekstueel van aard;
-hier als data + validatie-helpers voor modelcontrole, niet als automatische
-geometrie-splitsing.
+Rules from MiniBIM ILS v3.1 part A §9.3 and §9.4. Textual in nature;
+used here as data + validation helpers for model checking, not as
+automatic geometry splitting.
 """
 
 from __future__ import annotations
@@ -23,8 +23,7 @@ BOUWWERK_REGELS: list[dict] = [
     {
         "id": 3,
         "titel": (
-            "Niet-fysiek gescheiden met eigen lifthal/hoofdtrap"
-            " + gemeenschappelijke onderbouw"
+            "Niet-fysiek gescheiden met eigen lifthal/hoofdtrap + gemeenschappelijke onderbouw"
         ),
         "regel": (
             "Onderbouw is apart bouwwerk. Doorgaande lifthallen/trappenhuizen"
@@ -78,7 +77,7 @@ GEBRUIKSBESTEMMING_REGELS: list[dict] = [
     },
 ]
 
-# NEN 2580 is uitgangspunt voor vloeroppervlakte-demarcatie (geen code, wel principe)
+# NEN 2580 is the baseline for floor-area demarcation (no code, but a principle)
 NEN2580_OPMERKING = "NEN 2580 is uitgangspunt voor vloeroppervlakte-demarcatie."
 
 
@@ -91,15 +90,14 @@ def bouwwerk_regel(regel_id: int) -> dict | None:
 
 def validate_gebruiksbestemmingen(codes: list[str]) -> list[str]:
     """
-    Valideer lijst van Gebruiksbestemming-codes (komma-gescheiden in model).
-    Retourneert foutmeldingen, leeg bij geldig.
+    Validate a list of Gebruiksbestemming codes (comma-separated in the model).
+    Returns error messages, empty when valid.
     """
     from ifckit.ils.common import GEBRUIKSBESTEMMINGEN
 
-    fouten = []
+    errors = []
     for c in codes:
         if c not in GEBRUIKSBESTEMMINGEN:
-            fouten.append(f"Onbekende Gebruiksbestemming: {c!r}")
-    # Gemeenschappelijke ruimte met meerdere bestemmingen moet komma-gescheiden zijn —
-    # dat is al afgehandeld door de caller die split(',').
-    return fouten
+            errors.append(f"Unknown Gebruiksbestemming: {c!r}")
+    # A shared space with multiple destinations must be comma-separated —
+    # already handled by the caller that splits on ','.

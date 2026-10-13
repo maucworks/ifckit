@@ -28,5 +28,5 @@ def glaspercentages() -> list[str]:
     ]
 
 
-# Convenience: alle 11 combinaties (Gebruiksbestemming × Oriëntatie × Glaspercentage)
+# Convenience: all 11 combinations (Gebruiksbestemming × Oriëntatie × Glaspercentage)
 BENG_ROWS: list[dict] = load_beng()

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # This file was generated with the assistance of an AI coding tool.
 """
-Build MiniBIM SO voorbeeld — end-to-end ILS-demo.
+Build MiniBIM SO example — end-to-end ILS demo.
 
-Genereert een SO-model met:
-  - Georeferentie RD New (EPSG:28992)
-  - NL-SfB classificatie
-  - Terrein / Bouwwerk / Gebied / Ruimte / Buitenruimte als IfcSpace
-  - MiniBIM ILS pset per ruimte
-  - IfcZone groepering op EenheidNummer
+Generates an SO model with:
+  - Georeferencing: RD New (EPSG:28992)
+  - NL-SfB classification
+  - Terrain / Bouwwerk / Gebied / Ruimte / Buitenruimte as IfcSpace
+  - MiniBIM ILS pset per space
+  - IfcZone grouping by EenheidNummer
   - Qto_SpaceBaseQuantities
 
-Gebaseerd op specs/minibim referentie-IFCs (SO_00).
+Based on the specs/minibim reference IFCs (SO_00).
 
 Usage:
     python examples/build_minibim_so.py
@@ -31,23 +31,23 @@ from ifckit.model import IfcModel
 
 def main():
     from ifckit.schema import IfcSchema
-    m = IfcModel(name="MiniBIM SO voorbeeld", schema=IfcSchema.IFC4)
+    m = IfcModel(name="MiniBIM SO example", schema=IfcSchema.IFC4)
 
-    # Georeferentie — RD New, false origin ZW perceel
+    # Georeferencing — RD New, false origin SW parcel
     set_georeference(
         m._file,
         projected_crs={"Name": "EPSG:28992"},
         coordinate_operation={"Eastings": 100000, "Northings": 400000, "OrthogonalHeight": 0},
     )
 
-    # Classificatie
+    # Classification
     cls = add_classification(m._file, "NL-SfB", edition="2019")
 
     site = m.add_site("Terrein", location=(0, 0, 0))
     building = m.add_building(site, "Bouwwerk 00")
     storey = m.add_storey(building, "BG", elevation=0)
 
-    # Helper om een MiniBIM-ruimte te maken
+    # Helper to create a MiniBIM space
     def add_minibim_space(name, ruimtetype, gebied_soort="Gebruiksfunctie",
                           gebied_type="Appartement", gebruiks="Woonfunctie",
                           orientatie="Zuid", bepalings="NVO",
@@ -72,27 +72,27 @@ def main():
         write_quantities(m._file, sp, "Qto_SpaceBaseQuantities", {"NetFloorArea": area, "NetVolume": volume})
         return sp
 
-    # Terrein (als ruimte)
+    # Terrain (as a space)
     add_minibim_space("Terrein", "Onbenoemde ruimte", gebied_soort="Gebruiksfunctie",
                       gebied_type="Gebruiksgebied",
                       area=500, volume=0, nlsfb=("00.00", "terrein"))
 
-    # Gebied: appartement
+    # Gebied: apartment
     add_minibim_space("Gebied 01", "Woonkamer", gebied_soort="Gebruiksfunctie",
                       gebied_type="Appartement", gebruiks="Woonfunctie",
                       orientatie="Zuid", eenheid="01.00.01", area=45, volume=135)
 
-    # Ruimten binnen het gebied (zelfde EenheidNummer)
+    # Spaces within the gebied (same EenheidNummer)
     eenheid = format_eenheid_nummer(1, 0, 1)
     add_minibim_space("Woonkamer", "Woonkamer", area=25, volume=75, eenheid=eenheid)
     add_minibim_space("Slaapkamer", "Slaapkamer", area=12, volume=36, eenheid=eenheid)
     add_minibim_space("Badruimte", "Badruimte", area=6, volume=18, eenheid=eenheid)
 
-    # Tweede eenheid
+    # Second unit
     eenheid2 = format_eenheid_nummer(1, 0, 2)
     add_minibim_space("Woonkamer 2", "Woonkamer", area=28, volume=84, eenheid=eenheid2)
 
-    # Buitenruimte
+    # Buitenruimte (outdoor space)
     sp = ifcopenshell.api.run("root.create_entity", m._file, ifc_class="IfcSpace", name="Balkon")
     ifcopenshell.api.run("aggregate.assign_object", m._file, relating_object=storey.entity, products=[sp])
     apply_minibim_pset(sp, m._file, BuitenruimteType="Balkon", Orientatie="Zuid",

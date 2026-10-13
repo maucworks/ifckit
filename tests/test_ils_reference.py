@@ -1,10 +1,10 @@
 # This file was generated with the assistance of an AI coding tool.
-"""Validatie tegen MiniBIM referentie-IFCs (specs/minibim/*.ifc)."""
+"""Validation against MiniBIM reference IFCs (specs/minibim/*.ifc)."""
 
 from __future__ import annotations
 
-# Referentie-IFCs wonen in de meta-repo (196-ifckit-admin/specs/minibim), niet in
-# deze lib. Kandidaatlocaties: repo-root/specs, ../specs, $IFCKIT_SPEC_DIR.
+# Reference IFCs live in the meta repo (196-ifckit-admin/specs/minibim), not
+# in this lib. Candidate locations: repo-root/specs, ../specs, $IFCKIT_SPEC_DIR.
 import os
 import pathlib
 
@@ -38,7 +38,7 @@ def _all_ifcs() -> list:
 
 pytestmark = pytest.mark.skipif(
     _REF is None,
-    reason="specs/minibim niet gevonden (staat in 196-ifckit-admin, zet IFCKIT_SPEC_DIR)",
+    reason="specs/minibim not found (lives in 196-ifckit-admin; set IFCKIT_SPEC_DIR)",
 )
 
 
@@ -85,7 +85,7 @@ def test_uitvoeringsplan_raw():
 
 
 def test_generated_ifc_matches_reference_structure():
-    """E2E: bouw een minimal MiniBIM-model en valideer structuur zoals referentie."""
+    """E2E: build a minimal MiniBIM model and validate structure like the reference."""
     from ifckit.builders.classification import add_classification, assign_classification
     from ifckit.builders.georeference import set_georeference
     from ifckit.builders.quantities import write_quantities
