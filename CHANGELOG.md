@@ -71,6 +71,11 @@ Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(s
   (`serialize_to_file` already accepted file objects); the
   write-temp-`.ifc`-and-reread roundtrip is gone, so preview/export ticks
   perform no scratch-file I/O (regression-tested).
+- `feat(model): add(validate=False)` / `apply_delta(validate=False)` skip
+  rebuild-time validation for pre-validated preview ticks (default True).
+  cProfile on a 20-wall rebuild tick: 56602 → 56137 calls, 17.0 → 16.7 ms —
+  validation is a small share of a tick; the switch trims object churn,
+  tessellation still dominates.
 
 ### Fixed — ifcopenshell 0.9
 

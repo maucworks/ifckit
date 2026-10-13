@@ -180,3 +180,37 @@ class TestApplyDeltaHosts:
         del plain["component_graph"]
         with pytest.raises(ValueError, match="component_graph"):
             m.apply_delta([{**plain, "id": "win1", "host_id": "w1"}])
+
+
+class TestApplyDeltaValidation:
+    def _invalid_wall(self):
+        body = _wall_body()
+        body["footprint"] = body["footprint"][:2]
+        return {**body, "id": "bad"}
+
+    def test_invalid_raises_by_default(self, empty_model):
+        with pytest.raises(ValueError, match="at least 3 points"):
+            empty_model.apply_delta([self._invalid_wall()])
+
+    def test_validate_false_skips_validation(self, empty_model):
+        m = empty_model
+        changed = m.apply_delta([self._invalid_wall()], validate=False)
+        assert len(changed) == 1
+        assert m.ifc_file.by_guid(changed[0]).is_a("IfcWall")
+
+    def test_add_validate_false(self, empty_model):
+        from ifckit.geometry import Plane, Vec
+        from ifckit.handles import StoreyHandle
+
+        m = empty_model
+        storey = StoreyHandle(m.ifc_file.by_type("IfcBuildingStorey")[0], m)
+        pending = PendingWall(
+            footprint=[Vec(0, 0, 0), Vec(5, 0, 0)],
+            plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+            height=3.0,
+            name="Degenerate",
+        )
+        with pytest.raises(ValueError, match="at least 3 points"):
+            m.add(pending, storey)
+        handle = m.add(pending, storey, validate=False)
+        assert handle.entity.is_a("IfcWall")
