@@ -1310,6 +1310,7 @@ class IfcModel:
         y_up: bool = True,
         include_guids: Optional[Collection[str]] = None,
         preset: str = "final",
+        num_threads: int = 1,
     ) -> Iterator[dict]:
         """Stream viewer mesh dicts for every product, without temp files.
 
@@ -1331,6 +1332,9 @@ class IfcModel:
             preset: Tessellation preset, ``"final"`` (default) or
                 ``"interactive"`` (coarse preview) — see
                 ``geom_backend.PRESETS``. Explicit *tessellation* keys win.
+            num_threads: Iterator thread count (default 1, status quo).
+                Threaded iteration is re-sorted into file order with
+                bit-identical per-product geometry (measured).
         """
         from ifckit import geom_backend
 
@@ -1340,6 +1344,7 @@ class IfcModel:
             settings,
             skip_openings=skip_openings,
             include_guids=include_guids,
+            num_threads=num_threads,
         )
         yield from geom_backend.shapes_to_mesh_dicts(shapes, y_up=y_up)
 
@@ -1371,6 +1376,7 @@ class IfcModel:
         y_up: bool = True,
         include_guids: Optional[Collection[str]] = None,
         preset: str = "final",
+        num_threads: int = 1,
     ) -> Iterator[dict]:
         """Stream compact binary mesh chunks (see ``geom_backend.shapes_to_chunks``).
 
@@ -1385,6 +1391,7 @@ class IfcModel:
             include_guids: Only yield these GUIDs (selective re-tessellation).
             preset: Tessellation preset, ``"final"`` (default) or
                 ``"interactive"`` (coarse preview).
+            num_threads: Iterator thread count (default 1, status quo).
         """
         from ifckit import geom_backend
 
@@ -1394,6 +1401,7 @@ class IfcModel:
             settings,
             skip_openings=skip_openings,
             include_guids=include_guids,
+            num_threads=num_threads,
         )
         yield from geom_backend.shapes_to_chunks(shapes, y_up=y_up)
 

@@ -256,6 +256,7 @@ def iter_shapes(
     *,
     skip_openings: bool = True,
     include_guids: Optional[Collection[str]] = None,
+    num_threads: int = 1,
 ) -> Iterator[IterShape]:
     """Yield :class:`IterShape` records for every product in ``source``.
 
@@ -264,11 +265,15 @@ def iter_shapes(
         settings:       Geometry settings, e.g. from :func:`make_settings`.
         skip_openings:  Skip ``IfcOpeningElement`` shapes (voids), on by default.
         include_guids:  Only yield these GUIDs (selective re-tessellation).
+        num_threads:    Iterator thread count (default 1, status quo).
+            Threaded iteration yields out of order upstream, so records
+            are re-sorted into file order before yielding: same order
+            and (measured) bit-identical geometry as single-threaded.
     """
     import ifcopenshell.geom as _geom
 
     wanted = set(include_guids) if include_guids is not None else None
-    iterator = _geom.iterator(settings, source)
+    iterator = _geom.iterator(settings, source, num_threads)
     # NOTE: ``iterator.file`` is unreliable (upstream keeps the ``file`` class
     # instead of the instance when constructed from a file object), so resolve
     # the lookup file from ``source`` directly.
@@ -280,27 +285,52 @@ def iter_shapes(
         ifc_file = ifcopenshell.open(os.fspath(source))
     if not iterator.initialize():
         return
-    while True:
-        shape = iterator.get()
+    pending: list = []
+
+    def _emit(shape) -> "IterShape | None":
         guid = getattr(shape, "guid", "") or ""
-        if wanted is None or guid in wanted:
-            entity_type = ""
-            if guid:
-                try:
-                    entity = ifc_file.by_guid(guid)
-                    entity_type = entity.is_a() if entity is not None else ""
-                except Exception:
-                    entity_type = ""
-            if not (skip_openings and entity_type in _OPENING_TYPES):
-                geometry = shape.geometry
-                yield IterShape(
-                    guid=guid,
-                    entity_type=entity_type,
-                    verts=list(geometry.verts),
-                    faces=list(geometry.faces),
-                )
+        if wanted is not None and guid not in wanted:
+            return None
+        entity_type = ""
+        if guid:
+            try:
+                entity = ifc_file.by_guid(guid)
+                entity_type = entity.is_a() if entity is not None else ""
+            except Exception:
+                entity_type = ""
+        if skip_openings and entity_type in _OPENING_TYPES:
+            return None
+        geometry = shape.geometry
+        return IterShape(
+            guid=guid,
+            entity_type=entity_type,
+            verts=list(geometry.verts),
+            faces=list(geometry.faces),
+        )
+
+    while True:
+        record = _emit(iterator.get())
+        if record is not None:
+            if num_threads == 1:
+                yield record
+            else:
+                pending.append(record)
         if not iterator.next():
             break
+    if num_threads != 1:
+        # threaded iteration yields out of order upstream; restore
+        # file order (entity id) so selective splicing sees the same
+        # sequence as single-threaded runs
+        order: dict = {}
+        for product in ifc_file:
+            try:
+                g = product.GlobalId
+                if g:
+                    order[str(g)] = product.id()
+            except Exception:
+                pass
+        pending.sort(key=lambda r: order.get(r.guid, 0))
+        yield from pending
 
 
 def shapes_to_mesh_dicts(

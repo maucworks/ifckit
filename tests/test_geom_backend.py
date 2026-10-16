@@ -7,7 +7,6 @@ from ifckit.elements.opening import PendingOpening
 from ifckit.elements.structural import PendingBeam
 from ifckit.geometry import Line, Plane, Vec
 
-
 _SQUARE_PROFILE = [Vec(-0.1, -0.1), Vec(0.1, -0.1), Vec(0.1, 0.1), Vec(-0.1, 0.1)]
 
 
@@ -23,17 +22,24 @@ def _wall_with_opening_model():
     site = m.add_site("Site")
     bldg = m.add_building(site, "Building")
     storey = m.add_storey(bldg, "GF", elevation=0.0)
-    wall = m.add(PendingWall(
-        footprint=[Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0.2, 0), Vec(0, 0.2, 0)],
-        plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
-        height=3.0, name="W1",
-    ), storey)
+    wall = m.add(
+        PendingWall(
+            footprint=[Vec(0, 0, 0), Vec(5, 0, 0), Vec(5, 0.2, 0), Vec(0, 0.2, 0)],
+            plane=Plane(Vec(0, 0, 0), Vec(1, 0, 0), Vec(0, 1, 0)),
+            height=3.0,
+            name="W1",
+        ),
+        storey,
+    )
     m.add_opening(
         PendingOpening(
             plane=Plane(Vec(1.0, 0.0, 0.0), Vec(1, 0, 0), Vec(0, 1, 0)),
-            width=0.9, height=2.1, name="OP1",
+            width=0.9,
+            height=2.1,
+            name="OP1",
         ),
-        host=wall, container=storey,
+        host=wall,
+        container=storey,
     )
     return m
 
@@ -73,9 +79,7 @@ class TestMakeSettings:
         assert s.get("use-world-coords") is True
 
     def test_overrides(self):
-        s = geom_backend.make_settings(
-            {"linear_deflection": 0.01, "angular_deflection": 0.5}
-        )
+        s = geom_backend.make_settings({"linear_deflection": 0.01, "angular_deflection": 0.5})
         assert s.get("mesher-linear-deflection") == pytest.approx(0.01)
         assert s.get("mesher-angular-deflection") == pytest.approx(0.5)
 
@@ -158,9 +162,7 @@ class TestIterShapes:
         assert len(m.ifc_file.by_type("IfcOpeningElement")) == 1
         settings = geom_backend.make_settings()
         with_skip = list(geom_backend.iter_shapes(m.ifc_file, settings, skip_openings=True))
-        without_skip = list(
-            geom_backend.iter_shapes(m.ifc_file, settings, skip_openings=False)
-        )
+        without_skip = list(geom_backend.iter_shapes(m.ifc_file, settings, skip_openings=False))
         assert all(s.entity_type != "IfcOpeningElement" for s in with_skip)
         assert any(s.entity_type == "IfcOpeningElement" for s in without_skip)
         assert len(without_skip) == len(with_skip) + 1
@@ -168,9 +170,7 @@ class TestIterShapes:
     def test_include_guids(self):
         m = _wall_with_opening_model()
         settings = geom_backend.make_settings()
-        all_shapes = list(
-            geom_backend.iter_shapes(m.ifc_file, settings, skip_openings=False)
-        )
+        all_shapes = list(geom_backend.iter_shapes(m.ifc_file, settings, skip_openings=False))
         assert len(all_shapes) > 1
         wanted = all_shapes[0].guid
         filtered = list(
@@ -184,14 +184,7 @@ class TestIterShapes:
         m = _beam_model()
         settings = geom_backend.make_settings()
         assert list(geom_backend.iter_shapes(m.ifc_file, settings, include_guids=[])) == []
-        assert (
-            list(
-                geom_backend.iter_shapes(
-                    m.ifc_file, settings, include_guids=["0" * 22]
-                )
-            )
-            == []
-        )
+        assert list(geom_backend.iter_shapes(m.ifc_file, settings, include_guids=["0" * 22])) == []
 
 
 class TestSerializeSkipOpenings:
@@ -206,9 +199,7 @@ class TestSerializeSkipOpenings:
         kept = str(tmp_path / "kept.obj")
         try:
             geom_backend.serialize_to_file(m.ifc_file, skipped, settings)
-            geom_backend.serialize_to_file(
-                m.ifc_file, kept, settings, skip_openings=False
-            )
+            geom_backend.serialize_to_file(m.ifc_file, kept, settings, skip_openings=False)
         except ImportError:
             pytest.skip("OBJ serializer not in this ifcopenshell build")
         assert len(self._obj_groups(skipped)) == 1
@@ -255,9 +246,7 @@ class TestShapesToMeshDicts:
         assert len(d["positions"]) > 0
         assert len(d["indices"]) > 0
         # Y-up: positions[1] is Z, positions[2] is -Y.
-        shape = list(
-            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
-        )[0]
+        shape = list(geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings()))[0]
         assert d["positions"][0] == pytest.approx(shape.verts[0])
         assert d["positions"][1] == pytest.approx(shape.verts[2])
         assert d["positions"][2] == pytest.approx(-shape.verts[1])
@@ -266,9 +255,7 @@ class TestShapesToMeshDicts:
         m = _beam_model()
         shapes = geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
         dicts = list(geom_backend.shapes_to_mesh_dicts(shapes, y_up=False))
-        shape = list(
-            geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings())
-        )[0]
+        shape = list(geom_backend.iter_shapes(m.ifc_file, geom_backend.make_settings()))[0]
         assert dicts[0]["positions"] == pytest.approx(list(shape.verts))
 
 
@@ -278,9 +265,7 @@ def _two_beam_model():
     floor = m.add_site("S").add_building("B").add_storey("GF")
     big = [Vec(-0.2, -0.2), Vec(0.2, -0.2), Vec(0.2, 0.2), Vec(-0.2, 0.2)]
     floor.add(PendingBeam(Line(Vec(0, 0, 0), Vec(5, 0, 0)), _SQUARE_PROFILE, name="B1"))
-    floor.add(
-        PendingBeam(Line(Vec(10, 0, 0), Vec(15, 0, 0)), _SQUARE_PROFILE, name="B2")
-    )
+    floor.add(PendingBeam(Line(Vec(10, 0, 0), Vec(15, 0, 0)), _SQUARE_PROFILE, name="B2"))
     floor.add(PendingBeam(Line(Vec(20, 0, 0), Vec(25, 0, 0)), big, name="B3"))
     return m
 
@@ -312,8 +297,7 @@ class TestShapesToChunks:
         assert chunk["index_count"] == len(mesh["indices"])
         assert _decode_uints(chunk["index"]) == mesh["indices"]
         restored = [
-            c + chunk["offset"][i % 3]
-            for i, c in enumerate(_decode_floats(chunk["positions"]))
+            c + chunk["offset"][i % 3] for i, c in enumerate(_decode_floats(chunk["positions"]))
         ]
         assert restored == pytest.approx(mesh["positions"])
 
@@ -362,3 +346,51 @@ class TestShapesToChunks:
         assert chunk["positions"] == b""
         assert chunk["index"] == b""
         assert chunk["offset"] == [0.0, 0.0, 0.0]
+
+
+class TestIterShapesThreaded:
+    """Threaded iteration: same order, same bytes as single-threaded."""
+
+    @staticmethod
+    def _hall_model(n_beams=12):
+        from ifckit.elements.structural import PendingBeam
+
+        m = IfcModel(name="ThreadedTest", schema=IfcSchema.IFC4)
+        floor = m.add_site("S").add_building("B").add_storey("GF")
+        for k in range(n_beams):
+            floor.add(
+                PendingBeam(
+                    Line(Vec(k * 1.5, 0, 0), Vec(k * 1.5 + 4, (k % 3) * 0.7, 0)),
+                    _SQUARE_PROFILE,
+                    name=f"Beam-{k}",
+                )
+            )
+        return m
+
+    @staticmethod
+    def _keyed(shapes):
+        return [(s.guid, s.entity_type, tuple(s.verts), tuple(s.faces)) for s in shapes]
+
+    def test_threaded_matches_single(self):
+        import os
+
+        m = self._hall_model()
+        settings = geom_backend.make_settings()
+        ref = self._keyed(geom_backend.iter_shapes(m.ifc_file, settings, num_threads=1))
+        assert len(ref) == 12
+        got = self._keyed(
+            geom_backend.iter_shapes(
+                m.ifc_file, settings, num_threads=max(2, (os.cpu_count() or 4) // 2)
+            )
+        )
+        assert [r[0] for r in got] == [r[0] for r in ref]
+        assert got == ref
+
+    def test_threaded_include_guids(self):
+        m = self._hall_model(n_beams=6)
+        settings = geom_backend.make_settings()
+        wanted = [s.guid for s in geom_backend.iter_shapes(m.ifc_file, settings, num_threads=1)][:3]
+        got = list(
+            geom_backend.iter_shapes(m.ifc_file, settings, include_guids=wanted, num_threads=4)
+        )
+        assert [s.guid for s in got] == wanted
