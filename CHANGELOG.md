@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`
 
+## [0.4.0]
+
+### Changed — geometry ownership move
+
+- `feat(geometry)!`: `ifckit.geometry` resolves to geometrykit
+  (`geometrykit>=0.6.0,<0.6.1`, the single required runtime
+  dependency): primitives, biarc, spiral, transform, subdivision,
+  patterns, path (+ installed IFC bridge), field, surface, curve,
+  intersection and panel_report are facades over the promoted
+  implementations. Deliberate, suite-covered kernel deltas: kernel
+  evaluation/projection/interpolation, P-0 Coons default for C0
+  four-curve patches, kernel 2D intersection. OCC oracle paths stay
+  available; IFC-coupled code (`profiles`, builders, `ifc_geom`)
+  stays in ifckit by design.
+
 ## [0.3.3]
 
 ### Added — geometry reports and identity
