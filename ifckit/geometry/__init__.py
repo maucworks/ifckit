@@ -134,3 +134,15 @@ __all__ = [
     # transform
     "Transform",
 ]
+
+
+# IFC bridge: geometrykit is IFC-free by design, so its ``to_ifc_*``
+# serialisation methods delegate to an installed bridge. ifckit
+# installs its own ``ifc_geom`` module here, at geometry-package import
+# time (idempotent): ``Path.directrix`` and friends keep working with
+# byte-identical behavior through the facade.
+from geometrykit.geometry._bridge import install_ifc_bridge  # noqa: E402
+
+from ifckit.geometry import ifc_geom as _ifc_geom  # noqa: E402
+
+install_ifc_bridge(_ifc_geom)
