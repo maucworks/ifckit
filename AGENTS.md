@@ -152,9 +152,12 @@ modules/classes/docs — is in **English**. Exceptions:
 ### Dependencies
 
 - **Runtime**: `geometrykit` (the value types and NURBS kernels; pinned
-  `>= min-proven, < next-line` per the pin principle below) — the only
-  required runtime dependency. Everything else stays optional.
-- **Optional**: `ifcopenshell` for IFC file output
+  `>= min-proven, < next-line` per the pin principle below) and
+  `ifcopenshell` (IFC writing; required at import time since
+  `builders/base.py` — this package is IFC-only by design, geometry
+  without IFC lives in geometrykit). Everything else stays optional.
+- **Optional**: `pythonocc-core` (NURBS/intersection oracle paths):
+  conda-forge only — no PyPI distribution exists
 - **OCC** (`pythonocc-core`, NURBS/intersection paths): conda-forge only —
   no PyPI distribution exists, so `occ` is deliberately *not* part of the
   `all` extra (keeps `pip install ifckit[all]` resolvable)

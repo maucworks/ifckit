@@ -27,14 +27,15 @@ classifiers = [
 ]
 dependencies = [
     # Single geometry dependency (see AGENTS.md): the value types and
-    # kernels live in geometrykit; this package holds IFC generation.
+    # kernels live in geometrykit; this package holds IFC generation,
+    # which requires ifcopenshell at import time (builders/base.py).
     "geometrykit>=0.6.0,<0.6.1",
+    "ifcopenshell>=0.8.4.post1,<=0.9.0",
 ]
 
 [project.optional-dependencies]
 # Pin policy (see AGENTS.md): never open-ended; >= min-proven, <= current-at-release.
 # The max moves only at release time, after the matrix proved the new version.
-ifc = ["ifcopenshell>=0.8.4.post1,<=0.9.0"]
 dev = [
     "pytest>=7,<10",
     "pytest-cov>=7,<8",
