@@ -16,9 +16,7 @@ def _flat_field() -> Field:
     for j in range(3):
         for i in range(3):
             f.lattice[(i, j)] = len(f.points)
-            f.points.append(
-                FieldPoint(pos=Vec(i, j, 0), uv=(i / 2, j / 2), normal=Vec(0, 0, 1))
-            )
+            f.points.append(FieldPoint(pos=Vec(i, j, 0), uv=(i / 2, j / 2), normal=Vec(0, 0, 1)))
     for i in range(2):
         for j in range(2):
             a = f.lattice[(i, j)]
@@ -73,3 +71,38 @@ class TestFieldReport:
 
     def test_str(self):
         assert isinstance(str(FieldReport(n_cells=2)), str)
+
+
+class TestFacadeParity:
+    """The facade resolves to the promoted implementation."""
+
+    def test_names_are_the_promoted_objects(self):
+        import geometrykit.geometry.panel as promoted
+
+        from ifckit.geometry import panel_report as facade
+
+        assert facade.FieldReport is promoted.FieldReport
+        assert facade.cells_report is promoted.cells_report
+        assert facade.field_report is promoted.field_report
+
+    def test_reports_agree_on_metrics(self):
+        import geometrykit.geometry.panel as promoted
+
+        cells = [
+            [Vec(0, 0, 0), Vec(1, 0, 0), Vec(1, 1, 0), Vec(0, 1, 0)],
+            [Vec(2, 0, 0), Vec(3, 0, 0), Vec(3, 1, 0.5), Vec(2, 1, 0)],
+        ]
+        from geometrykit.geometry import Vec as GVec
+
+        g_cells = [[GVec(p.x, p.y, p.z) for p in cell] for cell in cells]
+        mine = cells_report(cells)
+        theirs = promoted.cells_report(g_cells)
+        for key in (
+            "n_cells",
+            "edge_min",
+            "edge_mean",
+            "edge_max",
+            "angle_max_dev",
+            "planarity_max",
+        ):
+            assert getattr(mine, key) == pytest.approx(getattr(theirs, key))
