@@ -28,7 +28,7 @@ classifiers = [
 dependencies = [
     # Single geometry dependency (see AGENTS.md): the value types and
     # kernels live in geometrykit; this package holds IFC generation.
-    "geometrykit>=0.5.1,<0.5.2",
+    "geometrykit>=0.6.0,<0.6.1",
 ]
 
 [project.optional-dependencies]
