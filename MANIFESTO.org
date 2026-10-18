@@ -1,4 +1,4 @@
-#+TITLE: Space Belongs to the Commons, Code Belongs to the Field. A manifesto.
+#+TITLE: Space Belongs to the Commons, Code Belongs to the Field. A Headless Manifesto.
 #+SUBTITLE: Code as Common, Intent as Weapon, Copyleft as Shield
 #+AUTHOR: Sander Boer
 #+DATE: [2026-10-18 Sun]
@@ -71,7 +71,7 @@ We refuse to trap human intent in rigid syntax. A missing comma should not paral
 
 LLMs act as interpretive translators between poetics and precision: the architect, the organizer, the citizen speak discourse; the AI drafts programmatic commands; =ifckit= encodes the open data underneath. The machine is returned to its place, a silent, universal compiler of human speech. Creation stays upstream. Status today (verifiable in the Appendix): a prototype path in =plankit= with the LLM in the loop; the finished universal compiler does not yet exist.
 
-** VII. The Modular Compiler Stack: From Discourse to Infrastructure
+** The Modular Compiler Stack: From Discourse to Infrastructure
 
 We refuse to replace one monolith with another. The pipeline is a sovereign, lightweight stack:
 
