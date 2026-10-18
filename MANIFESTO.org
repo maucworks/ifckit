@@ -99,7 +99,7 @@ Architects, software engineers, computational artisans, and spatial hackers:
 /Write the script, run the script./
 
 #+BEGIN_SRC bash
-python -m ifckit model.json output.ifc
+python -m ifckit build model.json -o output.ifc
 #+END_SRC
 
 **The space belongs to the commons. The code belongs to the field.**
