@@ -1,6 +1,6 @@
-#+TITLE: The Headless Manifesto: Space Belongs to the Commons, Code Belongs to the Field
+#+TITLE: Space Belongs to the Commons, Code Belongs to the Field. A manifesto.
 #+SUBTITLE: Code as Common, Intent as Weapon, Copyleft as Shield
-#+AUTHOR: maucworks
+#+AUTHOR: Sander Boer
 #+DATE: [2026-10-18 Sun]
 #+OPTIONS: toc:2 num:t
 #+KEYWORDS: IFC, headless, open-source, LGPL, BIM, copyleft
@@ -14,7 +14,8 @@ The traditional architect is dead, and we refuse to mourn them.
 
 For a century, the discipline underwent a tragic evolutionary regression. Stripped of political agency by hyper-capitalism, the architect voluntarily retreated into the prison cell of the administrative state, trading spatial autonomy for risk management. They became liability-bureaucrats.
 
-Then came the monopolies of the Centralized Viewport. Three charges.
+Then came the monopolies of the Centralized Viewport. 
+Four charges:
 
 1. /Ransom on your own production./ Your files sit behind a subscription; the work, the libraries, the templates sit inside them. Stop paying, and your own output goes dark. Subscription-only at ~$3,005 per seat per year, with no perpetual licenses.
 
@@ -34,37 +35,37 @@ We reject this capitulation. We zoom out, we strip the interface, we weaponize t
 
 * The Headless Principles
 
-** I. Decouple the Gaze: Abolish the Viewport
+** Decouple the Gaze: Abolish the Viewport
 
 The corporate matrix controls the architect through the image: the render, the diagram, the screen. Architecture is structured spatial data, logic, and intent. The marketing package is what the viewport made of it.
 
 =ifckit= is UI-agnostic because the viewport is a cage. By generating valid IFC files headlessly from text and code, we sever dependence on the proprietary CAD host. We stop drawing what capital wants to see; we start compiling what the community needs to build. Viewers (web-ifc-viewer, Grasshopper previews) remain for validation; they are outputs. Authorship happens upstream, in the script. The Grasshopper bridge is a door for existing habits, never a host: it may enter commands, and authorship stays in the script.
 
-** II. Reclaim the Means of Production: Lightweight Stack, Raw Material
+** Reclaim the Means of Production: Lightweight Stack, Raw Material
 
 We reject hardware and license monopolies. The stack must run on commodity hardware and solar-powered servers, without a license validator phoning home.
 
 That means a small, auditable core with explicit native boundaries (see Appendix). =ifckit= shifts the discipline from transaction to craft: it connects digital logic to local, fluid, unpredictable material realities (the moisture of timber, the rubble of a demolished village) without passing through a corporate gate. We move from mechanical "Wheat" extraction to collaborative "Rice" interdependence.
 
-** III. The Machine Is an Environment
+** The Machine Is an Environment
 
 We acknowledge the trap. A clean, lightweight API clears friction for automated AI agents. The machine /will/ attempt to co-opt this tool to optimize corporate layouts at hyper-speed. Let it.
 
 Our role is spelled out in the problem itself. Typing coordinate vectors is machine work. The human architect encodes ethics, ecological thresholds, and community values as unbreakable guardrails. If the AI writes the code, the human architect writes the /fitness functions/.
 
-** IV. The Copyleft Is Our Shield, Limits Stated
+** The Copyleft Is Our Shield, Limits Stated
 
 Our radicality lives in the license. All three repos are LGPL-3.0-or-later (=COPYING.LESSER= + =COPYING=): =ifckit=, =geometrykit=, =plankit=.
 
 Truth about the shield: LGPL is fence-mending, never an infection. It permits proprietary use via dynamic linking; it compels sharing only when the library itself is modified and distributed. A developer's closed model stays closed. A bank's codebase stays closed. The commons stays unenclosed, and the landlord keeps the deed; we chose that on purpose, for maximum reuse and minimum enclosure, without pretending it is a legal revolution on its own.
 
-** V. The Right to the Void: Computation in Service of the Analogue
+** The Right to the Void: Computation in Service of the Analogue
 
 We program for the physical world, to free it from corporate gridlock. We extend a hand to the technophobic vanguard: the carpenter, the bricklayer, the typologist, the phenomenologist who rightly fear digital sterility.
 
 The destination of a headless protocol is the /banishment of the screen from the building site/. Let code compute compliance in the darkness of the server so the artisan can shape material in the full light of day. The code builds a guerrilla canopy, and physical craft shelters beneath it from speculative real estate.
 
-** VI. Discourse as Compiler: Natural Language as Headless Interface
+** Discourse as Compiler: Natural Language as Headless Interface
 
 We refuse to trap human intent in rigid syntax. A missing comma should not paralyze a community's imagination. Natural language is the ultimate frictionless headless interface.
 
