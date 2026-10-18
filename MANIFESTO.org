@@ -53,7 +53,7 @@ We acknowledge the trap. A clean, lightweight API clears friction for automated 
 
 Our role is spelled out in the problem itself. Typing coordinate vectors is machine work. The human architect encodes ethics, ecological thresholds, and community values as unbreakable guardrails. If the AI writes the code, the human architect writes the /fitness functions/.
 
-** The Copyleft Is Our Shield, Limits Stated
+** The Copyleft Is Our Shield
 
 Our radicality lives in the license. All three repos are LGPL-3.0-or-later (=COPYING.LESSER= + =COPYING=): =ifckit=, =geometrykit=, =plankit=.
 
