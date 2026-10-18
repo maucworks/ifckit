@@ -79,7 +79,7 @@ floor.add(PendingBeam(axis, profile, name="Girder"))
 
 ### Layer responsibilities
 
-**`geometry/`** — Framework-agnostic primitives. No IFC knowledge. Pure math. `Vec` is a 3D vector with operator overloads (`+`, `-`, `*`, `@` for dot, `**` for cross). `Plane` is a right-handed frame (origin, x\_axis, y\_axis; z\_axis derived). `Line`, `Arc`, and `Path` carry geometric length as a `@property`. `Path` composes `Line` and `Arc` segments into a G1-continuous curve. `parallel_transport_frames()` propagates rotation-minimizing frames along a `Path` (Bishop frames), used for swept solid orientation.
+**`geometry/`** — Framework-agnostic primitives. No IFC knowledge. Pure math. `Vec` is a 3D vector with operator overloads (`+`, `-`, `*`, `@` for dot, `**` for cross). `Plane` is a right-handed frame (origin, x\_axis, y\_axis; z\_axis derived). `Line`, `Arc`, and `Path` carry geometric length as a `@property`. `Path` composes `Line` and `Arc` segments into a G1-continuous curve. `parallel_transport_frames()` propagates rotation-minimizing frames along a `Path` (Bishop frames), used for swept solid orientation. `ifckit.geometry.frames` is a re-export facade over `geometrykit.geometry.frames`; the transport, reference, and up-vector frame strategies with the miter-scale pipeline are documented in geometrykit (`docs/FRAME_TRANSPORT_MITER.md`).
 
 **`elements/`** — Data containers. Each `PendingElement` subclass declares `element_type: str` as a class variable used by the builder registry for dispatch. No ifcopenshell import. Subclasses are serializable to/from plain dicts for JSON transport across process boundaries (FastAPI, Grasshopper scripting).
 
