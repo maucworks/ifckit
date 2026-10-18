@@ -50,8 +50,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "ifckit[ifc]"], check=Tr
 JSON-driven build: reads `hello_wall.json` and constructs walls with
 openings, lining, and glazing via the JSON build pipeline.
 
-[Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fhello_wall.ifc)
-
+*Generates locally; open the result in web-ifc-viewer.*
 ---
 
 ## `build_sectioned_spine.py`
@@ -66,12 +65,12 @@ Five tests exercising the SectionedSpineBuilder internals:
 
 | File | Preview |
 |------|---------|
-| `test_sectioned_spine_basic.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ftest_sectioned_spine_basic.ifc) |
-| `test_sectioned_spine_varying.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ftest_sectioned_spine_varying.ifc) |
-| `test_sectioned_spine_ibeam.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ftest_sectioned_spine_ibeam.ifc) |
-| `test_sectioned_spine_transport.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ftest_sectioned_spine_transport.ifc) |
-| `test_sectioned_spine_comparison_inline.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ftest_sectioned_spine_comparison_inline.ifc) |
-| `test_sectioned_spine_comparison_core.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ftest_sectioned_spine_comparison_core.ifc) |
+| `test_sectioned_spine_basic.ifc` | regenerate locally |
+| `test_sectioned_spine_varying.ifc` | regenerate locally |
+| `test_sectioned_spine_ibeam.ifc` | regenerate locally |
+| `test_sectioned_spine_transport.ifc` | regenerate locally |
+| `test_sectioned_spine_comparison_inline.ifc` | regenerate locally |
+| `test_sectioned_spine_comparison_core.ifc` | regenerate locally |
 
 ---
 
@@ -82,8 +81,8 @@ path.  Two variants: rectangular profile and I-beam.
 
 | File | Preview |
 |------|---------|
-| `sectioned_spine_demo.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fsectioned_spine_demo.ifc) |
-| `sectioned_spine_demo_ibeam.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fsectioned_spine_demo_ibeam.ifc) |
+| `sectioned_spine_demo.ifc` | regenerate locally |
+| `sectioned_spine_demo_ibeam.ifc` | regenerate locally |
 
 ---
 
@@ -94,8 +93,8 @@ and cross-sections from a single profile + starter plane.
 
 | File | Preview |
 |------|---------|
-| `sectioned_spine_auto_rect.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fsectioned_spine_auto_rect.ifc) |
-| `sectioned_spine_auto_ibeam.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fsectioned_spine_auto_ibeam.ifc) |
+| `sectioned_spine_auto_rect.ifc` | regenerate locally |
+| `sectioned_spine_auto_ibeam.ifc` | regenerate locally |
 
 ---
 
@@ -106,10 +105,10 @@ All spines built from `Path.from_pts([...])` + `fillet(index, radius)`.
 
 | File | Preview |
 |------|---------|
-| `fillet_single_corner.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ffillet_single_corner.ifc) |
-| `fillet_line_arc_line.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ffillet_line_arc_line.ifc) |
-| `fillet_s_curve.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ffillet_s_curve.ifc) |
-| `fillet_multi_corner.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Ffillet_multi_corner.ifc) |
+| `fillet_single_corner.ifc` | regenerate locally |
+| `fillet_line_arc_line.ifc` | regenerate locally |
+| `fillet_s_curve.ifc` | regenerate locally |
+| `fillet_multi_corner.ifc` | regenerate locally |
 
 ---
 
@@ -120,6 +119,6 @@ correct inner barrel + annular end-cap tessellation.
 
 | File | Preview |
 |------|---------|
-| `pipe_straight.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fpipe_straight.ifc) |
-| `pipe_bend.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fpipe_bend.ifc) |
-| `pipe_s_curve.ifc` | [Preview](https://maucworks.github.io/web-ifc-viewer/?ifc=https%3A%2F%2Fraw.githubusercontent.com%2Fmaucworks%2Fifckit%2Frefs%2Fheads%2Fmaster%2Fexamples%2Foutput%2Fpipe_s_curve.ifc) |
+| `pipe_straight.ifc` | regenerate locally |
+| `pipe_bend.ifc` | regenerate locally |
+| `pipe_s_curve.ifc` | regenerate locally |

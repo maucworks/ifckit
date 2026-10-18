@@ -41,6 +41,7 @@ htmlcov/
 
 # IFC output (test artifacts)
 tests/output/
+examples/output/
 *.ifc
 
 # IDE
