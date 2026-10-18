@@ -1,0 +1,159 @@
+#+TITLE: The Headless Manifesto: Space Belongs to the Commons, Code Belongs to the Field
+#+SUBTITLE: Code as Common, Intent as Weapon, Copyleft as Shield
+#+AUTHOR: maucworks
+#+DATE: [2026-10-18 Sun]
+#+OPTIONS: toc:2 num:t
+#+KEYWORDS: IFC, headless, open-source, LGPL, BIM, copyleft
+#+URL: https://github.com/maucworks/ifckit
+#+URL: https://github.com/maucworks/geometrykit
+#+URL: https://github.com/maucworks/plankit
+
+* Preamble: The Death Bed of the Architect
+
+The traditional architect is dead, and we refuse to mourn them.
+
+For a century, the discipline underwent a tragic evolutionary regression. Stripped of political agency by hyper-capitalism, the architect voluntarily retreated into the prison cell of the administrative state, trading spatial autonomy for risk management. They became liability-bureaucrats.
+
+Then came the monopolies of the Centralized Viewport. Three charges.
+
+1. /Ransom on your own production./ Your files sit behind a subscription; the work, the libraries, the templates sit inside them. Stop paying, and your own output goes dark. Subscription-only at ~$3,005 per seat per year, with no perpetual licenses.
+
+2. /Read-edit captivity./ Those files can only be read and edited inside proprietary software you cannot meaningfully extend. The families, the standards, the project history you built do not export; the format is the fence.
+
+3. /Codified ritual./ The GUI encodes the work structure itself. Elsewhere, someone designed the click-paths: which elements exist, what may connect, what order you must follow. Agency shrinks into ritual path-following: judgment where the menu allows it, obedience everywhere else.
+
+4. /Conscripted R&D./ And you pay for the privilege of being watched. Desktop analytics reports command-level usage and design metadata (file names, paths, units, object and layer metrics), and the terms reserve the right to analyze /your content/ and feed the results into product planning and machine learning. Your clicks are their roadmap research. You fund it twice: once in subscription, once in data.
+
+The architect ends up an unpaid R&D rival and an involuntary database for the very companies encoding their displacement. Space, meanwhile, was reset as a closed asset class.
+
+Now generative AI arrives to strip away the last of that bureaucrat's desk job. The corporate "Wheat-Culture" (individualistic, extractive, obsessed with automated profit maximization) is ready to discard the human designer entirely.
+
+Faced with this metacrisis, the starchitects default to what they already were: the curator curates, the journalist investigates, the administrator rebrands as "prompt engineer," the romantic retreats into an analog past. These are palliative routines, and the patient is the discipline itself. Read them as archetypes; Sources §6 carries the argument and admits it is unproven.
+
+We reject this capitulation. We zoom out, we strip the interface, we weaponize the code.
+
+* The Headless Principles
+
+** I. Decouple the Gaze: Abolish the Viewport
+
+The corporate matrix controls the architect through the image: the render, the diagram, the screen. Architecture is structured spatial data, logic, and intent. The marketing package is what the viewport made of it.
+
+=ifckit= is UI-agnostic because the viewport is a cage. By generating valid IFC files headlessly from text and code, we sever dependence on the proprietary CAD host. We stop drawing what capital wants to see; we start compiling what the community needs to build. Viewers (web-ifc-viewer, Grasshopper previews) remain for validation; they are outputs. Authorship happens upstream, in the script. The Grasshopper bridge is a door for existing habits, never a host: it may enter commands, and authorship stays in the script.
+
+** II. Reclaim the Means of Production: Lightweight Stack, Raw Material
+
+We reject hardware and license monopolies. The stack must run on commodity hardware and solar-powered servers, without a license validator phoning home.
+
+That means a small, auditable core with explicit native boundaries (see Appendix). =ifckit= shifts the discipline from transaction to craft: it connects digital logic to local, fluid, unpredictable material realities (the moisture of timber, the rubble of a demolished village) without passing through a corporate gate. We move from mechanical "Wheat" extraction to collaborative "Rice" interdependence.
+
+** III. The Machine Is an Environment
+
+We acknowledge the trap. A clean, lightweight API clears friction for automated AI agents. The machine /will/ attempt to co-opt this tool to optimize corporate layouts at hyper-speed. Let it.
+
+Our role is spelled out in the problem itself. Typing coordinate vectors is machine work. The human architect encodes ethics, ecological thresholds, and community values as unbreakable guardrails. If the AI writes the code, the human architect writes the /fitness functions/.
+
+** IV. The Copyleft Is Our Shield, Limits Stated
+
+Our radicality lives in the license. All three repos are LGPL-3.0-or-later (=COPYING.LESSER= + =COPYING=): =ifckit=, =geometrykit=, =plankit=.
+
+Truth about the shield: LGPL is fence-mending, never an infection. It permits proprietary use via dynamic linking; it compels sharing only when the library itself is modified and distributed. A developer's closed model stays closed. A bank's codebase stays closed. The commons stays unenclosed, and the landlord keeps the deed; we chose that on purpose, for maximum reuse and minimum enclosure, without pretending it is a legal revolution on its own.
+
+** V. The Right to the Void: Computation in Service of the Analogue
+
+We program for the physical world, to free it from corporate gridlock. We extend a hand to the technophobic vanguard: the carpenter, the bricklayer, the typologist, the phenomenologist who rightly fear digital sterility.
+
+The destination of a headless protocol is the /banishment of the screen from the building site/. Let code compute compliance in the darkness of the server so the artisan can shape material in the full light of day. The code builds a guerrilla canopy, and physical craft shelters beneath it from speculative real estate.
+
+** VI. Discourse as Compiler: Natural Language as Headless Interface
+
+We refuse to trap human intent in rigid syntax. A missing comma should not paralyze a community's imagination. Natural language is the ultimate frictionless headless interface.
+
+LLMs act as interpretive translators between poetics and precision: the architect, the organizer, the citizen speak discourse; the AI drafts programmatic commands; =ifckit= encodes the open data underneath. The machine is returned to its place, a silent, universal compiler of human speech. Creation stays upstream. Status today (verifiable in the Appendix): a prototype path in =plankit= with the LLM in the loop; the finished universal compiler does not yet exist.
+
+** VII. The Modular Compiler Stack: From Discourse to Infrastructure
+
+We refuse to replace one monolith with another. The pipeline is a sovereign, lightweight stack:
+
+1. =plankit= (The Intent): plan-as-graph. PvE to half-edge/DCEL skeleton, IFC-free. LLM proposes moves, deterministic validators dispose.
+2. =geometrykit= (The Math): OCC-free NURBS substrate. Value types, evaluation, energy-minimizing patch fills, plane-sections, STEP/OBJ/STL writers. Rust accelerator where wheels exist, pure-Python/numpy mirror otherwise.
+3. =ifckit= (The Protocol): framework-agnostic IFC4 / IFC4X3 authoring. JSON/CLI/Python/Grasshopper entries, no CAD host required to author — ifcopenshell required at runtime to serialize.
+
+* The Accusation of the Innkeepers: In Praise of Don Quixote
+
+The pragmatists, the BIM managers, and the developers will call this a delusion. A standalone library charging at the windmills of Autodesk, BlackRock, and the risk-management state. Impractical. Amateur.
+
+Let the innkeepers talk. Their "practicality" produced sterilized cities, ecological devastation, and the economic eviction of the designer. Their realism is a suicide pact.
+
+To operate as Don Quixote in the age of automation is the only sane choice left. We build code to /render the existing market obsolete/. Nothing here asks to serve it. =ifckit= is a manual tool built for human intent, forged with an edge sharp enough to split a monopoly open.
+
+* The Call to Action
+
+Architects, software engineers, computational artisans, and spatial hackers:
+
+- Fork the repositories.
+- Automate the bureaucracy.
+- Open-source the models.
+- Enforce the copyleft.
+
+Drop the bricks. Drop the mouse. /Write the script, run the script./
+
+#+BEGIN_SRC bash
+python -m ifckit model.json output.ifc
+#+END_SRC
+
+**The space belongs to the commons. The code belongs to the field.**
+
+* Appendix: State of the Code (Verified 2026-10-18)
+
+Intent versus reality. No vapor.
+
+| Repo | Intent in Manifesto | Verified State |
+|------+---------------------+----------------|
+| =ifckit= (master, ~347 commits, 2 stars, Python ~1.6M loc incl. tests/docs, LGPL-3.0) | Headless IFC authoring, no CAD host, JSON/CLI/Grasshopper, "pure Python" | True except "pure": since v0.4.0 (2026-10-16) =ifcopenshell= is a hard install dependency (import-time, not extra). IFC serialization still rides native code. Scope is bounded: PendingWall/Slab/Column/Beam/Space (IFC4), Alignment/Beam/Bridge parts (IFC4X3), profiles incl. I/L + polygon. Suite cited in-tree as 1853 passed. No forks, no releases page activity beyond tags. Headless-authorship claim holds; dependency-free claim does not. |
+| =geometrykit= (master, ~99 commits since 2026-10-13, 0 stars, Python ~1.0M + Rust ~87k, LGPL-3.0) | "Purge heavy native C++ kernels, lightweight pure Python math" | Partially true, honestly hybrid: Rust core (=geometrykit-core= on crates.io) + Python/numpy mirror. Wheels =cp39-abi3= carry =geometrykit._rust= where built; =GEOMETRYKIT_ENGINE=npu= forces the mirror. OCC-free is true; native-free is false. Provides NURBS eval, energy patch fills, sections, STEP/OBJ/STL. Explicitly out of scope: B-rep booleans, IFC (lives in =ifckit=). Suite cited as 721/721. |
+| =plankit= (main, 32 commits, 0 stars, Python ~206k + TS demo, LGPL-3.0) | Declarative DECL, discourse-to-plan, frictionless natural-language interface | Early-stage, IFC-free by design. PvE -> skeleton with mechanical revise loop (move/swap/move_toward + select_best). In-tree reports: ~175 tests green, toy 1->0 violated, stress 9->9 — single moves do not bridge clusters; LLM role defined as composite moves, not yet demonstrated end-to-end. Frontend is demo-only (vanilla TS+SCSS, not shipped with library). "Discourse as compiler" is roadmap + harness, not product. |
+
+Consequences for principles II, VI, and VII above: the €35-machine / solar-server line is an aspiration constrained by =ifcopenshell= (ifckit) and Rust wheels (geometrykit); the stack is lightweight relative to Revit or Rhino while still dependent. The copyleft line is LGPL rather than GPL, reuse-friendly, enclosure-resistant, and short of expropriation. The discourse-compiler line is the active frontier in =plankit=, with deterministic validation doing the real work today.
+
+* Sources: What Each Preamble Claim Rests On
+
+Manifesto sentences are polemics. Below is what supports them, and where the text extends beyond the source.
+
+** 1. "Liability-bureaucrats" / retreat from the Master Builder
+- Jeremy Till, Architecture Depends (MIT Press, 2009): architecture depends on people/time/politics/ethics, autonomy is a myth; contingency denied via order/beauty. [[https://mitpress.mit.edu/9780262012539/architecture-depends][MIT Press]] / [[http://www.jeremytill.net/architecture-depends][till archive]] / contingency paper [[https://jeremytill.s3.amazonaws.com/uploads/post/attachment/33/arch_and_contingency.pdf][Architecture and Contingency PDF]]
+- Patrick MacLeamy, Effort/MacLeamy Curve (2004/2005): shift effort early, IPD; 50 years HOK, founder/chair buildingSMART, 2D-CAD to BIM. [[https://macleamy.com/about-patrick][macleamy.com]] / [[https://en.wikipedia.org/wiki/Patrick_MacLeamy][Wikipedia]] / [[https://www.buildingsmart.org/patrick-macleamy][buildingSMART]] / critique of curve origins [[https://www.danieldavis.com/macleamy][Davis]]
+- AIA risk-management regime as the administrative cell: [[https://www.aia.org/sites/default/files/2025-12/AIA_BestPractices_Riskmanagementbasics.pdf][AIA Risk management basics PDF]]. Claim "voluntarily retreated" is interpretation; sources document the incentive structure, not motive.
+
+** 2. "Centralized Viewport", the four charges
+- /Charge 1: ransom on your own production./ Subscription-only terms and per-seat cost: [[https://www.autodesk.com/products/revit/buy][Autodesk buy]] / [[https://www.autodesk.com/solutions/revit-subscription-faq][subscription FAQ]] (~$3,005/yr single user; perpetual licenses retired). Switching off the subscription leaves existing .rvt files dependent on license status for full read-write use; the vendor documents license-linked behavior, and file destruction goes unclaimed. "Your output becomes unreadable" is polemic over that dependency.
+- /Charge 2: read-edit captivity through non-extendable proprietary software./ Closed format and family lock-in: [[https://www.a16z.news/p/every-building-youve-ever-been-in][a16z 2026-03-30: ~$3B ARR, >95% share, families don't export]]. "Unpaid R&D" is polemic; the source supports lock-in mechanics, and supports no labor claim. Revit's API exists; "cannot be meaningfully extended" refers to extension being confined to the vendor's own closed stack (polemic, not literal).
+- /Charge 3: codified ritual, agency as GUI path-following./ The workflow itself (model east of the link, sync, reconcile in Excel) is dictated by the tool: same a16z piece. MacLeamy's Effort Curve institutionalizes "front-load effort into the tool": [[https://macleamy.com/about-patrick][macleamy.com]]. GUI-as-workflow is also the accepted reading in the BIM-criticism literature the author assembled in the review files.
+- /Charge 4: conscripted R&D, telemetry as development input./ Autodesk's own documents: Analytics Programs collect "product session and commands" plus /design metadata/ (file path, name, format, size, dimensional units, object and layer metrics), explicitly used to "plan for new features," "conduct research to analyze how our users interact," "develop new offerings," and "make business decisions": [[https://www.autodesk.com/company/autodesk-analytics][Autodesk analytics programs]]. Privacy Statement: "develop and improve our current and future offerings … automated systems that analyze data using machine learning": [[https://www.autodesk.com/company/legal-notices-trademarks/privacy-statement][Autodesk Privacy Statement]]. Special Terms: "Autodesk may also perform certain data analytics or other analysis on /Your Content/, use the resulting data and insights for our internal purposes, and disclose insights derived from Your Content on an aggregate and anonymous basis to third parties or publicly": [[https://www.autodesk.com/company/terms-of-use/en/special-terms][Autodesk Special Terms]]. Caveat for precision: analytics participation is opt-out (profile.autodesk.com → Product Privacy, or in-product Desktop Analytics settings), telemetry claims aggregate/anonymization, and "R&D worker" remains polemic. The sourced fact stands: paying users supply command-behavior and content-derived inputs that Autodesk's own terms direct into product planning and ML. Combine with charge 2 for the full "R&D worker" reading: unpaid /rival/ (you compete on features you can't ship) while paying /input-supplier/ (data exhaust).
+
+** 3. "Space as closed asset class"
+- R-REITs as "just another asset class" (Van Loon & Aalbers lineage): [[https://www.tandfonline.com/doi/full/10.1080/02723638.2024.2337570][T&F 2024]] / [[https://www.researchgate.net/publication/393787133_Housing_Precarity_and_the_Financialization_of_Renting][financialization of renting ch.]].
+- Corrective: BlackRock denies buying single-family homes directly: [[https://www.blackrock.com/corporate/newsroom/setting-the-record-straight/buying-houses-facts][BlackRock statement]]. Manifesto names BlackRock as metonym for asset-class logic; do not cite as single-family buyer without this caveat.
+
+** 4. "AI strips the bureaucrat's desk job" / junior crisis
+- RIBA AI survey 2026: 74% using AI, 59% expect job losses, 61% say AI takes opportunities from young architects: [[https://www.architectsjournal.co.uk/news/architects-fear-ai-will-cost-jobs-and-harm-professions-next-generation-riba-finds][AJ/RIBA 2026-07-23]].
+- AIA hiring flux + AI anxiety: [[https://www.aia.org/aia-architect/article/next-generation-architects-entering-profession-flux][AIA 2026-09-28]] / [[https://www.snaptrude.com/blog/junior-staff-ai-anxiety-is-a-leadership-communication-problem-not-a-tool-problem][Snaptrude/AIA 2025 adoption]].
+- Task compression not replacement, missing middle: [[https://archademia.com/blog/will-ai-replace-architects-what-the-data-actually-shows-about-job-displacement-by-2030][Archademia]] / [[https://aecmag.com/ai/architecture-the-missing-ai-middle][AEC Magazine]]. "Ready to discard the designer" is extrapolation; sources support compression of entry-level production work.
+
+** 5. "Wheat-Culture" vs "Rice" metaphor
+- Talhelm et al., Science 2014: rice south more interdependent/holistic than wheat north: [[https://www.science.org/doi/10.1126/science.1246850][Science 344:603-608]].
+- Quasi-random assignment, single-generation formation: [[https://pmc.ncbi.nlm.nih.gov/articles/PMC10899190][Nat Commun 2024]] / [[https://pubmed.ncbi.nlm.nih.gov/38413584][PubMed]].
+- Limit: papers test collectivism/cognition, not "extractive profit-maximization". Manifesto's Wheat=corporate extraction / Rice=commons interdependence is a deliberate political reuse, not a finding.
+
+** 6. "Biographical defaults" (curator / journalist / negotiator): interpretation, guarded as such
+- Koolhaas — sourced facts: journalist Haagse Post 1963-1967; screenwriting incl. The White Slave (1969 co-write), unproduced Russ Meyer script; AA London from 1968. Sources: [[https://books.open.tudelft.nl/home/catalog/book/136][Cantero, Rem Before Koolhaas, TU Delft OPEN]] / [[https://www.pritzkerprize.com/biography-rem-koolhaas][Pritzker bio]] / [[https://www.pritzkerprize.com/sites/default/files/file_fields/field_files_inline/2000_bio.pdf][Pritzker 2000 PDF]] / [[https://en.wikipedia.org/wiki/Rem_Koolhaas][Wikipedia w/ refs]] / GSD role [[https://www.gsd.harvard.edu/event/rem-koolhaas][GSD bio]]. Published theses used here: Generic City (1995) [[https://monoskop.org/images/7/78/Koolhaas_Rem_1995_The_Generic_City.pdf][PDF]] / Junkspace (2001/2002) [[https://www.oma.com/publications/junkspace-with-running-room-][OMA]].
+- Till — sourced facts: architect (SWA, 9 Stock Orchard Street); educator/bureaucrat roles Head CSM + Pro-Vice-Chancellor UAL 2012-2022, Dean Westminster 2008-2012, Head Sheffield 1999-2008, now Emeritus + MOULD; author Architecture Depends (MIT 2009), Spatial Agency (2011), Flexible Housing (2007), all RIBA President's Award research. Sources: [[http://www.jeremytill.net/about][jeremytill.net/about]] / [[https://www.arts.ac.uk/colleges/central-saint-martins/people/jeremy-till][UAL CSM profile]] / [[https://en.wikipedia.org/wiki/Jeremy_Till][Wikipedia]] / [[https://mitpress.mit.edu/9780262012539/architecture-depends][MIT Press]]. Self-label "recovering architect" is Till's own.
+- What is NOT sourced: that either man "fled", "panicked", or advocates his "default" from self-interest. That mapping is the author's deconstruction (see 261018-king-is-dead-positions.org, flagged there as hypothesis with invented caricature-quotes that must never be cited as utterances). Any reuse must keep the label "author's reading".
+
+** 7. Interregnum / Critical Zones / Smart-city failure / Vrachliotis
+- Gramsci, Prison Notebooks, Notebook 3 (1930), "old is dying and new cannot be born … morbid symptoms": [[https://www.loc.gov/item/71168985/][LoC catalogue]] / analysis [[https://academic.oup.com/ia/article/96/3/767/5712430][Int. Affairs 2020]] / [[https://brill.com/view/journals/powr/1/2/article-p379_379.xml][Achcar 2022]].
+- Vrachliotis, Reclaiming Design Sovereignty (LAVA Lab): lone-wolf fading, curator/judgment, digital twin, permanent beta: [[https://l-a-v-a.com/articles/reclaiming-design-sovereignty][LAVA essay]].
+- Latour & Weibel, Critical Zones: Science and Politics of Landing on Earth (MIT Press/ZKM 2020): [[https://mitpress.mit.edu/9780262044455/critical-zones][MIT Press]] / [[https://zkm.de/en/publications/critical-zones][ZKM]] / [[https://www.bruno-latour.fr/node/838.html][latour.fr]].
+- Sidewalk Labs Toronto Quayside (2017-2020) collapse, privacy/surveillance opposition: [[https://www.cbc.ca/news/canada/toronto/sidewalk-labs-cancels-project-1.5559370][CBC 2020-05-07]] / [[https://www.politico.com/news/2020/05/07/sidewalk-labs-toronto-quayside-243877][Politico]] / [[https://ccla.org/privacy/surveillance-technology/smart-cities/statement-on-the-reset-of-the-quayside-project][CCLA]].
+
+** 8. Copyleft shield and its limits (Principle IV)
+- LGPL-3.0 text: additional permissions over GPL-3.0, Combined Work / shared-library mechanism: [[https://www.gnu.org/licenses/lgpl-3.0.en.html][FSF]] / summary [[https://choosealicense.com/licenses/lgpl-3.0][choosealicense]]. Supports the Appendix correction: no "infection" of proprietary code via mere use; share-alike triggers on the library itself.
