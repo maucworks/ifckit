@@ -1,12 +1,15 @@
 # ifckit
 
-Framework-agnostic IFC builder library for architecture and infrastructure.
+ifckit is a framework-agnostic IFC builder library for architecture and
+infrastructure. The intent behind this code is written down in the repo, one
+division up: [MANIFESTO.org](MANIFESTO.org) — the tooling half of the Headless
+Manifesto. Space belongs to the commons, code belongs to the field.
 
 ![Tests](https://github.com/maucworks/ifckit/actions/workflows/tests.yml/badge.svg)
 ![PyPI](https://img.shields.io/pypi/v/ifckit)
 [![Docs](https://img.shields.io/badge/docs-pdoc-blue)](https://maucworks.github.io/ifckit/)
 
-Build valid IFC files in pure Python — no CAD host required.
+Build valid IFC files in Python — no CAD host required.
 Works standalone, from Grasshopper, or via the JSON/CLI interface.
 
 Files created can be viewed in its companion [IfcViewer](https://github.com/maucworks/web-ifc-viewer)
@@ -29,11 +32,12 @@ Files created can be viewed in its companion [IfcViewer](https://github.com/mauc
 ## Install
 
 ```bash
-pip install ifckit[ifc]    # with ifcopenshell (full functionality)
-pip install ifckit         # without ifcopenshell (JSON/schema tools only)
+pip install ifckit    # brings geometrykit and ifcopenshell as core dependencies
 ```
 
-Requires Python 3.9+ (Rhino 8 ships CPython 3.9; needs `ifcopenshell==0.8.4.post1`, see below).
+Every `ifckit` release carries both: `geometrykit` (value types and NURBS)
+and `ifcopenshell` (IFC writer, required at import time since v0.4.0).
+Requires Python 3.9+.
 
 ## Quick start: building
 
@@ -53,7 +57,7 @@ floor.add(wall)
 model.save("project.ifc")
 ```
 
-See `examples/quickstart.py` and `examples/simple_building.py` for fuller examples.
+See `examples/build_hello_wall.py` for a fuller worked version of this wall flow.
 
 ## Quick start: bridge
 
@@ -70,7 +74,8 @@ deck.add(beam)
 model.save("bridge.ifc")
 ```
 
-See `examples/quickstart_bridge.py` and `examples/simple_bridge.py` for fuller examples including alignments.
+The bridge flow is exercised end to end in `tests/builders/test_bridge_builder.py`
+and `tests/test_model.py`.
 
 ## Supported schemas and element types
 
@@ -83,22 +88,25 @@ See `examples/quickstart_bridge.py` and `examples/simple_bridge.py` for fuller e
 | Space | `PendingSpace` | ✓ | |
 | Alignment | `PendingAlignment` | | ✓ |
 
-Profiles: `IBeamProfile`, `LBeamProfile`, `SteelProfile`, and arbitrary polygon profiles.
+Profiles: `IBeamProfile`, `LBeamProfile` (top-level), `SteelProfile` (import from
+`ifckit.profiles`), and arbitrary polygon profiles.
 
 ## JSON build
 
 Build an IFC file from a JSON description — useful for CLI pipelines and REST APIs:
 
 ```python
-from ifckit.json_build import build
+import json
+from ifckit.json_build import build, build_from_json
 
-build("model.json", "output.ifc")
+build(json.load(open("model.json")), "output.ifc")     # dict in
+build_from_json(open("model.json").read(), "output.ifc")  # or JSON string
 ```
 
-Or from the command line:
+Or from the command line (note the `build` subcommand and `-o` flag):
 
 ```bash
-python -m ifckit model.json output.ifc
+python -m ifckit build model.json -o output.ifc
 ```
 
 The JSON schema mirrors the Python API. See `examples/example_building.json` for a full example.
