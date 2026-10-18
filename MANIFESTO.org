@@ -96,7 +96,7 @@ Architects, software engineers, computational artisans, and spatial hackers:
 - Open-source the models.
 - Enforce the copyleft.
 
-Drop the bricks. Drop the mouse. /Write the script, run the script./
+/Write the script, run the script./
 
 #+BEGIN_SRC bash
 python -m ifckit model.json output.ifc
