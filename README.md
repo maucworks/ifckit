@@ -9,6 +9,10 @@ Manifesto. Space belongs to the commons, code belongs to the field.
 ![PyPI](https://img.shields.io/pypi/v/ifckit)
 [![Docs](https://img.shields.io/badge/docs-pdoc-blue)](https://maucworks.github.io/ifckit/)
 
+API reference: **[maucworks.github.io/ifckit](https://maucworks.github.io/ifckit/)**
+(pdoc, generated from the docstrings); sibling geometry library:
+**[maucworks.github.io/geometrykit](https://maucworks.github.io/geometrykit/)**
+
 Build valid IFC files in Python — no CAD host required.
 Works standalone, from Grasshopper, or via the JSON/CLI interface.
 
