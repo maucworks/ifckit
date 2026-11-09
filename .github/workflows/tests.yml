@@ -8,7 +8,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # setup-python no longer ships 3.9 images for ubuntu-26, so the matrix
+    # stays on 24.04 to keep proving the Rhino 8 floor.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
