@@ -25,7 +25,7 @@ def check_filename(path: str) -> list[str]:
     Validate a file name against BIM Basis tile 3.1.
 
     Returns error messages, empty when valid.
-    Valid examples: "PRJ-ARC-01.ifc", "196-ifckit-admin_ARC_SO.ifc".
+    Valid examples: "PRJ-ARC-01.ifc", "PROJ-123_ARC_SO.ifc".
     Invalid examples: "model.ifc" (no structure), "my model.ifc" (space),
     "model.pdf" (no .ifc).
     """

@@ -272,7 +272,6 @@ The placement chain handles it automatically. Storey elevation is encoded in sto
 ---
 
 ## Related Documentation
-- Full analysis: moved to the admin repo (`../..` checkout): `research/COORDINATE_SYSTEM_ANALYSIS.md`
 - Architecture overview: `ARCHITECTURE.md`
 - Contribution guidelines: `AGENTS.md`
 - See docstrings in `/ifckit/builders/_geom.py` and `/ifckit/geometry/primitives.py`

@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-# Reference IFCs live in the meta repo (196-ifckit-admin/specs/minibim), not
-# in this lib. Candidate locations: repo-root/specs, ../specs, $IFCKIT_SPEC_DIR.
+# Reference IFCs are spec-source material, not committed to this lib.
+# Candidate locations: repo-root/specs, ../specs, $IFCKIT_SPEC_DIR.
 import os
 import pathlib
 
@@ -38,7 +38,7 @@ def _all_ifcs() -> list:
 
 pytestmark = pytest.mark.skipif(
     _REF is None,
-    reason="specs/minibim not found (lives in 196-ifckit-admin; set IFCKIT_SPEC_DIR)",
+    reason="specs/minibim not found; set IFCKIT_SPEC_DIR",
 )
 
 
