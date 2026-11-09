@@ -40,8 +40,8 @@ pip install ifckit    # brings geometrykit and ifcopenshell as core dependencies
 ```
 
 Every `ifckit` release carries both: `geometrykit` (value types and NURBS)
-and `ifcopenshell` (IFC writer, required at import time since v0.4.0).
-Requires Python 3.9+.
+and `ifcopenshell` (IFC writer — imported unconditionally by the builder
+core; a hard install dependency). Requires Python 3.9+.
 
 ## Quick start: building
 
