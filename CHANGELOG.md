@@ -3,6 +3,51 @@
 All notable changes to this project will be documented in this file.
 Format: [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`
 
+## [0.5.0]
+
+### Changed — hard ifcopenshell dependency
+
+- `feat(deps)!`: `pip install ifckit` now brings `ifcopenshell` as a core
+  install dependency (same proven pin: `>=0.8.4.post1,<=0.9.0`). The
+  builder core imports ifcopenshell unconditionally, so the previous
+  "without ifcopenshell (JSON/schema tools only)" install was a broken
+  promise; the `[ifc]` extra remains as a compatibility alias for the
+  same pin.
+
+### Changed — geometrykit 0.6.1 adoption
+
+- `deps(geometry)`: proven band `>=0.6.0,<0.6.2`; upper bound moved only
+  after the new version proved green over the full suite. geometrykit
+  0.6.1 fixes the `Path.plane` frame (z-axis carries the path normal
+  where 0.6.0 stood the plane edge-on) and the line-path `Path.normal`;
+  the mirrored `TestPathPlane` expectation aligns with upstream and the
+  frame-dependent downstream suites (tapered extrusion, frames,
+  rhinokit) re-verified green.
+
+### Added — Rhino path assembly and repo-boundary enforcement
+
+- `feat(rhinokit)`: explode-free Rhino → Path assembly. `polyline_to_path`
+  handles point sequences, `TryGetPolyline` curves, and PolyCurve/
+  PolylineCurve segment walks (`SegmentCount`/`SegmentCurve`, no
+  `Explode()` reliance); closed inputs drop the duplicate end point.
+  `curves_to_path` routes polyline curves fast and classifies segments
+  through one shared appender.
+- `chore(release)`: repo-boundary enforcement — `tools/check_boundary.py`
+  scans tracked content and pending commit messages for check-out/plan
+  vocabulary; `tests/test_repo_boundary.py` runs it in the default
+  suite; check-out mentions were removed from tracked content.
+
+### Fixed — reload order
+
+- `fix(reload)`: `ifckit.profiles.derived` and `ifckit.profiles.sections`
+  join `_RELOAD_ORDER`. Concrete profile modules missing from the order
+  silently dropped out of `RegisterProfileType._registry` after a
+  Grasshopper live-reload, failing `dispatch_from_dict` ("Unknown
+  profile_type 'derived'"). Coverage: the order must list every concrete
+  profile module (discovered structurally) and dispatch must survive
+  `reload_all()` — checked in a child process, since `reload_all()`
+  re-executes ifckit modules and rebinds enum/class identities.
+
 ## [0.4.0]
 
 ### Changed — geometry ownership move
