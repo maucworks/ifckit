@@ -179,6 +179,122 @@ def curve_to_segments(crv: Any) -> List[Any]:
     return [crv]
 
 
+def _append_segment(p: Path, s: Any) -> None:
+    """Append one Rhino segment (line / arc / NURBS) to Path *p*."""
+    if hasattr(s, "Radius") and getattr(s, "Radius", 0) > 0:
+        arc = arc_to_arc(s)
+        p.add_arc(arc.center, arc.normal, arc.start, arc.angle)
+    elif _is_rhino_nurbs(s):
+        curve = rhino_nurbs_to_curve(s)
+        biarc_path = curve.to_biarcs()
+        p._segments.extend(biarc_path._segments)
+    else:
+        line = line_to_line(s)
+        p.add_line(line.start, line.end)
+
+
+def _polycurve_segments(crv: Any) -> Optional[List[Any]]:
+    """Segments of a PolyCurve/PolylineCurve via SegmentCount/SegmentCurve.
+
+    Explode-free: some bindings do not split polylines on Explode.
+    Returns None when the binding lacks that API (caller falls back).
+    """
+    try:
+        count = crv.SegmentCount
+    except AttributeError:
+        return None
+    try:
+        count = count() if callable(count) else int(count)
+    except Exception:
+        return None
+    try:
+        return [crv.SegmentCurve(i) for i in range(count)]
+    except Exception:
+        return None
+
+
+def _points_to_path(pts: Any) -> Path:
+    """Point sequence → Path of line segments (exact closing dup dropped)."""
+    vecs = [pt_to_vec(p) for p in pts]
+    if len(vecs) > 1:
+        first, last = vecs[0], vecs[-1]
+        if (
+            abs(first.x - last.x) < 1e-9
+            and abs(first.y - last.y) < 1e-9
+            and abs(first.z - last.z) < 1e-9
+        ):
+            vecs = vecs[:-1]
+    p = Path()
+    for a, b in zip(vecs, vecs[1:]):
+        p.add_line(a, b)
+    return p
+
+
+def _try_get_polyline_points(crv: Any) -> Optional[List[Any]]:
+    """Point list via TryGetPolyline; None when unavailable / not a polyline."""
+    fn = getattr(crv, "TryGetPolyline", None)
+    if fn is None:
+        return None
+    try:
+        res = fn()
+    except Exception:
+        return None
+    try:
+        pts = list(res[1]) if res[0] else []
+    except Exception:
+        return None
+    if not pts:
+        return None
+    return pts
+
+
+def polyline_to_path(obj: Any) -> Path:
+    """Convert polyline-ish input to an ifckit Path.
+
+    Accepts (checked in this order):
+    - a list/tuple of Rhino Point3d (point sequence → line segments),
+    - any curve reporting itself as a polyline via TryGetPolyline
+      (point sequence → line segments; no Explode() relied on),
+    - a Rhino PolyCurve/PolylineCurve, walked segment-wise via
+      SegmentCount/SegmentCurve so mixed line + arc spans work and no
+      Explode() behaviour is relied on,
+    - a Rhino Polyline struct or any other point iterable,
+    - any other curve or curve list (delegates to curves_to_path).
+
+    Closed inputs (first point ≈ last point) drop the duplicate end
+    point; a single point yields an empty Path.
+
+    Args:
+        obj: PolylineCurve, PolyCurve, Polyline, point list, or curve.
+
+    Returns:
+        ifckit Path with Line/Arc segments in input order.
+    """
+    if obj is None:
+        return Path()
+    if isinstance(obj, (list, tuple)) and obj and hasattr(obj[0], "X"):
+        return _points_to_path(obj)
+    pts = _try_get_polyline_points(obj)
+    if pts is not None:
+        return _points_to_path(pts)
+    segs = _polycurve_segments(obj)
+    if segs is not None:
+        p = Path()
+        for s in segs:
+            if s is None:
+                continue
+            _append_segment(p, s)
+        return p
+    if hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes)):
+        try:
+            pts = list(obj)
+        except Exception:
+            pts = []
+        if pts and hasattr(pts[0], "X"):
+            return _points_to_path(pts)
+    return curves_to_path(obj)
+
+
 def curves_to_path(curves: Any) -> Path:
     """Convert a Rhino curve or iterable of Rhino curves into an ifckit Path.
 
@@ -196,24 +312,21 @@ def curves_to_path(curves: Any) -> Path:
         if crv is None:
             continue
 
+        pts = _try_get_polyline_points(crv)
+        if pts is not None:
+            p._segments.extend(_points_to_path(pts).segments)
+            continue
+
         if _is_rhino_nurbs(crv):
             curve = rhino_nurbs_to_curve(crv)
             biarc_path = curve.to_biarcs()
             p._segments.extend(biarc_path._segments)
             continue
 
-        segs = curve_to_segments(crv)
-        for s in segs:
-            if hasattr(s, "Radius") and getattr(s, "Radius", 0) > 0:
-                arc = arc_to_arc(s)
-                p.add_arc(arc.center, arc.normal, arc.start, arc.angle)
-            elif _is_rhino_nurbs(s):
-                curve = rhino_nurbs_to_curve(s)
-                biarc_path = curve.to_biarcs()
-                p._segments.extend(biarc_path._segments)
-            else:
-                line = line_to_line(s)
-                p.add_line(line.start, line.end)
+        for s in curve_to_segments(crv):
+            if s is None:
+                continue
+            _append_segment(p, s)
 
     return p
 
