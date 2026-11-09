@@ -631,6 +631,148 @@ class TestSurfaceToRhino:
 
 
 # ===================================================================
+# polyline_to_path
+# ===================================================================
+
+
+class _FakeLineSeg:
+    """LineCurve-like: property-style endpoints, no Explode, no Radius."""
+
+    def __init__(self, a, b):
+        self._a = _Point(*a)
+        self._b = _Point(*b)
+
+    @property
+    def PointAtStart(self):
+        return self._a
+
+    @property
+    def PointAtEnd(self):
+        return self._b
+
+
+class _FakeArc:
+    """Arc-like: Center / StartPoint / EndPoint / Angle / Plane.Normal."""
+
+    def __init__(self, center, start, angle, normal):
+        self.Center = _Point(*center)
+        self.StartPoint = _Point(*start)
+        self.EndPoint = _Point(*start)
+        self.Angle = angle
+        self.Plane = mock.MagicMock(Normal=_Point(*normal))
+
+
+class _FakeArcSeg:
+    """ArcCurve-like: Radius > 0 and an .Arc property."""
+
+    Radius = 5.0
+
+    def __init__(self, center, start, angle, normal):
+        self.Arc = _FakeArc(center, start, angle, normal)
+
+
+class _FakePolyCurve:
+    """PolyCurve-like with SegmentCount/SegmentCurve and NO Explode."""
+
+    def __init__(self, segs):
+        self._segs = list(segs)
+
+    @property
+    def SegmentCount(self):
+        return len(self._segs)
+
+    def SegmentCurve(self, i):
+        return self._segs[i]
+
+    def Explode(self):
+        raise AssertionError("polyline_to_path must not rely on Explode")
+
+
+class _FakePolyline:
+    """Raw Polyline struct-like: iterable of points, no SegmentCount."""
+
+    def __init__(self, pts):
+        self._pts = [_Point(*p) for p in pts]
+
+    def __iter__(self):
+        return iter(self._pts)
+
+
+class TestPolylineToPath:
+    def test_none_returns_empty_path(self):
+        p = rk.polyline_to_path(None)
+        assert isinstance(p, Path)
+        assert len(p.segments) == 0
+
+    def test_trygetpolyline_beats_segment_walk(self):
+        """TryGetPolyline points win over SegmentCount/SegmentCurve."""
+
+        class _PolyWithBoth:
+            def TryGetPolyline(self):
+                return (True, [_Point(0, 0, 0), _Point(9, 0, 0)])
+
+            @property
+            def SegmentCount(self):
+                return 1
+
+            def SegmentCurve(self, i):
+                return _FakeLineSeg((0, 0, 0), (1, 1, 1))
+
+        p = rk.polyline_to_path(_PolyWithBoth())
+        assert len(p.segments) == 1
+        assert (p.segments[0].start.x, p.segments[0].end.x) == (0.0, 9.0)
+
+    def test_trygetpolyline_false_falls_through(self):
+        """TryGetPolyline False -> SegmentCount/SegmentCurve still used."""
+
+        class _PolyFalse:
+            def TryGetPolyline(self):
+                return (False, [])
+
+            @property
+            def SegmentCount(self):
+                return 1
+
+            def SegmentCurve(self, i):
+                return _FakeLineSeg((0, 0, 0), (4, 0, 0))
+
+        p = rk.polyline_to_path(_PolyFalse())
+        assert len(p.segments) == 1
+        assert isinstance(p.segments[0], Line)
+
+    def test_point_list_builds_lines(self):
+        pts = [_Point(0, 0, 0), _Point(2, 0, 0), _Point(2, 3, 0)]
+        p = rk.polyline_to_path(pts)
+        assert len(p.segments) == 2
+        assert all(isinstance(s, Line) for s in p.segments)
+        assert (p.segments[0].start.x, p.segments[0].end.x) == (0.0, 2.0)
+        assert (p.segments[1].start.y, p.segments[1].end.y) == (0.0, 3.0)
+
+    def test_point_list_drops_closing_duplicate(self):
+        pts = [_Point(0, 0, 0), _Point(2, 0, 0), _Point(2, 2, 0), _Point(0, 0, 0)]
+        p = rk.polyline_to_path(pts)
+        assert len(p.segments) == 2
+
+    def test_polycurve_mixed_line_arc_no_explode(self):
+        arc = _FakeArcSeg((0, 0, 0), (5, 0, 0), 1.57079632679, (0, 0, 1))
+        poly = _FakePolyCurve([_FakeLineSeg((0, 0, 0), (5, 0, 0)), arc])
+        p = rk.polyline_to_path(poly)
+        assert len(p.segments) == 2
+        assert isinstance(p.segments[0], Line)
+        assert isinstance(p.segments[1], Arc)
+
+    def test_raw_polyline_struct(self):
+        p = rk.polyline_to_path(_FakePolyline([(0, 0, 0), (1, 0, 0), (1, 1, 0)]))
+        assert len(p.segments) == 2
+        assert all(isinstance(s, Line) for s in p.segments)
+
+    def test_single_curve_delegates(self):
+        p = rk.polyline_to_path(_FakeLineSeg((0, 0, 0), (4, 0, 0)))
+        assert len(p.segments) == 1
+        assert isinstance(p.segments[0], Line)
+
+
+# ===================================================================
 # curves_to_path — NURBS detection
 # ===================================================================
 
@@ -640,6 +782,21 @@ class TestCurvesToPath:
         p = rk.curves_to_path(None)
         assert isinstance(p, Path)
         assert len(p.segments) == 0
+
+    def test_polyline_never_touches_explode(self):
+        """A polyline-curve input converts via points, not Explode."""
+
+        class _ExplodingPolyline:
+            def TryGetPolyline(self):
+                return (True, [_Point(0, 0, 0), _Point(3, 0, 0), _Point(3, 4, 0)])
+
+            def Explode(self):
+                raise AssertionError("must not rely on Explode")
+
+        p = rk.curves_to_path(_ExplodingPolyline())
+        assert len(p.segments) == 2
+        assert all(isinstance(s, Line) for s in p.segments)
+        assert (p.segments[1].start.x, p.segments[1].end.y) == (3.0, 4.0)
 
     def test_rhino_nurbs_auto_biarc(self, monkeypatch):
         """A NurbsCurve input should be converted via biarc fitting."""
