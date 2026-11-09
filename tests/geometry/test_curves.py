@@ -588,7 +588,12 @@ class TestPathPlane:
         p = Path().add_arc(Vec(0, 0, 0), Vec(0, 0, 1), Vec(5, 0, 0), 0.5)
         plane = p.plane
         assert plane.origin.equals(Vec(5, 0, 0))
-        assert plane.y_axis.equals(Vec(0, 0, 1))
+        # The plane's z-axis carries the path normal; x/y lie flat in the
+        # path plane (an earlier release stood the plane edge-on by
+        # passing the normal as y_axis).
+        assert plane.z_axis.equals(Vec(0, 0, 1))
+        assert abs(plane.x_axis @ Vec(0, 0, 1)) < 1e-9
+        assert abs(plane.y_axis @ Vec(0, 0, 1)) < 1e-9
 
     def test_plane_lines(self):
         p = Path().add_line(Vec(0, 0, 0), Vec(10, 0, 0))
