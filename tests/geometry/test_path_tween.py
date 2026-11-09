@@ -54,7 +54,13 @@ def test_tween_holes_pairwise():
     (mid,) = Path.tween(h0, h1, 1)
     assert len(mid.holes) == 1
     hole_verts = [(v.x, v.y) for v in mid.holes[0].endpoints]
-    assert hole_verts == pytest.approx([(0, 0), (1.5, 0), (1.5, 1.5), (0, 1.5), (0, 0)])
+    # Pointwise compare: pytest.approx dropped nested-sequence support
+    # in 9.2, and a flat scalars check survived every release in band.
+    expected = [(0, 0), (1.5, 0), (1.5, 1.5), (0, 1.5), (0, 0)]
+    assert len(hole_verts) == len(expected)
+    for got, want in zip(hole_verts, expected):
+        assert got[0] == pytest.approx(want[0])
+        assert got[1] == pytest.approx(want[1])
     assert mid.holes[0].is_closed
 
 

@@ -79,7 +79,11 @@ def scan_pending_commits() -> list[str]:
     try:
         _git("rev-parse", "--verify", "origin/master")
     except subprocess.CalledProcessError:
-        revs = "@{u}" if _git("rev-parse", "--verify", "@{u}") else None
+        try:
+            _git("rev-parse", "--verify", "@{u}")
+        except subprocess.CalledProcessError:
+            return hits  # no upstream known (shallow/PR checkout): nothing pending
+        revs = "@{u}"
     log = _git("log", "--format=%s%n%b", f"{revs}..HEAD")
     sha = _git("log", "--format=%h", f"{revs}..HEAD").splitlines()
     for block in log.split("\n\n"):
