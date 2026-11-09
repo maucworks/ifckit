@@ -10,7 +10,7 @@ from ifckit.ils.common.rules.bim_basis import (
 
 def test_check_filename_valid():
     assert check_filename("PRJ-ARC-01.ifc") == []
-    assert check_filename("196-ifckit-admin_ARC_SO.ifc") == []
+    assert check_filename("PROJ-123_ARC_SO.ifc") == []
 
 
 def test_check_filename_space():

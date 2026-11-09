@@ -116,6 +116,22 @@ modules/classes/docs — is in **English**. Exceptions:
 - IFC property keys and pset identifiers (e.g. the MiniBIM pset names
   `EenheidNummer`, `BouwwerkNummer`) are schema names — never renamed.
 
+## Repo boundary (enforced)
+
+- This library is **unaware of its check-out location**. Never mention —
+  in code, docstrings, comments, docs, READMEs, commit messages, tests or
+  anywhere else — the environment this repo is cloned into: no plan file
+  paths or plan names, no working-checkout or layer-by-structure
+  vocabulary, none of the tokens listed in
+  `tools/check_boundary.py::BLOCKLIST` (the scanner is the authority;
+  AGENTS.md stays out of its scan so the rule text can state it).
+- Note on geometry ownership: the geometry primitives/kernels live in
+  `geometrykit`; this repo's `ifckit.geometry` is a facade plus the IFC
+  serialisation layer. Do not re-import kernels into this repo.
+- Enforcement: `python tools/check_boundary.py` — scans tracked content
+  and pending commit messages; runs as `tests/test_repo_boundary.py`
+  inside the default pytest suite.
+
 ## Testing
 
 - Pull requests with test coverage are **much more likely to be merged**.
