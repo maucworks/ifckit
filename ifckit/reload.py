@@ -39,6 +39,8 @@ _RELOAD_ORDER = [
     "ifckit.elements",
     "ifckit.elements.opening",
     "ifckit.profiles.base",
+    "ifckit.profiles.derived",
+    "ifckit.profiles.sections",
     "ifckit.profiles.shapes",
     "ifckit.profiles.i_beam",
     "ifckit.profiles.l_beam",
